@@ -12,9 +12,13 @@ let package = Package(
             name: "CollabDockCore",
             targets: ["CollabDockCore"]
         ),
+        .library(
+            name: "CollabDockApp",
+            targets: ["CollabDockApp"]
+        ),
         .executable(
             name: "CollabDock",
-            targets: ["CollabDockApp"]
+            targets: ["CollabDock"]
         )
     ],
     targets: [
@@ -22,10 +26,15 @@ let package = Package(
             name: "CollabDockCore",
             path: "Sources/CollabDockCore"
         ),
-        .executableTarget(
+        .target(
             name: "CollabDockApp",
             dependencies: ["CollabDockCore"],
             path: "Sources/CollabDockApp"
+        ),
+        .executableTarget(
+            name: "CollabDock",
+            dependencies: ["CollabDockApp"],
+            path: "Sources/CollabDock"
         ),
         .testTarget(
             name: "CollabDockCoreTests",

@@ -1,7 +1,7 @@
 import SwiftUI
 import CollabDockCore
 
-struct MenuBarContentView: View {
+public struct MenuBarContentView: View {
     @Bindable var coordinator: AppCoordinator
     @Environment(\.colorScheme) private var scheme
     @Environment(\.openSettings) private var openSettings
@@ -14,7 +14,7 @@ struct MenuBarContentView: View {
     @State private var isImportingPR: Bool = false
     @State private var importPRError: String?
 
-    init(
+    public init(
         coordinator: AppCoordinator,
         initialDetailItemID: String? = nil,
         initialShowStats: Bool = false,
@@ -31,7 +31,7 @@ struct MenuBarContentView: View {
         return coordinator.items.first(where: { $0.id == id && $0.status == .pendingConfirmation })
     }
 
-    var body: some View {
+    public var body: some View {
         ZStack {
             if let detailItem = activeDetailItem {
                 TaskDetailView(

@@ -4,12 +4,24 @@ import ServiceManagement
 import UserNotifications
 import CollabDockCore
 
+/// macOS 系统集成能力协议（通知、开机自启、接管会话与打开本地报告），用于 `AppCoordinator` 依赖注入与单测隔离
+@MainActor
+public protocol SystemIntegrating: AnyObject {
+    var onNotificationSelectedItem: ((String) -> Void)? { get set }
+    func configureNotificationsIfAvailable()
+    func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool)
+    func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool)
+    func setLaunchAtLogin(_ enabled: Bool) -> String?
+    func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?)
+    func openLocalReport(path: String)
+}
+
 /// macOS 原生系统集成服务：UNUserNotificationCenter 通知、SMAppService 开机自启、一键接管会话与打开本地报告（关联 REQ-004, REQ-010, TASK-010, TASK-015）
 @MainActor
-final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = SystemIntegrationService()
+public final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate, SystemIntegrating {
+    public static let shared = SystemIntegrationService()
 
-    var onNotificationSelectedItem: ((String) -> Void)?
+    public var onNotificationSelectedItem: ((String) -> Void)?
 
     private var isRunningInsideAppBundle: Bool {
         Bundle.main.bundleURL.pathExtension == "app" && Bundle.main.bundleIdentifier != nil
@@ -19,14 +31,14 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
         super.init()
     }
 
-    func configureNotificationsIfAvailable() {
+    public func configureNotificationsIfAvailable() {
         guard isRunningInsideAppBundle else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
-    func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool) {
+    public func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool) {
         guard enabled, isRunningInsideAppBundle else { return }
         let content = UNMutableNotificationContent()
         content.title = "\(item.platform.displayName) · \(item.triggerKind.badgeText)"
@@ -43,7 +55,7 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
         UNUserNotificationCenter.current().add(request)
     }
 
-    func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool) {
+    public func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool) {
         guard enabled, isRunningInsideAppBundle else { return }
         let content = UNMutableNotificationContent()
         content.title = "CollabDock · 草稿已就绪"
@@ -62,14 +74,14 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
 
     // MARK: - UNUserNotificationCenterDelegate
 
-    nonisolated func userNotificationCenter(
+    public nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
 
-    nonisolated func userNotificationCenter(
+    public nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
@@ -84,7 +96,7 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
 
     // MARK: - 开机自启（SMAppService）
 
-    func setLaunchAtLogin(_ enabled: Bool) -> String? {
+    public func setLaunchAtLogin(_ enabled: Bool) -> String? {
         guard isRunningInsideAppBundle else {
             return "开机自启需从打包后的 CollabDock.app 运行时生效"
         }
@@ -102,7 +114,7 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
 
     // MARK: - 一键接管原会话（Lody Deep Link / Terminal --resume）
 
-    func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {
+    public func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {
         let command: String
         if handle.engine == .lody {
             let lodyBackend = LodyBackend(config: LodyConfig(workspace: lodyWorkspace ?? ""))
@@ -139,7 +151,7 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
         NSWorkspace.shared.openApplication(at: terminalURL, configuration: NSWorkspace.OpenConfiguration())
     }
 
-    func openLocalReport(path: String) {
+    public func openLocalReport(path: String) {
         let url = URL(fileURLWithPath: path)
         NSWorkspace.shared.open(url)
     }
