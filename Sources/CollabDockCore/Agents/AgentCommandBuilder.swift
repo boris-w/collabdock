@@ -112,7 +112,7 @@ public struct AgentCommandBuilder: Sendable {
 
         switch item.payload {
         case .codeChange(let code):
-            let safeBaseRef = Self.sanitizeUntrustedContent(code.baseRef)
+            let safeBaseRef = Self.validatedShellSafeGitRef(code.baseRef) ?? "HEAD"
             if hasEmbeddedDiff {
                 taskGuidance = "下方 <untrusted_pr_diff> 已直接提供本次 PR 相对 `origin/\(safeBaseRef)` 的完整 Unified Diff；请直接结合隔离工作树中的只读文件工具查阅上下文完成深度审查（无需执行 shell 命令），所有行内评论的 path 与 line 必须严格对应变更行。"
             } else {
@@ -230,20 +230,22 @@ public struct AgentCommandBuilder: Sendable {
         incrementalCommitLog: String?,
         wasForcePushed: Bool
     ) -> String {
-        let oldShort = String(previousReview.reviewedHeadSHA.prefix(7))
+        let safeOldSHA = Self.validatedShortCommitSHA(previousReview.reviewedHeadSHA)
+        let oldShort = safeOldSHA ?? String(previousReview.reviewedHeadSHA.prefix(7))
+        let prNumber: Int?
+        let safeNewSHA: String?
         let newShort: String
-        let baseRef: String?
-        let headRef: String?
+        let safeBaseRef: String?
         if case .codeChange(let code) = item.payload {
-            newShort = String(code.headSHA.prefix(7))
-            let trimmedBase = code.baseRef.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedHead = code.headRef.trimmingCharacters(in: .whitespacesAndNewlines)
-            baseRef = trimmedBase.isEmpty ? nil : Self.sanitizeUntrustedContent(trimmedBase)
-            headRef = trimmedHead.isEmpty ? nil : Self.sanitizeUntrustedContent(trimmedHead)
+            prNumber = code.number > 0 ? code.number : nil
+            safeNewSHA = Self.validatedShortCommitSHA(code.headSHA)
+            newShort = safeNewSHA ?? String(code.headSHA.prefix(7))
+            safeBaseRef = Self.validatedShellSafeGitRef(code.baseRef)
         } else {
+            prNumber = nil
+            safeNewSHA = nil
             newShort = "latest"
-            baseRef = nil
-            headRef = nil
+            safeBaseRef = nil
         }
 
         let safeContextTag = Self.sanitizeUntrustedContent(item.displayContextTag)
@@ -260,8 +262,11 @@ public struct AgentCommandBuilder: Sendable {
         let forcePushNote: String
         if wasForcePushed {
             if isBackgroundSession {
-                let targetBase = baseRef ?? "main"
-                forcePushNote = "\n提示：检测到 PR 分支发生过 rebase / force-push，请相对基线分支 `origin/\(targetBase)` 重新审查完整改动范围。"
+                if let safeBaseRef {
+                    forcePushNote = "\n提示：检测到 PR 分支发生过 rebase / force-push，请相对基线分支 `origin/\(safeBaseRef)` 重新审查完整改动范围。"
+                } else {
+                    forcePushNote = "\n提示：检测到 PR 分支发生过 rebase / force-push，请相对默认基线分支（`origin/HEAD`）重新审查完整改动范围。"
+                }
             } else {
                 forcePushNote = "\n提示：检测到 PR 分支发生过 rebase / force-push，下方已自动回退为最新完整 PR Diff。"
             }
@@ -279,19 +284,19 @@ public struct AgentCommandBuilder: Sendable {
 
         let diffBlock: String
         if isBackgroundSession {
-            // 后台会话（Lody / claude --bg）的 agent 可自行拉取与 diff，避免嵌入 diff 正文撑爆长会话上下文
-            let targetBase = baseRef ?? "main"
-            let fetchCmd: String
+            // 后台会话（Lody / claude --bg）的 agent 可自行拉取与 diff；命令参数严禁插入不可信分支名，改用整数 PR 编号与十六进制 SHA（关联 REQ-008）
+            let fetchCmd = prNumber.map { "git fetch origin pull/\($0)/head" } ?? "git fetch origin"
             let diffCmd: String
             if wasForcePushed {
-                fetchCmd = headRef.map { "git fetch origin \(targetBase) \($0)" } ?? "git fetch origin"
-                diffCmd = "git diff origin/\(targetBase)...\(newShort)"
+                let targetBase = safeBaseRef ?? "HEAD"
+                let targetHead = safeNewSHA ?? "FETCH_HEAD"
+                diffCmd = "git diff origin/\(targetBase)...\(targetHead)"
+            } else if let safeOldSHA, let safeNewSHA {
+                diffCmd = "git diff \(safeOldSHA)..\(safeNewSHA)"
             } else {
-                fetchCmd = headRef.map { "git fetch origin \($0)" } ?? "git fetch origin"
-                diffCmd = "git diff \(oldShort)..\(newShort)"
+                diffCmd = "git diff HEAD..FETCH_HEAD"
             }
-            let branchLine = headRef.map { "分支：`origin/\($0)`（最新提交 `\(newShort)`，上一轮基线 `\(oldShort)`）\n" } ?? ""
-            diffBlock = "\n\n拉取与对比指令（本消息未嵌入 diff 正文，请直接在工作区拉取最新提交并查看改动）：\n\(branchLine)- 先执行 `\(fetchCmd)` 同步远端最新提交\n- 再执行 `\(diffCmd)` 查看本轮需要审查的改动（必要时结合只读文件工具查阅完整上下文）"
+            diffBlock = "\n\n拉取与对比指令（本消息未嵌入 diff 正文，请直接在工作区拉取最新提交并查看改动）：\n- 先执行 `\(fetchCmd)` 同步远端最新提交\n- 再执行 `\(diffCmd)` 查看本轮需要审查的改动（必要时结合只读文件工具查阅完整上下文）"
         } else if let rawDiff = incrementalDiff?.trimmingCharacters(in: .whitespacesAndNewlines), !rawDiff.isEmpty {
             let maxChars = 45_000
             let body = rawDiff.count > maxChars
@@ -300,7 +305,10 @@ public struct AgentCommandBuilder: Sendable {
             let safeBody = Self.sanitizeUntrustedContent(body)
             diffBlock = "\n\n<untrusted_incremental_diff>\n\(safeBody)\n</untrusted_incremental_diff>"
         } else {
-            diffBlock = "\n\n（本地未提取到增量 Diff 文本，请结合 `git fetch` 后的 `git diff \(oldShort)..\(newShort)` 或 `origin` 最新分支查看本次修复提交。）"
+            let fallbackDiffCmd = (safeOldSHA != nil && safeNewSHA != nil)
+                ? "git diff \(safeOldSHA!)..\(safeNewSHA!)"
+                : "git diff HEAD..FETCH_HEAD"
+            diffBlock = "\n\n（本地未提取到增量 Diff 文本，请结合 `git fetch` 后的 `\(fallbackDiffCmd)` 查看本次修复提交。）"
         }
 
         let triggerBlock: String
@@ -695,6 +703,36 @@ public struct AgentCommandBuilder: Sendable {
             range: range,
             withTemplate: "&lt;$1"
         )
+    }
+
+    private static let safeGitRefCharset = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._/-"
+    )
+    private static let hexCharset = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
+
+    /// 严格校验可安全出现在 shell `git` 命令参数中的 ref 名（白名单字符，杜绝 `$()` / `;` / `|` / 反引号与选项注入）
+    private static func validatedShellSafeGitRef(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              !trimmed.hasPrefix("-"),
+              !trimmed.hasPrefix("/"),
+              !trimmed.hasSuffix("/"),
+              !trimmed.contains(".."),
+              !trimmed.contains("//"),
+              trimmed.unicodeScalars.allSatisfy({ safeGitRefCharset.contains($0) }) else {
+            return nil
+        }
+        return trimmed
+    }
+
+    /// 严格校验十六进制 commit SHA 前缀，防止不可信字符串进入 `git diff` 命令
+    private static func validatedShortCommitSHA(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.unicodeScalars.allSatisfy({ hexCharset.contains($0) }) else {
+            return nil
+        }
+        return String(trimmed.prefix(7))
     }
 
     public static func modelIDEncodesEffort(_ modelID: String) -> Bool {
