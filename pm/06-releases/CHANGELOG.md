@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复手动导入 PR 新一轮时未自动归档上一轮已处理卡片的问题** (`REQ-002`)：`InboxSyncService` 抽出共用归档规则 `archiveSupersededRounds` 并新增 `importPullRequestResult` 返回被归档条目，`AppCoordinator.importPullRequest` 同步更新列表，使手动「+」导入与自动同步一致保持同 PR 仅一张活跃卡片。
 - **修复 Lody 续聊复审及超 1 小时审查耗时丢失与累计上下文重复计入问题** (`REQ-014`)：
   - `LodySessionUsageSnapshot` 暴露 `lastMessageAt` 并新增 `roundDurationSeconds(since:)`（按最后一条消息时间减去本轮派发时间计算，移除 1 小时静默上限）；`AppCoordinator` 的卡片摘要与用量账本同步改用对应用量记录的 `createdAt` 作为本轮派发起点。
   - 统一 `syncPendingLodyUsage` 与实时监控回补逻辑：续聊同一 Lody 会话时用量账本仅计入相对同会话更早且已同步轮次的新增上下文（上下文发生压缩变小时记录当前上下文、不记负数），避免重复统计上一轮用量。
