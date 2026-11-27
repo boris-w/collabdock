@@ -8,6 +8,7 @@ public struct IncomingCollaborationEvent: Hashable, Sendable {
     public let actor: String
     public let isDraftItem: Bool
     public let body: String?
+    public let viewerIsReviewer: Bool
 
     public init(
         platform: PlatformKind,
@@ -16,7 +17,8 @@ public struct IncomingCollaborationEvent: Hashable, Sendable {
         triggerKind: TriggerKind,
         actor: String,
         isDraftItem: Bool = false,
-        body: String? = nil
+        body: String? = nil,
+        viewerIsReviewer: Bool = false
     ) {
         self.platform = platform
         self.scope = scope
@@ -25,6 +27,7 @@ public struct IncomingCollaborationEvent: Hashable, Sendable {
         self.actor = actor
         self.isDraftItem = isDraftItem
         self.body = body
+        self.viewerIsReviewer = viewerIsReviewer
     }
 }
 
@@ -117,7 +120,7 @@ public struct TriggerRuleEngine: Sendable {
             if event.triggerKind == .mention && !normalizedMe.isEmpty && !containsDirectMention(of: normalizedMe, in: body) {
                 return .reject(.missingDirectMention)
             }
-            if rules.requireMentionKeywords && !containsAnyKeyword(rules.mentionKeywords, in: body) {
+            if rules.requireMentionKeywords && !event.viewerIsReviewer && !containsAnyKeyword(rules.mentionKeywords, in: body) {
                 return .reject(.missingMentionKeyword)
             }
             let hints = rules.parseTriggerHints ? parseHints(from: body) : ParsedTriggerHints()

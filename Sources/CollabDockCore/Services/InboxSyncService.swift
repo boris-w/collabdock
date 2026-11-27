@@ -82,6 +82,7 @@ public struct InboxSyncRequest: Sendable {
 /// 单次同步输出结果
 public struct InboxSyncResult: Equatable, Sendable {
     public let newItems: [CollaborationItem]
+    public let supersededItems: [CollaborationItem]
     public let prStateUpdates: [PRStateReconciler.Update]
     public let notifications: [InboxNotification]
     public let state: InboxSyncState
@@ -92,6 +93,7 @@ public struct InboxSyncResult: Equatable, Sendable {
 
     public init(
         newItems: [CollaborationItem] = [],
+        supersededItems: [CollaborationItem] = [],
         prStateUpdates: [PRStateReconciler.Update] = [],
         notifications: [InboxNotification] = [],
         state: InboxSyncState = InboxSyncState(),
@@ -101,6 +103,7 @@ public struct InboxSyncResult: Equatable, Sendable {
         diagnosticMessage: String? = nil
     ) {
         self.newItems = newItems
+        self.supersededItems = supersededItems
         self.prStateUpdates = prStateUpdates
         self.notifications = notifications
         self.state = state
@@ -226,10 +229,17 @@ public struct InboxSyncService: Sendable {
 
         var knownItems = request.existingItems
         var existingIDs = Set(request.existingItems.map(\.id))
+        var pendingTargets = Set(
+            request.existingItems
+                .filter { $0.status == .pendingConfirmation }
+                .map(Self.targetKey(for:))
+        )
         var newItems: [CollaborationItem] = []
+        var supersededItems: [CollaborationItem] = []
         var notifications: [InboxNotification] = []
 
-        for candidate in batch.candidates {
+        var acceptedCandidates: [(index: Int, candidate: PolledCollaborationCandidate, hints: ParsedTriggerHints)] = []
+        for (index, candidate) in batch.candidates.enumerated() {
             let alreadySeen = try await persist(.hasSeen) {
                 try await store.hasSeen(dedupeKey: candidate.dedupeKey)
             }
@@ -243,9 +253,24 @@ public struct InboxSyncService: Sendable {
             guard case .accept(let hints) = evaluation else {
                 continue
             }
+            acceptedCandidates.append((index: index, candidate: candidate, hints: hints))
+        }
 
-            // 已有同 ID 条目在收件箱中时，绝不覆盖存储里的已有状态，也不重复入箱或重复通知
-            if existingIDs.contains(candidate.item.id) {
+        // 同一次同步里同一 PR 命中多个事件时优先保留 reviewRequested，其次保持原顺序
+        let prioritized = acceptedCandidates.sorted { lhs, rhs in
+            let lp = Self.triggerPriority(lhs.candidate.event.triggerKind)
+            let rp = Self.triggerPriority(rhs.candidate.event.triggerKind)
+            if lp != rp { return lp < rp }
+            return lhs.index < rhs.index
+        }
+
+        for entry in prioritized {
+            let candidate = entry.candidate
+            let hints = entry.hints
+            let targetKey = Self.targetKey(for: candidate.item)
+
+            // 已有同 ID 条目，或同 PR 已存在一张「待确认」卡片时，仅标记已见，绝不重复入箱或重复通知
+            if existingIDs.contains(candidate.item.id) || pendingTargets.contains(targetKey) {
                 try await persist(.markSeen) {
                     try await store.markSeen(dedupeKey: candidate.dedupeKey, itemID: candidate.item.id)
                 }
@@ -264,11 +289,31 @@ public struct InboxSyncService: Sendable {
             try await persist(.markSeen) {
                 try await store.markSeen(dedupeKey: candidate.dedupeKey, itemID: newItem.id)
             }
+
+            // 新一轮卡片入箱时，将同 PR 仍停留在收件箱中的已处理卡片（草稿就绪 / 失败）自动归档为 .superseded，保留历史审查内容
+            for i in knownItems.indices {
+                guard knownItems[i].id != newItem.id,
+                      Self.targetKey(for: knownItems[i]) == targetKey,
+                      knownItems[i].status == .draftReady || knownItems[i].status == .failed else {
+                    continue
+                }
+                knownItems[i].status = .completed
+                knownItems[i].completionReason = .superseded
+                let archived = knownItems[i]
+                try await persist(.upsertItem) {
+                    try await store.upsertItem(archived)
+                }
+                supersededItems.append(archived)
+            }
+
             try await persist(.upsertItem) {
                 try await store.upsertItem(newItem)
             }
 
             existingIDs.insert(newItem.id)
+            if newItem.status == .pendingConfirmation {
+                pendingTargets.insert(targetKey)
+            }
             knownItems.insert(newItem, at: 0)
             newItems.append(newItem)
             notifications.append(.incomingTask(newItem))
@@ -296,6 +341,7 @@ public struct InboxSyncService: Sendable {
 
         return InboxSyncResult(
             newItems: newItems,
+            supersededItems: supersededItems,
             prStateUpdates: prStateUpdates,
             notifications: notifications,
             state: state,
@@ -446,6 +492,18 @@ public struct InboxSyncService: Sendable {
             summarySnippet: snippet,
             reviewRound: prior.reviewRound
         )
+    }
+
+    private static func targetKey(for item: CollaborationItem) -> String {
+        "\(item.platform.rawValue)|\(item.scope.lowercased())|\(item.externalRef.lowercased())"
+    }
+
+    private static func triggerPriority(_ kind: TriggerKind) -> Int {
+        switch kind {
+        case .reviewRequested: return 0
+        case .assigned: return 1
+        case .mention, .teamMention, .threadReply: return 2
+        }
     }
 
     private func persist<T>(

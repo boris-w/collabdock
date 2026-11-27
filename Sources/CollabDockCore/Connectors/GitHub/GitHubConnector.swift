@@ -450,6 +450,7 @@ public struct GitHubConnector: CodeReviewConnector {
         var commentBody: String?
         var actor = pr.user.login
         var revisionKey: String
+        var viewerIsReviewer = false
 
         if triggerKind == .reviewRequested {
             // Re-request review 以 pr.head.sha 为去重基线，并在本人提交过 review 后再次被请求时追加请求时间（与 Search 通道保持一致）
@@ -470,6 +471,14 @@ public struct GitHubConnector: CodeReviewConnector {
                 actor = comment.user.login
                 revisionKey = "c\(comment.id)"
             }
+            if triggerKind == .mention || triggerKind == .threadReply {
+                viewerIsReviewer = await resolveViewerIsReviewer(
+                    repo: repo,
+                    pr: pr,
+                    viewerLogin: viewerLogin,
+                    token: token
+                )
+            }
         }
 
         let dedupeKey = "github:\(repo)#\(pr.number):\(triggerKind.rawValue):\(revisionKey)"
@@ -479,7 +488,8 @@ public struct GitHubConnector: CodeReviewConnector {
             pr: pr,
             triggerKind: triggerKind,
             actor: actor,
-            commentBody: commentBody
+            commentBody: commentBody,
+            viewerIsReviewer: viewerIsReviewer
         )
     }
 
@@ -541,6 +551,7 @@ public struct GitHubConnector: CodeReviewConnector {
             var commentBody: String?
             var actor = pr.user.login
             var revisionKey = pr.head.sha
+            var viewerIsReviewer = false
 
             if fetchLatestComment, let commentsURLStr = issue.commentsURL, let commentsURL = URL(string: commentsURLStr) {
                 if let latest = await fetchLatestIssueComment(url: commentsURL, token: token) {
@@ -561,6 +572,15 @@ public struct GitHubConnector: CodeReviewConnector {
                 )
             }
 
+            if triggerKind == .mention || triggerKind == .threadReply {
+                viewerIsReviewer = await resolveViewerIsReviewer(
+                    repo: repo,
+                    pr: pr,
+                    viewerLogin: viewerLogin,
+                    token: token
+                )
+            }
+
             let dedupeKey = "github:\(repo)#\(pr.number):\(triggerKind.rawValue):\(revisionKey)"
             results.append(
                 makeCandidate(
@@ -569,7 +589,8 @@ public struct GitHubConnector: CodeReviewConnector {
                     pr: pr,
                     triggerKind: triggerKind,
                     actor: actor,
-                    commentBody: commentBody
+                    commentBody: commentBody,
+                    viewerIsReviewer: viewerIsReviewer
                 )
             )
         }
@@ -631,13 +652,50 @@ public struct GitHubConnector: CodeReviewConnector {
         return latestReRequest?.raw
     }
 
+    /// 判定当前用户是否为该 PR 的 reviewer（仍在 `requested_reviewers` 中，或已在 timeline 提交过非 pending 的 review）
+    private func resolveViewerIsReviewer(
+        repo: String,
+        pr: GHPullRequestDetail,
+        viewerLogin: String?,
+        token: String
+    ) async -> Bool {
+        guard let viewer = viewerLogin?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !viewer.isEmpty else {
+            return false
+        }
+        let target = viewer.lowercased()
+        if let requested = pr.requestedReviewers,
+           requested.contains(where: { $0.login?.lowercased() == target }) {
+            return true
+        }
+        guard let events = await fetchIssueTimeline(repo: repo, number: pr.number, token: token) else {
+            return false
+        }
+        return Self.hasSubmittedReview(in: events, viewerLogin: viewer)
+    }
+
+    private static func hasSubmittedReview(
+        in events: [GHTimelineEvent],
+        viewerLogin: String
+    ) -> Bool {
+        let target = viewerLogin.lowercased()
+        return events.contains { event in
+            guard event.event?.lowercased() == "reviewed",
+                  event.user?.login?.lowercased() == target else {
+                return false
+            }
+            return event.state?.lowercased() != "pending"
+        }
+    }
+
     private func makeCandidate(
         dedupeKey: String,
         repo: String,
         pr: GHPullRequestDetail,
         triggerKind: TriggerKind,
         actor: String,
-        commentBody: String?
+        commentBody: String?,
+        viewerIsReviewer: Bool = false
     ) -> PolledCollaborationCandidate {
         let prURL = URL(string: pr.htmlURL) ?? URL(string: "https://github.com/\(repo)/pull/\(pr.number)")!
         let createdAt = Self.parseISO8601(pr.updatedAt ?? pr.createdAt) ?? Date()
@@ -649,7 +707,8 @@ public struct GitHubConnector: CodeReviewConnector {
             triggerKind: triggerKind,
             actor: actor,
             isDraftItem: pr.draft ?? false,
-            body: commentBody
+            body: commentBody,
+            viewerIsReviewer: viewerIsReviewer
         )
 
         let item = CollaborationItem(
@@ -1129,6 +1188,7 @@ private struct GHPullRequestDetail: Decodable {
     let createdAt: String?
     let updatedAt: String?
     let user: GHUser
+    let requestedReviewers: [GHOptionalUser]?
     let base: GHRef
     let head: GHRef
 
@@ -1138,6 +1198,7 @@ private struct GHPullRequestDetail: Decodable {
         case changedFiles = "changed_files"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case requestedReviewers = "requested_reviewers"
     }
 }
 

@@ -371,6 +371,22 @@ public enum PreviewSnapshotter {
         let s6 = makeBaseCoord()
         s6.items = [
             CollaborationItem(
+                id: "sc-done-superseded",
+                platform: .github,
+                itemKind: .pullRequest,
+                scope: "acme/backend",
+                externalRef: "#482",
+                title: "feat: cursor pagination with keyset index",
+                url: URL(string: "https://github.com/acme/backend/pull/482")!,
+                author: "carol",
+                triggeredBy: "carol",
+                triggerKind: .reviewRequested,
+                payload: .codeChange(CodeChangePayload(repository: "acme/backend", number: 482, baseRef: "develop", headRef: "feat/pagination", headSHA: "a0", additions: 88, deletions: 14, changedFiles: 4)),
+                status: .completed,
+                reviewRound: 1,
+                completionReason: .superseded
+            ),
+            CollaborationItem(
                 id: "sc-done-approved",
                 platform: .github,
                 itemKind: .pullRequest,

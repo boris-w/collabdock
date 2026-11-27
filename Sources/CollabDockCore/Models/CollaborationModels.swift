@@ -701,12 +701,13 @@ public enum RemoteSessionStatus: String, Codable, Hashable, Sendable {
     case failed
 }
 
-/// 事项归档至「已完成」的原因（用于区分手动完成与 GitHub Approve / 合并 / 关闭自动归档，关联 ITER-017）
+/// 事项归档至「已完成」的原因（用于区分手动完成、被新一轮取代与 GitHub Approve / 合并 / 关闭自动归档，关联 ITER-017, REQ-002）
 public enum TaskCompletionReason: String, Codable, Hashable, Sendable {
     case manual
     case prApproved
     case prMerged
     case prClosed
+    case superseded
 
     public var displayLabel: String {
         switch self {
@@ -714,6 +715,7 @@ public enum TaskCompletionReason: String, Codable, Hashable, Sendable {
         case .prApproved: return "已 Approve"
         case .prMerged: return "已合并"
         case .prClosed: return "已关闭"
+        case .superseded: return "已进入下一轮"
         }
     }
 }

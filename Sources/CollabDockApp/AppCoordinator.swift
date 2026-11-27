@@ -871,6 +871,11 @@ public final class AppCoordinator {
             }
             lastSyncDiagnostic = result.diagnosticMessage
 
+            for superseded in result.supersededItems {
+                if let idx = items.firstIndex(where: { $0.id == superseded.id }) {
+                    items[idx] = superseded
+                }
+            }
             for newItem in result.newItems.reversed() {
                 if !items.contains(where: { $0.id == newItem.id }) {
                     items.insert(newItem, at: 0)
