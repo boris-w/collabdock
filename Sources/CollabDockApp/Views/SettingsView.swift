@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import CollabDockCore
 
-struct SettingsView: View {
-    enum SettingsTab: Hashable {
+public struct SettingsView: View {
+    public enum SettingsTab: Hashable {
         case connectors
         case triggerRules
         case engines
@@ -27,12 +27,12 @@ struct SettingsView: View {
         return "v\(ver?.isEmpty == false ? ver! : "0.1.0")"
     }
 
-    init(coordinator: AppCoordinator, initialTab: SettingsTab = .connectors) {
+    public init(coordinator: AppCoordinator, initialTab: SettingsTab = .connectors) {
         self.coordinator = coordinator
         self._selectedTab = State(initialValue: initialTab)
     }
 
-    var body: some View {
+    public var body: some View {
         TabView(selection: $selectedTab) {
             connectorsTab
                 .tabItem { Label("协作来源", systemImage: "point.3.connected.trianglepath.dotted") }

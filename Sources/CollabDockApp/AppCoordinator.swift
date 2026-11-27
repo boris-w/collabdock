@@ -3,25 +3,39 @@ import Foundation
 import Observation
 import CollabDockCore
 
-struct LocalRepoCandidate: Identifiable, Hashable, Sendable {
-    let path: String
-    let displayName: String
-    let repositoryFullName: String?
-    let lodyLocalProjectID: String?
-    let sourceLabel: String
+public struct LocalRepoCandidate: Identifiable, Hashable, Sendable {
+    public let path: String
+    public let displayName: String
+    public let repositoryFullName: String?
+    public let lodyLocalProjectID: String?
+    public let sourceLabel: String
 
-    var id: String { path }
+    public var id: String { path }
+
+    public init(
+        path: String,
+        displayName: String,
+        repositoryFullName: String?,
+        lodyLocalProjectID: String?,
+        sourceLabel: String
+    ) {
+        self.path = path
+        self.displayName = displayName
+        self.repositoryFullName = repositoryFullName
+        self.lodyLocalProjectID = lodyLocalProjectID
+        self.sourceLabel = sourceLabel
+    }
 }
 
 @MainActor
 @Observable
-final class AppCoordinator {
-    var settings: AppSettings {
+public final class AppCoordinator {
+    public var settings: AppSettings {
         didSet {
             guard !isPreviewMode else { return }
             persistSettings()
             if oldValue.launchAtLogin != settings.launchAtLogin {
-                lastSystemNotice = SystemIntegrationService.shared.setLaunchAtLogin(settings.launchAtLogin)
+                lastSystemNotice = systemIntegration.setLaunchAtLogin(settings.launchAtLogin)
             }
             if oldValue.workspaceSearchRoots != settings.workspaceSearchRoots {
                 refreshDiscoveredLocalRepos()
@@ -32,45 +46,50 @@ final class AppCoordinator {
             }
         }
     }
-    var items: [CollaborationItem] {
+    public var items: [CollaborationItem] {
         didSet {
             guard !isPreviewMode else { return }
             syncRunningBlinkLoop()
         }
     }
-    var isMenuBarBlinking: Bool = false
-    var environment: EnvironmentSnapshot?
-    var isDetectingEnvironment: Bool = false
-    var isSyncing: Bool = false
-    var isPaused: Bool = false
-    var lastSyncAt: Date?
-    var lastSyncDiagnostic: String?
-    var lastSyncError: String?
-    var lastSystemNotice: String?
-    var latestRateLimit: RateLimitSnapshot?
-    var lastSyncWas304: Bool = false
-    var rateLimitedUntil: Date?
-    var effectivePollIntervalSeconds: Int = 60
-    var selectedTab: PopoverTab = .inbox
-    var selectedPlatformFilter: PlatformKind? = nil
-    var requestedDetailItemID: String? = nil
-    var requestedSettingsTab: SettingsView.SettingsTab? = nil
-    var availableModelsByEngine: [AgentEngine: [ModelOption]]
-    var lodyCatalog: LodyCatalogSnapshot?
-    var isRefreshingLodyCatalog: Bool = false
-    var discoveredLocalRepos: [LocalRepoCandidate] = []
-    var usageRuns: [ReviewUsageRun] = []
-    var isSyncingLodyUsage: Bool = false
+    public var isMenuBarBlinking: Bool = false
+    public var environment: EnvironmentSnapshot?
+    public var isDetectingEnvironment: Bool = false
+    public var isSyncing: Bool = false
+    public var isPaused: Bool = false
+    public var lastSyncAt: Date?
+    public var lastSyncDiagnostic: String?
+    public var lastSyncError: String?
+    public var lastSystemNotice: String?
+    public var latestRateLimit: RateLimitSnapshot?
+    public var lastSyncWas304: Bool = false
+    public var rateLimitedUntil: Date?
+    public var effectivePollIntervalSeconds: Int = 60
+    public var selectedTab: PopoverTab = .inbox
+    public var selectedPlatformFilter: PlatformKind? = nil
+    public var requestedDetailItemID: String? = nil
+    public var requestedSettingsTab: SettingsView.SettingsTab? = nil
+    public var availableModelsByEngine: [AgentEngine: [ModelOption]]
+    public var lodyCatalog: LodyCatalogSnapshot?
+    public var isRefreshingLodyCatalog: Bool = false
+    public var discoveredLocalRepos: [LocalRepoCandidate] = []
+    public var usageRuns: [ReviewUsageRun] = []
+    public var isSyncingLodyUsage: Bool = false
     /// 内存中缓存已加载的 GitHub 头像，避免菜单栏弹窗反复开关时重新拉图闪烁
-    var githubAvatarImage: NSImage? = nil
+    public var githubAvatarImage: NSImage? = nil
     private var loadedAvatarURLString: String? = nil
 
     private let isPreviewMode: Bool
-    private let settingsStore: SettingsStore
-    private let detector: EnvironmentDetector
+    private let autoStart: Bool
+    private let settingsStore: any SettingsStoring
+    private let detector: any EnvironmentDetecting
+    private let connectorFactory: any ConnectorFactory
+    private let backendFactory: any ExecutionBackendFactory
+    private let systemIntegration: any SystemIntegrating
+    private let clock: any ClockProviding
     private let ruleEngine = TriggerRuleEngine()
-    private let worktreeManager = WorktreeManager()
     private var taskStore: (any TaskStore)?
+    private var lifecycleTask: Task<Void, Never>?
     private var pollingTask: Task<Void, Never>?
     private var blinkTask: Task<Void, Never>?
     private var lodyMonitorTasks: [String: Task<Void, Never>] = [:]
@@ -78,21 +97,33 @@ final class AppCoordinator {
     private var syncState = InboxSyncState()
     private var isReconcilingPRStates: Bool = false
 
-    enum PopoverTab: String, CaseIterable, Identifiable {
+    public enum PopoverTab: String, CaseIterable, Identifiable {
         case inbox = "收件箱"
         case completed = "已完成"
 
-        var id: String { rawValue }
+        public var id: String { rawValue }
     }
 
-    init(
+    public init(
         previewMode: Bool = false,
-        settingsStore: SettingsStore = SettingsStore(),
-        detector: EnvironmentDetector = EnvironmentDetector()
+        autoStart: Bool = true,
+        settingsStore: any SettingsStoring = SettingsStore(),
+        detector: any EnvironmentDetecting = EnvironmentDetector(),
+        taskStore: (any TaskStore)? = nil,
+        makeDefaultTaskStore: () throws -> any TaskStore = { try SQLiteTaskStore() },
+        connectorFactory: (any ConnectorFactory)? = nil,
+        backendFactory: any ExecutionBackendFactory = DefaultExecutionBackendFactory(),
+        systemIntegration: (any SystemIntegrating)? = nil,
+        clock: any ClockProviding = SystemClock()
     ) {
         self.isPreviewMode = previewMode
+        self.autoStart = autoStart
         self.settingsStore = settingsStore
         self.detector = detector
+        self.connectorFactory = connectorFactory ?? DefaultConnectorFactory(detector: detector)
+        self.backendFactory = backendFactory
+        self.systemIntegration = systemIntegration ?? SystemIntegrationService.shared
+        self.clock = clock
         self.availableModelsByEngine = Dictionary(
             uniqueKeysWithValues: AgentEngine.allCases.map { ($0, $0.defaultModels) }
         )
@@ -102,7 +133,7 @@ final class AppCoordinator {
             self.lodyCatalog = Self.makePreviewLodyCatalog()
             self.items = Self.makePreviewItems()
             self.usageRuns = Self.makePreviewUsageRuns()
-            self.lastSyncAt = Date()
+            self.lastSyncAt = clock.now
             refreshDiscoveredLocalRepos()
         } else {
             let loadedSettings = settingsStore.load()
@@ -112,24 +143,33 @@ final class AppCoordinator {
             self.effectivePollIntervalSeconds = initialInterval
             self.items = []
             self.syncState.effectivePollIntervalSeconds = initialInterval
-            do {
-                self.taskStore = try SQLiteTaskStore()
-            } catch {
-                self.taskStore = nil
-                self.lastSystemNotice = "本地数据库打开失败（本次运行数据不会持久化）：\(error.localizedDescription)"
+            if let injectedStore = taskStore {
+                self.taskStore = injectedStore
+            } else {
+                do {
+                    self.taskStore = try makeDefaultTaskStore()
+                } catch {
+                    self.taskStore = nil
+                    self.lastSystemNotice = "本地数据库打开失败（本次运行数据不会持久化）：\(error.localizedDescription)"
+                }
             }
-            refreshDiscoveredLocalRepos()
-            SystemIntegrationService.shared.configureNotificationsIfAvailable()
-            SystemIntegrationService.shared.onNotificationSelectedItem = { [weak self] itemID in
+            if autoStart {
+                refreshDiscoveredLocalRepos()
+            }
+            self.systemIntegration.configureNotificationsIfAvailable()
+            self.systemIntegration.onNotificationSelectedItem = { [weak self] itemID in
                 self?.selectedTab = .inbox
                 self?.requestedDetailItemID = itemID
             }
-            startLifecycle()
+            if autoStart {
+                startLifecycle()
+            }
         }
     }
 
-    private func startLifecycle() {
-        Task {
+    public func startLifecycle() {
+        lifecycleTask?.cancel()
+        lifecycleTask = Task {
             await loadPersistedItems()
             await refreshEnvironment()
             resumeActiveLodyMonitors()
@@ -138,7 +178,21 @@ final class AppCoordinator {
         }
     }
 
-    private func loadPersistedItems() async {
+    public func stopLifecycle() {
+        lifecycleTask?.cancel()
+        lifecycleTask = nil
+        pollingTask?.cancel()
+        pollingTask = nil
+        blinkTask?.cancel()
+        blinkTask = nil
+        isMenuBarBlinking = false
+        for task in lodyMonitorTasks.values {
+            task.cancel()
+        }
+        lodyMonitorTasks.removeAll()
+    }
+
+    public func loadPersistedItems() async {
         guard let store = taskStore else { return }
         do {
             let persisted = try await store.loadAllItems()
@@ -237,8 +291,8 @@ final class AppCoordinator {
             isCouncilSecondary: isCouncilSecondary,
             usage: effectiveUsage,
             succeeded: succeeded,
-            createdAt: Date(),
-            syncedAt: effectiveUsage.metricKind == .exact ? Date() : nil
+            createdAt: clock.now,
+            syncedAt: effectiveUsage.metricKind == .exact ? clock.now : nil
         )
         usageRuns.insert(run, at: 0)
         if !isPreviewMode && !item.id.hasPrefix("demo-") {
@@ -246,7 +300,7 @@ final class AppCoordinator {
         }
     }
 
-    func syncPendingLodyUsage() async {
+    public func syncPendingLodyUsage() async {
         guard !isPreviewMode, !isSyncingLodyUsage else { return }
         guard let lodyProbe = environment?.engines[.lody], lodyProbe.isInstalled else { return }
 
@@ -289,7 +343,7 @@ final class AppCoordinator {
                     )
                 }
                 if snap.isSettledIdle && snap.contextUsedTokens > 0 {
-                    updated.syncedAt = Date()
+                    updated.syncedAt = clock.now
                 }
                 usageRuns[idx] = updated
                 await persistUsageRun(updated)
@@ -304,7 +358,7 @@ final class AppCoordinator {
                 guard let self else { return }
                 var sleepSecs = max(60, max(self.settings.pollIntervalSeconds, self.effectivePollIntervalSeconds))
                 if let until = self.rateLimitedUntil {
-                    let wait = Int(ceil(until.timeIntervalSinceNow))
+                    let wait = Int(ceil(until.timeIntervalSince(self.clock.now)))
                     if wait > sleepSecs {
                         sleepSecs = wait
                     }
@@ -320,7 +374,7 @@ final class AppCoordinator {
 
     // MARK: - Computed State
 
-    var activePlatformsInInbox: [PlatformKind] {
+    public var activePlatformsInInbox: [PlatformKind] {
         var seen: Set<PlatformKind> = []
         var ordered: [PlatformKind] = []
         for item in inboxItems where !seen.contains(item.platform) {
@@ -330,24 +384,24 @@ final class AppCoordinator {
         return ordered
     }
 
-    var inboxItems: [CollaborationItem] {
+    public var inboxItems: [CollaborationItem] {
         items.filter { $0.status.isInboxActive }
     }
 
-    var filteredInboxItems: [CollaborationItem] {
+    public var filteredInboxItems: [CollaborationItem] {
         guard let filter = selectedPlatformFilter else { return inboxItems }
         return inboxItems.filter { $0.platform == filter }
     }
 
-    var completedItems: [CollaborationItem] {
+    public var completedItems: [CollaborationItem] {
         items.filter { !$0.status.isInboxActive }
     }
 
-    var pendingConfirmationCount: Int {
+    public var pendingConfirmationCount: Int {
         items.filter { $0.status == .pendingConfirmation }.count
     }
 
-    var runningCount: Int {
+    public var runningCount: Int {
         items.filter {
             $0.status == .preparing
             || $0.status == .running
@@ -356,11 +410,12 @@ final class AppCoordinator {
         }.count
     }
 
-    var draftReadyCount: Int {
+    public var draftReadyCount: Int {
         items.filter { $0.status == .draftReady && $0.remoteSessionStatus != .running }.count
     }
 
     private func syncRunningBlinkLoop() {
+        guard autoStart else { return }
         let shouldBlink = runningCount > 0
         if shouldBlink {
             guard blinkTask == nil else { return }
@@ -447,7 +502,7 @@ final class AppCoordinator {
 
     // MARK: - Environment & Live GitHub Sync
 
-    func refreshEnvironment() async {
+    public func refreshEnvironment() async {
         guard !isDetectingEnvironment else { return }
         isDetectingEnvironment = true
         defer { isDetectingEnvironment = false }
@@ -479,7 +534,7 @@ final class AppCoordinator {
         }
     }
 
-    func refreshLodyCatalog() async {
+    public func refreshLodyCatalog() async {
         guard !isPreviewMode, !isRefreshingLodyCatalog else { return }
         guard let lodyProbe = environment?.engines[.lody], lodyProbe.isInstalled else { return }
         isRefreshingLodyCatalog = true
@@ -746,7 +801,7 @@ final class AppCoordinator {
         return lodyCatalog?.workspaceID ?? ""
     }
 
-    func syncNow(manual: Bool = false) async {
+    public func syncNow(manual: Bool = false) async {
         guard !isPreviewMode, !isSyncing else { return }
         guard settings.connectors.contains(where: { $0.platform == .github && $0.isEnabled }) else {
             return
@@ -765,26 +820,26 @@ final class AppCoordinator {
         lastSyncError = nil
         defer {
             isSyncing = false
-            lastSyncAt = Date()
+            lastSyncAt = clock.now
         }
 
-        let ghPath = environment?.gh.executablePath
-        let knownHasNotifScope: Bool? = environment?.githubAuth.tokenSource == .ghCLI
-            ? environment?.githubAuth.hasNotificationsScope
-            : nil
         let rules = settings.effectiveRules(for: .github)
-
-        let connector = GitHubConnector(
-            tokenProvider: DefaultGitHubTokenProvider(detector: detector, ghExecutablePath: ghPath),
-            includeReviewRequestedSearch: rules.enableReviewRequested,
-            includeMentionsSearchFallback: rules.enableMention,
-            knownNotificationsScope: knownHasNotifScope
+        let connectorContext = ConnectorBuildContext(
+            platform: .github,
+            rules: rules,
+            environment: environment
         )
+        guard let source = connectorFactory.makeSource(context: connectorContext) else {
+            return
+        }
 
         let syncService = InboxSyncService(
-            source: connector,
+            source: source,
+            prStatusQuery: connectorFactory.makePRStatusQuery(context: connectorContext),
+            prFetcher: connectorFactory.makePRFetcher(context: connectorContext),
             store: store,
-            ruleEngine: ruleEngine
+            ruleEngine: ruleEngine,
+            clock: clock
         )
 
         do {
@@ -824,7 +879,7 @@ final class AppCoordinator {
             for notification in result.notifications {
                 switch notification {
                 case .incomingTask(let item):
-                    SystemIntegrationService.shared.postIncomingTaskNotification(
+                    systemIntegration.postIncomingTaskNotification(
                         for: item,
                         enabled: settings.notificationsEnabled
                     )
@@ -840,7 +895,7 @@ final class AppCoordinator {
     }
 
     /// GraphQL 单次批量对齐收件箱中活跃 GitHub PR 的远端状态（Approve / Merged / Closed 自动归档；Request Changes 保留跟进，关联 ITER-017）
-    func reconcileInboxGitHubPRStates(force: Bool = false) async {
+    public func reconcileInboxGitHubPRStates(force: Bool = false) async {
         guard !isPreviewMode,
               !isReconcilingPRStates,
               settings.autoCompleteApprovedOrClosedPRs,
@@ -848,7 +903,7 @@ final class AppCoordinator {
             return
         }
 
-        if !force, let last = syncState.lastPRStateReconcileAt, Date().timeIntervalSince(last) < 25 {
+        if !force, let last = syncState.lastPRStateReconcileAt, clock.now.timeIntervalSince(last) < 25 {
             return
         }
 
@@ -856,18 +911,21 @@ final class AppCoordinator {
         let targets = PRStateReconciler.targets(in: items)
         guard !targets.isEmpty else { return }
 
+        let connectorContext = ConnectorBuildContext(
+            platform: .github,
+            rules: settings.effectiveRules(for: .github),
+            environment: environment
+        )
+        guard let statusQuery = connectorFactory.makePRStatusQuery(context: connectorContext) else {
+            return
+        }
+
         isReconcilingPRStates = true
         defer {
             isReconcilingPRStates = false
-            syncState.lastPRStateReconcileAt = Date()
+            syncState.lastPRStateReconcileAt = clock.now
         }
 
-        let statusQuery: any PRStatusQuerying = GitHubConnector(
-            tokenProvider: DefaultGitHubTokenProvider(
-                detector: detector,
-                ghExecutablePath: environment?.gh.executablePath
-            )
-        )
         let result: PRStatusBatchResult
         do {
             result = try await statusQuery.fetchPRStatusSnapshots(targets: targets)
@@ -904,7 +962,7 @@ final class AppCoordinator {
     // MARK: - Execution Plan & Real End-to-End Execution (M3 / TASK-015)
 
     /// 检索同平台、同仓库、同 PR 编号的最近一次已完成/草稿就绪的审查记录，自动挂载复审记忆上下文
-    func findPreviousReview(for item: CollaborationItem) -> PreviousReviewContext? {
+    public func findPreviousReview(for item: CollaborationItem) -> PreviousReviewContext? {
         InboxSyncService.findPreviousReview(
             for: item,
             in: items,
@@ -923,7 +981,7 @@ final class AppCoordinator {
         }
     }
 
-    func defaultPlan(for item: CollaborationItem) -> ExecutionPlan {
+    public func defaultPlan(for item: CollaborationItem) -> ExecutionPlan {
         let prev = item.previousReview
         let engine: AgentEngine
         let continuityMode: ReviewContinuityMode
@@ -990,13 +1048,13 @@ final class AppCoordinator {
         )
     }
 
-    func togglePause() {
+    public func togglePause() {
         isPaused.toggle()
     }
 
-    func refreshNow() {
+    public func refreshNow() {
         if isPreviewMode {
-            lastSyncAt = Date()
+            lastSyncAt = clock.now
             return
         }
         Task {
@@ -1004,7 +1062,7 @@ final class AppCoordinator {
         }
     }
 
-    func dismissItem(id: String) {
+    public func dismissItem(id: String) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].status = .dismissed
         items[idx].progressMessage = nil
@@ -1015,7 +1073,7 @@ final class AppCoordinator {
     }
 
     /// 邮件式归档：标为已完成（移入「已完成」分栏，保留记录与会话入口）
-    func markItemCompleted(id: String) {
+    public func markItemCompleted(id: String) {
         lodyMonitorTasks[id]?.cancel()
         lodyMonitorTasks.removeValue(forKey: id)
         runRegistry.cancel(itemID: id)
@@ -1034,7 +1092,7 @@ final class AppCoordinator {
     }
 
     /// 彻底删除单条列表记录（同步移除 SQLite collaboration_items，但保留 seen_events 去重记录与 review_usage_runs 用量账本）
-    func deleteItem(id: String) {
+    public func deleteItem(id: String) {
         lodyMonitorTasks[id]?.cancel()
         lodyMonitorTasks.removeValue(forKey: id)
         runRegistry.cancel(itemID: id)
@@ -1045,7 +1103,7 @@ final class AppCoordinator {
     }
 
     /// 一键清空「已完成」列表（不删除任何用量统计记录）
-    func clearCompletedItems() {
+    public func clearCompletedItems() {
         let toDelete = items.filter { !$0.status.isInboxActive }
         guard !toDelete.isEmpty else { return }
         items.removeAll { !$0.status.isInboxActive }
@@ -1059,7 +1117,7 @@ final class AppCoordinator {
         }
     }
 
-    func retryFailedItem(id: String) {
+    public func retryFailedItem(id: String) {
         guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
         items[idx].status = .pendingConfirmation
         items[idx].errorMessage = nil
@@ -1068,20 +1126,20 @@ final class AppCoordinator {
         requestedDetailItemID = id
     }
 
-    func openHandoff(for item: CollaborationItem) {
+    public func openHandoff(for item: CollaborationItem) {
         guard let handle = item.sessionHandle else { return }
-        SystemIntegrationService.shared.openSessionHandoff(
+        systemIntegration.openSessionHandoff(
             handle: handle,
             lodyWorkspace: resolvedLodyWorkspaceForDeepLink
         )
     }
 
-    func openLocalReport(for item: CollaborationItem) {
+    public func openLocalReport(for item: CollaborationItem) {
         guard let path = item.localReportPath else { return }
-        SystemIntegrationService.shared.openLocalReport(path: path)
+        systemIntegration.openLocalReport(path: path)
     }
 
-    func importPullRequest(reference: String) async -> Result<CollaborationItem, Error> {
+    public func importPullRequest(reference: String) async -> Result<CollaborationItem, Error> {
         guard !isPreviewMode else {
             return .failure(NSError(domain: "CollabDock", code: 1, userInfo: [NSLocalizedDescriptionKey: "预览模式下无法联网拉取 PR"]))
         }
@@ -1089,16 +1147,19 @@ final class AppCoordinator {
             let err = NSError(domain: "CollabDock", code: 2, userInfo: [NSLocalizedDescriptionKey: "本地数据库不可用，无法导入 PR"])
             return .failure(err)
         }
-        let connector = GitHubConnector(
-            tokenProvider: DefaultGitHubTokenProvider(
-                detector: detector,
-                ghExecutablePath: environment?.gh.executablePath
-            )
+        let connectorContext = ConnectorBuildContext(
+            platform: .github,
+            rules: settings.effectiveRules(for: .github),
+            environment: environment
         )
+        let source = connectorFactory.makeSource(context: connectorContext) ?? NullCollaborationSource(platform: .github)
+        let fetcher = connectorFactory.makePRFetcher(context: connectorContext)
         let syncService = InboxSyncService(
-            source: connector,
+            source: source,
+            prFetcher: fetcher,
             store: store,
-            ruleEngine: ruleEngine
+            ruleEngine: ruleEngine,
+            clock: clock
         )
         do {
             let item = try await syncService.importPullRequest(reference: reference, existingItems: items)
@@ -1175,8 +1236,9 @@ final class AppCoordinator {
     }
 
     /// 真实端到端执行管线：隔离 Worktree -> 单/双引擎只读沙箱并行执行 -> 会诊汇总 -> Diff 行号校验 -> GitHub Pending Review 草稿 + 本地 Markdown 报告
-    func confirmAndRun(itemID: String, plan: ExecutionPlan) {
-        guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return }
+    @discardableResult
+    public func confirmAndRun(itemID: String, plan: ExecutionPlan) -> Task<Void, Never>? {
+        guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return nil }
         settings.defaultEngine = plan.engine
         if plan.engine == .lody {
             let activeLodyCfg = plan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig
@@ -1203,8 +1265,7 @@ final class AppCoordinator {
 
         // 演示条目仍走安全模拟，防止向虚构仓库 `acme/backend` 发起真实 git clone / GitHub POST
         if isPreviewMode || targetItem.id.hasPrefix("demo-") {
-            runDemoSimulation(ticket: ticket, targetItem: targetItem, plan: plan)
-            return
+            return runDemoSimulation(ticket: ticket, targetItem: targetItem, plan: plan)
         }
 
         let preset = settings.presets.first(where: { $0.id == plan.presetID })
@@ -1234,10 +1295,10 @@ final class AppCoordinator {
                 items[updatedIdx].progressMessage = nil
                 items[updatedIdx].errorMessage = "本地数据库不可用，无法执行审查"
             }
-            return
+            return nil
         }
 
-        Task {
+        return Task {
             defer {
                 self.runRegistry.finish(ticket)
             }
@@ -1255,23 +1316,29 @@ final class AppCoordinator {
                 }
                 let envSnapshot = self.environment
 
-                let directBackend = DirectCLIBackend(worktreeManager: worktreeManager)
-                let lodyBackend = LodyBackend(
+                let directBackend = self.backendFactory.makeDirectBackend()
+                let lodyBackend = self.backendFactory.makeLodyBackend(
                     config: lodyConfig,
-                    catalog: lodyCatalogSnapshot,
-                    worktreeManager: worktreeManager
+                    catalog: lodyCatalogSnapshot
                 )
-                let ghConnector = GitHubConnector(
-                    tokenProvider: DefaultGitHubTokenProvider(
-                        detector: detector,
-                        ghExecutablePath: envSnapshot?.gh.executablePath
+                let sinkContext = ConnectorBuildContext(
+                    platform: targetItem.platform,
+                    rules: self.settings.effectiveRules(for: targetItem.platform),
+                    environment: envSnapshot
+                )
+                guard let sink = self.connectorFactory.makeSink(context: sinkContext) else {
+                    throw NSError(
+                        domain: "CollabDock",
+                        code: 3,
+                        userInfo: [NSLocalizedDescriptionKey: "未找到 \(targetItem.platform.displayName) 的交付连接器"]
                     )
-                )
+                }
                 let executionService = ReviewExecutionService(
                     directBackend: directBackend,
                     lodyBackend: lodyBackend,
-                    sink: ghConnector,
-                    store: store
+                    sink: sink,
+                    store: store,
+                    clock: self.clock
                 )
                 let executionRequest = ReviewExecutionRequest(
                     item: targetItem,
@@ -1311,7 +1378,7 @@ final class AppCoordinator {
                     if plan.engine == .lody, let sid = handle?.sessionID, !sid.isEmpty {
                         startMonitoringLodySession(itemID: itemID, sessionID: sid, notifyEnabled: notifyEnabled)
                     } else {
-                        SystemIntegrationService.shared.postCompletionNotification(
+                        systemIntegration.postCompletionNotification(
                             for: dispatched,
                             summary: continued ? "已续聊原 \(plan.engine.displayName) 会话复审" : "已派发至 \(plan.engine.displayName) 原生后台会话",
                             enabled: notifyEnabled
@@ -1326,7 +1393,7 @@ final class AppCoordinator {
                         items[updatedIdx] = delivered
                     }
                     selectedTab = delivered.status.isInboxActive ? .inbox : .completed
-                    SystemIntegrationService.shared.postCompletionNotification(
+                    systemIntegration.postCompletionNotification(
                         for: delivered,
                         summary: delivered.executionOutput?.summaryText ?? "审查已完成",
                         enabled: notifyEnabled
@@ -1353,7 +1420,7 @@ final class AppCoordinator {
         }
     }
 
-    func cancelRunningItem(id: String) {
+    public func cancelRunningItem(id: String) {
         runRegistry.cancel(itemID: id)
         restorePendingOnCancel(itemID: id)
     }
@@ -1464,7 +1531,7 @@ final class AppCoordinator {
                     let updated = self.items[idx]
                     await self.persistItem(updated)
                     await self.applyLodySnapshotToUsageLedger(sessionID: sessionID, snapshot: snap)
-                    SystemIntegrationService.shared.postCompletionNotification(
+                    self.systemIntegration.postCompletionNotification(
                         for: updated,
                         summary: summary,
                         enabled: notifyEnabled
@@ -1514,16 +1581,16 @@ final class AppCoordinator {
             )
         }
         if snap.isSettledIdle && snap.contextUsedTokens > 0 {
-            updated.syncedAt = Date()
+            updated.syncedAt = clock.now
         }
         usageRuns[runIdx] = updated
         await persistUsageRun(updated)
     }
 
-    private func runDemoSimulation(ticket: ExecutionRunTicket, targetItem: CollaborationItem, plan: ExecutionPlan) {
+    private func runDemoSimulation(ticket: ExecutionRunTicket, targetItem: CollaborationItem, plan: ExecutionPlan) -> Task<Void, Never> {
         let itemID = ticket.itemID
         updateProgress(for: ticket, status: .running, message: "[演示] 模拟 \(plan.engine.displayName) (\(plan.model)) 在只读沙箱中分析...")
-        Task {
+        return Task {
             defer {
                 self.runRegistry.finish(ticket)
             }

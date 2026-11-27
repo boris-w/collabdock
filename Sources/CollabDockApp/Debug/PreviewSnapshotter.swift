@@ -4,8 +4,8 @@ import SwiftUI
 import CollabDockCore
 
 @MainActor
-enum PreviewSnapshotter {
-    static func runIfRequested() {
+public enum PreviewSnapshotter {
+    public static func runIfRequested() {
         let args = CommandLine.arguments
         guard let idx = args.firstIndex(of: "--snapshot-dir"), idx + 1 < args.count else {
             return

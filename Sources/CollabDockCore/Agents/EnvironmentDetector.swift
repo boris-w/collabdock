@@ -203,7 +203,33 @@ public struct EnvironmentSnapshot: Equatable, Codable, Sendable {
 }
 
 /// 本机运行环境与 CLI 探测器（解决 macOS GUI App PATH 缺失，并动态拉取 agy models，关联 REQ-001, TASK-004）
-public struct EnvironmentDetector: Sendable {
+/// 本机 CLI / GitHub 认证 / Lody 目录环境探测协议（`EnvironmentDetector` 为生产实现，测试可注入 Fake）
+public protocol EnvironmentDetecting: Sendable {
+    func detectAll(
+        customPaths: [String: String],
+        manualGitHubPAT: String?
+    ) async -> EnvironmentSnapshot
+    func resolveGitHubToken(ghExecutablePath: String?, manualPAT: String?) async -> String?
+    func fetchLodyCatalog(
+        lodyProbe: CLIProbeStatus,
+        workspace: String?,
+        resolvedPATH: String?
+    ) async -> LodyCatalogSnapshot?
+    func fetchLodySessionUsage(
+        lodyProbe: CLIProbeStatus,
+        sessionID: String,
+        workspace: String?,
+        resolvedPATH: String?
+    ) async -> EnvironmentDetector.LodySessionUsageSnapshot?
+}
+
+public extension EnvironmentDetecting {
+    func detectAll(customPaths: [String: String] = [:]) async -> EnvironmentSnapshot {
+        await detectAll(customPaths: customPaths, manualGitHubPAT: nil)
+    }
+}
+
+public struct EnvironmentDetector: EnvironmentDetecting {
     private let runner: any ProcessRunner
 
     public init(runner: any ProcessRunner = DefaultProcessRunner()) {

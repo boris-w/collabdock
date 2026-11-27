@@ -1,7 +1,17 @@
 import Foundation
 
+/// 配置持久化与团队配置包导入导出协议（`SettingsStore` 为生产实现，测试可注入内存 Fake）
+public protocol SettingsStoring: Sendable {
+    func load() -> AppSettings
+    func save(_ settings: AppSettings) throws
+    func exportTeamPresetData(teamName: String, from settings: AppSettings) throws -> Data
+    func decodeTeamPreset(from data: Data) throws -> TeamPreset
+    func loadLodyCatalogCache() -> LodyCatalogSnapshot?
+    func saveLodyCatalogCache(_ snapshot: LodyCatalogSnapshot)
+}
+
 /// 配置持久化与团队配置包导入导出服务（关联 REQ-003, REQ-011, TASK-007）
-public struct SettingsStore: Sendable {
+public struct SettingsStore: SettingsStoring {
     public let fileURL: URL
 
     public init(fileURL: URL? = nil) {

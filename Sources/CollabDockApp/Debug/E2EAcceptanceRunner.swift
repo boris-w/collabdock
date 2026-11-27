@@ -3,8 +3,8 @@ import Foundation
 import CollabDockCore
 
 /// 仅用于 DEBUG 模式的真实 PR 端到端链路验收器（不编入 Release 包，关联 TASK-014）
-enum E2EAcceptanceRunner {
-    static func runIfRequested() {
+public enum E2EAcceptanceRunner {
+    public static func runIfRequested() {
         let args = CommandLine.arguments
         guard let prIdx = args.firstIndex(of: "--e2e-pr"), prIdx + 1 < args.count else {
             return

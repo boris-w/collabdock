@@ -21,12 +21,12 @@ public protocol GitHubTokenProvider: Sendable {
 }
 
 public struct DefaultGitHubTokenProvider: GitHubTokenProvider {
-    private let detector: EnvironmentDetector
+    private let detector: any EnvironmentDetecting
     private let ghExecutablePath: String?
     private let manualPAT: String?
 
     public init(
-        detector: EnvironmentDetector = EnvironmentDetector(),
+        detector: any EnvironmentDetecting = EnvironmentDetector(),
         ghExecutablePath: String? = nil,
         manualPAT: String? = nil
     ) {
