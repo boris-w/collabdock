@@ -86,7 +86,8 @@ public struct DirectCLIBackend: ExecutionBackend {
         } else if let found = AgentSessionRunner.findInPATH(rawSpec.executable, path: request.environment?.resolvedPATH) {
             finalExecutablePath = found
         } else {
-            throw AgentRunnerError.executableNotFound(rawSpec.executable)
+            // 纯命令构造不强依赖本机已安装对应 CLI（如 CI 无 codex 二进制时仍可单测 buildCommand）；真正启动前由 execute 校验
+            finalExecutablePath = rawSpec.executable
         }
 
         return AgentCommandSpec(
@@ -131,6 +132,9 @@ public struct DirectCLIBackend: ExecutionBackend {
             schemaFileURL: schemaURL,
             outputFileURL: codexOutURL
         )
+        guard spec.executable.hasPrefix("/") else {
+            throw AgentRunnerError.executableNotFound(spec.executable)
+        }
 
         let sanitizedEnv = AgentSessionRunner.sanitizedEnvironment(from: request.environment)
         onProgress("启动 \(request.plan.engine.displayName) (\(request.plan.model))...")

@@ -14,13 +14,16 @@ struct FakeAgentCLI {
     ///   - exitCode: 退出码
     ///   - stderr: 回放到 stderr 的内容
     ///   - hangSeconds: >0 时先启动一个子进程 sleep 并等待它，用来模拟长时间运行（以及会派生子进程的真实 CLI）
+    ///   - outputFileFlag / outputFileContent: 设置后，把内容写到该参数后面给出的文件路径（如 codex 的 `-o <file>`）
     init(
         in directory: URL,
         name: String = "claude",
         stdoutLines: [String],
         exitCode: Int32 = 0,
         stderr: String = "",
-        hangSeconds: Int = 0
+        hangSeconds: Int = 0,
+        outputFileFlag: String? = nil,
+        outputFileContent: String = ""
     ) throws {
         let bin = directory.appendingPathComponent("bin", isDirectory: true)
         recordDir = directory.appendingPathComponent("record-\(name)", isDirectory: true)
@@ -31,11 +34,16 @@ struct FakeAgentCLI {
         try (stdoutLines.joined(separator: "\n") + "\n")
             .write(to: recordDir.appendingPathComponent("stdout.jsonl"), atomically: true, encoding: .utf8)
         try stderr.write(to: recordDir.appendingPathComponent("stderr.txt"), atomically: true, encoding: .utf8)
+        try outputFileContent.write(to: recordDir.appendingPathComponent("outfile.txt"), atomically: true, encoding: .utf8)
 
         let rec = recordDir.path
         let hang = hangSeconds > 0
             ? "sleep \(hangSeconds) &\necho $! > '\(rec)/child_pid'\nwait\n"
             : ""
+        let writeOutputFile = outputFileFlag.map { flag in
+            "prev=\"\"; out=\"\"\nfor a in \"$@\"; do if [ \"$prev\" = '\(flag)' ]; then out=\"$a\"; fi; prev=\"$a\"; done\n"
+                + "if [ -n \"$out\" ]; then cat '\(rec)/outfile.txt' > \"$out\"; fi\n"
+        } ?? ""
         let script = """
         #!/bin/sh
         printf '%s\\0' "$@" > '\(rec)/argv'
@@ -43,7 +51,7 @@ struct FakeAgentCLI {
         pwd -P > '\(rec)/cwd'
         echo $$ > '\(rec)/pid'
         touch '\(rec)/started'
-        \(hang)cat '\(rec)/stderr.txt' >&2
+        \(writeOutputFile)\(hang)cat '\(rec)/stderr.txt' >&2
         cat '\(rec)/stdout.jsonl'
         exit \(exitCode)
 
