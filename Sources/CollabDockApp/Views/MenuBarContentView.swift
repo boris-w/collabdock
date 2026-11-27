@@ -109,7 +109,7 @@ public struct MenuBarContentView: View {
         }
         .onAppear {
             Task {
-                await coordinator.reconcileInboxGitHubPRStates(force: false)
+                await coordinator.popoverDidOpen()
             }
         }
     }

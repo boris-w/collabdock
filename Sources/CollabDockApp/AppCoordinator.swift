@@ -780,7 +780,24 @@ public final class AppCoordinator {
         return lodyCatalog?.workspaceID ?? ""
     }
 
+    /// 菜单栏弹窗打开时触发：距上次 Search 对齐超过 60 秒则自动执行一次带对齐的同步（仍遵守限流退避），并保留 PR 状态对齐
+    public func popoverDidOpen() async {
+        guard !isPreviewMode else { return }
+        let now = clock.now
+        let needsSearchSync = syncState.lastReconcileAt == nil
+            || now.timeIntervalSince(syncState.lastReconcileAt!) >= 60
+        if needsSearchSync {
+            await performSync(manual: false, reconcileIntervalSeconds: 60)
+        } else {
+            await reconcileInboxGitHubPRStates(force: false)
+        }
+    }
+
     public func syncNow(manual: Bool = false) async {
+        await performSync(manual: manual, reconcileIntervalSeconds: 180)
+    }
+
+    private func performSync(manual: Bool, reconcileIntervalSeconds: TimeInterval) async {
         guard !isPreviewMode, !isSyncing else { return }
         guard settings.connectors.contains(where: { $0.platform == .github && $0.isEnabled }) else {
             return
@@ -829,7 +846,8 @@ public final class AppCoordinator {
                     rules: rules,
                     currentHandle: resolvedGitHubUsername,
                     autoCompleteApprovedOrClosedPRs: false,
-                    previousState: syncState
+                    previousState: syncState,
+                    reconcileIntervalSeconds: reconcileIntervalSeconds
                 )
             )
             syncState = result.state

@@ -63,6 +63,14 @@ final class FixedClock: ClockProviding, @unchecked Sendable {
     init(_ now: Date = Date(timeIntervalSince1970: 1_800_000_000)) { self.now = now }
 }
 
+final class MutableClock: ClockProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: Date
+    init(_ now: Date = Date(timeIntervalSince1970: 1_800_000_000)) { current = now }
+    var now: Date { lock.withLock { current } }
+    func advance(by seconds: TimeInterval) { lock.withLock { current = current.addingTimeInterval(seconds) } }
+}
+
 // MARK: - Store
 
 actor MemoryTaskStore: TaskStore {
@@ -100,11 +108,12 @@ final class ScriptedSource: CollaborationSource, @unchecked Sendable {
     private let lock = NSLock()
     var result: Result<PollBatch, Error>
     private(set) var pollCount = 0
+    private(set) var requests: [PollRequest] = []
 
     init(_ result: Result<PollBatch, Error> = .success(PollBatch(candidates: []))) { self.result = result }
 
     func poll(_ request: PollRequest) async throws -> PollBatch {
-        let r = lock.withLock { pollCount += 1; return result }
+        let r = lock.withLock { pollCount += 1; requests.append(request); return result }
         return try r.get()
     }
 }

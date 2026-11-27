@@ -135,7 +135,7 @@ struct InboxSyncServiceTests {
 
     // MARK: sync — throttling & backoff
 
-    @Test("Slow review-request reconciliation runs on first sync, on manual refresh, and at most every 15 minutes otherwise")
+    @Test("Slow search reconciliation runs on first sync, on manual refresh, and every 3 minutes by default (GitHub notifications may be unavailable)")
     func slowChannelReconcileIsThrottled() async throws {
         let clock = TestClock()
         let source = FakeSource([.success(PollBatch(candidates: [], wasNotModified: true))])
@@ -145,7 +145,7 @@ struct InboxSyncServiceTests {
         #expect(source.pollRequests.last?.reconcileNow == true)
         #expect(first.state.lastReconcileAt == clock.now)
 
-        clock.advance(by: 5 * 60)
+        clock.advance(by: 2 * 60)
         let second = try await svc.sync(InboxSyncRequest(previousState: first.state))
         #expect(source.pollRequests.last?.reconcileNow == false)
         #expect(second.state.lastReconcileAt == first.state.lastReconcileAt)
@@ -153,8 +153,24 @@ struct InboxSyncServiceTests {
         let manual = try await svc.sync(InboxSyncRequest(manual: true, previousState: second.state))
         #expect(source.pollRequests.last?.reconcileNow == true)
 
-        clock.advance(by: 16 * 60)
+        clock.advance(by: 3 * 60)
         _ = try await svc.sync(InboxSyncRequest(previousState: manual.state))
+        #expect(source.pollRequests.last?.reconcileNow == true)
+    }
+
+    @Test("SPEC: the slow search cadence is configurable per request")
+    func reconcileIntervalIsConfigurable() async throws {
+        let clock = TestClock()
+        let source = FakeSource([.success(PollBatch(candidates: [], wasNotModified: true))])
+        let svc = service(source: source, clock: clock)
+        let first = try await svc.sync(InboxSyncRequest(reconcileIntervalSeconds: 600))
+
+        clock.advance(by: 5 * 60)
+        _ = try await svc.sync(InboxSyncRequest(previousState: first.state, reconcileIntervalSeconds: 600))
+        #expect(source.pollRequests.last?.reconcileNow == false)
+
+        clock.advance(by: 6 * 60)
+        _ = try await svc.sync(InboxSyncRequest(previousState: first.state, reconcileIntervalSeconds: 600))
         #expect(source.pollRequests.last?.reconcileNow == true)
     }
 
