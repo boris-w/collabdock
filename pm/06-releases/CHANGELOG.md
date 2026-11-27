@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### Changed
+- 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
+
 ### Added
 - **猫坞 PeekCat 品牌图标与 6 态原生菜单栏矢量重塑** (`ITER-018`, `REQ-004`, `REQ-011`, `TASK-016`)：
   - 完成两轮交互式可爱系图标评选（归档于 `pm/05-iterations/assets/ITER-018/`），定稿「V2 暖杏小黑猫配色 × 歪头招手猫造型」1024×1024 母版（`Resources/AppIconMaster.png`），并升级 `scripts/generate-icon.swift` 采用 SwiftUI 原厂 `.continuous` 连续曲率 Squircle 生成 `Resources/AppIcon.icns`。
