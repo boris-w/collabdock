@@ -23,7 +23,7 @@
   - 开发负责人只改 `Sources/**`；
   - **不得删除测试或削弱断言**。确需调整测试调用处（如接口改名）时，只做机械修改，并在 PR 描述里逐条列出。
 - 大的重构先提交**接口骨架**（类型与签名，方法体 `fatalError("unimplemented")`），测试负责人针对接口写红灯测试后再实现。
-- `make coverage` 要求 `CollabDockCore` 行覆盖率 ≥ 75%（见 `scripts/coverage.sh`），新代码不应拉低覆盖率。可测试的逻辑放进 `CollabDockCore`，App 层只做界面与状态编排。
+- `make coverage` 要求 `CollabDockCore` 行覆盖率 ≥ 80%（见 `scripts/coverage.sh`），新代码不应拉低覆盖率。可测试的逻辑放进 `CollabDockCore`，App 层只做界面与状态编排。
 
 ## 3. 隐私红线（公开仓库）
 

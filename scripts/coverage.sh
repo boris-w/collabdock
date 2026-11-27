@@ -2,12 +2,12 @@
 # 运行全部测试并统计 CollabDockCore 的行覆盖率；低于门槛时失败。
 # 在 GitHub Actions 中会把逐文件覆盖率写进 Job Summary。
 #
-#   MIN_CORE_LINE_COVERAGE=75 ./scripts/coverage.sh
+#   MIN_CORE_LINE_COVERAGE=80 ./scripts/coverage.sh
 #
 # 说明：CollabDockApp 是可执行 target，目前没有被测试链接，所以这里只统计 Core。
 set -euo pipefail
 
-MIN="${MIN_CORE_LINE_COVERAGE:-75}"
+MIN="${MIN_CORE_LINE_COVERAGE:-80}"
 
 swift test --enable-code-coverage
 
