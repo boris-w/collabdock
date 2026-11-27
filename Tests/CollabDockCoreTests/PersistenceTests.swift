@@ -61,15 +61,13 @@ struct PersistenceTests {
         defer { try? FileManager.default.removeItem(at: tempURL.deletingLastPathComponent()) }
 
         let store = SettingsStore(fileURL: tempURL)
-        var personal = AppSettings(
-            defaultEngine: .antigravity,
-            defaultModels: [.antigravity: "gemini-4-neon-xhigh"],
-            workspaceSearchRoots: ["~/my-private-code"]
-        )
+        var personal = AppSettings(workspaceSearchRoots: ["~/my-private-code"])
+        personal.lodyConfig.defaultAgentConfig = "Claude Code"
         try store.save(personal)
 
         let reloaded = store.load()
-        #expect(reloaded.defaultEngine == .antigravity)
+        #expect(reloaded.defaultEngine == .lody)
+        #expect(reloaded.lodyConfig.defaultAgentConfig == "Claude Code")
         #expect(reloaded.workspaceSearchRoots == ["~/my-private-code"])
 
         var teamSource = AppSettings()
@@ -81,8 +79,8 @@ struct PersistenceTests {
         personal.applyTeamPreset(decoded)
         #expect(personal.globalTriggerRules.scopeAllowlist == ["acme/*"])
         #expect(personal.globalTriggerRules.mentionKeywords == ["cr", "audit"])
-        // 个人模型和本地代码目录不受团队配置包覆盖
-        #expect(personal.defaultEngine == .antigravity)
+        // 个人 Lody agent 和本地代码目录不受团队配置包覆盖
+        #expect(personal.lodyConfig.defaultAgentConfig == "Claude Code")
         #expect(personal.workspaceSearchRoots == ["~/my-private-code"])
     }
 
@@ -106,7 +104,6 @@ struct PersistenceTests {
         #expect(decoded.injectPresetPrompt == true)
         #expect(decoded.lodyConfig.preferNPXFallback == true)
         #expect(decoded.lodyConfig.defaultAgentConfig == "antigravity")
-        #expect(decoded.defaultModels[.lody] == "default")
         #expect(decoded.presets == TaskPreset.defaults)
         #expect(decoded.presets.count == 1)
 

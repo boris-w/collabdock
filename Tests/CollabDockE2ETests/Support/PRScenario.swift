@@ -101,10 +101,6 @@ struct PRScenario {
             }
             """
         )
-        github.on(
-            "POST", "/repos/\(Self.repository)/pulls/\(Self.number)/reviews",
-            json: #"{"id": 1001, "state": "PENDING"}"#
-        )
     }
 
     var connector: GitHubConnector {
@@ -181,12 +177,6 @@ struct PRScenario {
             reviewRound: previousReview == nil ? 1 : previousReview!.reviewRound + 1
         )
     }
-}
-
-/// 模型返回的结构化审查：一条落在 diff 内（第 5 行），一条越界（第 250 行，应降级进总结）
-enum SampleReview {
-    static let inDiffLine = 5
-    static let json = #"{"summary":"Adds a TTL constant; purge() is a no-op.","recommendedVerdict":"COMMENT","comments":[{"path":"Sources/Cache.swift","line":5,"side":"RIGHT","severity":"warning","title":"purge() does nothing","body":"Clear the storage here.","suggestion":"    mutating func purge() { storage.removeAll() }"},{"path":"Sources/Cache.swift","line":250,"side":"RIGHT","severity":"nit","title":"Out-of-diff note","body":"Should be folded into the review summary."}]}"#
 }
 
 /// 线程安全的进度收集器

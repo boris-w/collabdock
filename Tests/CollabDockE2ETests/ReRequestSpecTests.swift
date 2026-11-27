@@ -38,7 +38,7 @@ struct ReRequestSpecTests {
             )),
             createdAt: ISO8601DateFormatter().date(from: firstRequest)!,
             status: .draftReady,
-            sessionHandle: AgentSessionHandle(engine: .codex, sessionID: "0199c3a2-7b1e-7f30-9a4d-5e2f8c61d0b7", workspacePath: "/tmp/wt", launchMode: .managedStructuredRun),
+            sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "0199c3a2-7b1e-7f30-9a4d-5e2f8c61d0b7", workspacePath: "/tmp/wt", launchMode: .nativeBackgroundSession),
             gitHubReviewVerdict: "CHANGES_REQUESTED"
         )
     }

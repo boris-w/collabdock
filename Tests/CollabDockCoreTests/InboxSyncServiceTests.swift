@@ -118,7 +118,7 @@ struct InboxSyncServiceTests {
     @Test("A new round for an already-reviewed PR carries the previous review context (round 2)")
     func previousReviewIsAttached() async throws {
         var reviewed = Fixtures.prItem(repository: "acme/api", number: 1, headSHA: "1111111111111111111111111111111111111111", status: .completed)
-        reviewed.sessionHandle = AgentSessionHandle(engine: .claudeCode, sessionID: "sess-1", workspacePath: "/tmp/wt", launchMode: .managedStructuredRun)
+        reviewed.sessionHandle = AgentSessionHandle(engine: .lody, sessionID: "sess-1", workspacePath: "/tmp/wt", launchMode: .nativeBackgroundSession)
         let next = Fixtures.candidate(repository: "acme/api", number: 1, headSHA: "2222222222222222222222222222222222222222")
         let source = FakeSource([.success(PollBatch(candidates: [next]))])
 
@@ -130,7 +130,7 @@ struct InboxSyncServiceTests {
         #expect(item.reviewRound == 2)
         #expect(item.previousReview?.reviewedHeadSHA == "1111111111111111111111111111111111111111")
         #expect(item.previousReview?.sessionID == "sess-1")
-        #expect(item.previousReview?.engine == .claudeCode)
+        #expect(item.previousReview?.engine == .lody)
     }
 
     // MARK: sync — throttling & backoff
@@ -383,14 +383,13 @@ struct InboxSyncServiceTests {
         // existingItems 与收件箱一致：最新的在前
         let context = InboxSyncService.findPreviousReview(
             for: target,
-            in: [pending, otherPR, newer, older, target],
-            defaultEngine: .codex
+            in: [pending, otherPR, newer, older, target]
         )
 
         #expect(context?.previousItemID == newer.id)
         #expect(context?.reviewedHeadSHA == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
         #expect(context?.reviewRound == 2)
-        #expect(context?.engine == .codex) // 没有会话句柄时回退到默认引擎
+        #expect(context?.engine == .lody) // 没有会话句柄时回退到唯一的引擎 Lody
         #expect(context?.summarySnippet == "newer summary")
 
         #expect(InboxSyncService.findPreviousReview(for: target, in: [pending, otherPR, target]) == nil)

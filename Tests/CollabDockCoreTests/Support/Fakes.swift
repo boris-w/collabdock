@@ -103,54 +103,23 @@ struct FakePRFetcher: PullRequestFetching {
     func fetchPullRequest(reference: String) async throws -> CollaborationItem { item }
 }
 
-final class FakeSink: CollaborationSink, @unchecked Sendable {
-    struct Delivery {
-        let output: ExecutionOutput
-        let item: CollaborationItem
-        let mode: DeliveryMode
-        let context: DeliveryContext
-    }
-
-    let platform: PlatformKind = .github
-    private let lock = NSLock()
-    private var recorded: [Delivery] = []
-    var error: Error?
-    var reportPath = URL(fileURLWithPath: "/tmp/collabdock-test-report.md")
-
-    var deliveries: [Delivery] { lock.withLock { recorded } }
-
-    func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode] {
-        ConnectorCatalog.supportedDeliveryModes(for: item)
-    }
-
-    func deliver(output: ExecutionOutput, for item: CollaborationItem, mode: DeliveryMode, context: DeliveryContext) async throws -> DeliveryReceipt {
-        lock.withLock { recorded.append(Delivery(output: output, item: item, mode: mode, context: context)) }
-        if let error { throw error }
-        return DeliveryReceipt(deliveredMode: mode, destinationURL: item.url, localReportPath: reportPath)
-    }
-}
-
 // MARK: - Backend fake
 
-/// 假执行后端：记录 prepare / execute 调用，按脚本返回结果；可在执行中途模拟用户中止
+/// 假 Lody 执行后端：记录 prepare / execute 调用，按脚本返回结果；可在执行中途模拟用户中止
 final class FakeBackend: ExecutionBackend, @unchecked Sendable {
-    let kind: ExecutionBackendKind
-    let supportedEngines: [AgentEngine]
+    let kind: ExecutionBackendKind = .lody
     private let lock = NSLock()
     private var prepares: [WorkspacePreparationRequest] = []
     private var executes: [AgentRunRequest] = []
 
     var context: PreparedWorkspaceContext
     var prepareError: Error?
-    /// 返回值按 engine 区分（会诊时两个引擎各自返回）
-    var results: [AgentEngine: AgentRunResult] = [:]
+    var result: AgentRunResult?
     var executeError: Error?
     var onPrepare: (@Sendable () -> Void)?
     var onExecute: (@Sendable (AgentRunRequest) -> Void)?
 
-    init(kind: ExecutionBackendKind, engines: [AgentEngine], context: PreparedWorkspaceContext) {
-        self.kind = kind
-        self.supportedEngines = engines
+    init(context: PreparedWorkspaceContext = Fixtures.workspace()) {
         self.context = context
     }
 
@@ -164,7 +133,7 @@ final class FakeBackend: ExecutionBackend, @unchecked Sendable {
         return context
     }
 
-    func buildCommand(for request: AgentRunRequest, prompt: String, schemaFileURL: URL, outputFileURL: URL?) throws -> AgentCommandSpec {
+    func buildCommand(for request: AgentRunRequest, prompt: String) throws -> AgentCommandSpec {
         AgentCommandSpec(executable: "/usr/bin/true", arguments: [], workingDirectory: request.workspace.workspaceURL)
     }
 
@@ -173,8 +142,8 @@ final class FakeBackend: ExecutionBackend, @unchecked Sendable {
         onProgress("fake progress from \(request.plan.engine.rawValue)")
         onExecute?(request)
         if let executeError { throw executeError }
-        guard let result = results[request.plan.engine] else {
-            throw AgentRunnerError.unparseableOutput("no scripted result for \(request.plan.engine)")
+        guard let result else {
+            throw AgentRunnerError.unparseableOutput("no scripted result")
         }
         return result
     }
@@ -218,11 +187,10 @@ extension Fixtures {
         .codeReview(CodeReviewResult(summary: summary, recommendedVerdict: .comment, comments: comments))
     }
 
-    static func workspace(diff: String = "diff --git a/x b/x") -> PreparedWorkspaceContext {
+    static func workspace(path: String = "/tmp/collabdock-fake-worktree") -> PreparedWorkspaceContext {
         PreparedWorkspaceContext(
-            workspaceURL: URL(fileURLWithPath: "/tmp/collabdock-fake-worktree", isDirectory: true),
-            isTemporaryWorktree: true,
-            unifiedDiff: diff
+            workspaceURL: URL(fileURLWithPath: path, isDirectory: true),
+            isTemporaryWorktree: true
         )
     }
 }

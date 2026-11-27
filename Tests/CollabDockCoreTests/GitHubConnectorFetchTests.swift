@@ -163,47 +163,4 @@ struct GitHubConnectorFetchTests {
         #expect(failed.snapshots.isEmpty)
         #expect(failed.viewerLogin == nil)
     }
-
-    // MARK: delivery without a local diff
-
-    @Test("Delivering a draft without a local diff fetches the PR diff from GitHub to validate comment lines")
-    func deliveryFetchesDiffWhenMissing() async throws {
-        let diff = """
-        diff --git a/Sources/Cache.swift b/Sources/Cache.swift
-        --- a/Sources/Cache.swift
-        +++ b/Sources/Cache.swift
-        @@ -1,4 +1,6 @@
-         struct Cache {
-             var storage: [String: String] = [:]
-             func get(_ key: String) -> String? { storage[key] }
-        +    static let ttl = 60
-        +    func purge() { }
-         }
-        """
-        let transport = RoutedTransport([
-            "GET /repos/acme/backend/pulls/7": (200, diff),
-            "POST /repos/acme/backend/pulls/7/reviews": (200, #"{"id":1,"state":"PENDING"}"#)
-        ])
-        let connector = GitHubConnector(transport: transport, tokenProvider: Token(value: "gho_placeholder"))
-        let item = try await GitHubConnector(
-            transport: RoutedTransport(["GET /repos/acme/backend/pulls/7": (200, prJSON)]),
-            tokenProvider: Token(value: "gho_placeholder")
-        ).fetchPullRequest(reference: "acme/backend#7")
-        let reports = FileManager.default.temporaryDirectory.appendingPathComponent("collabdock-reports-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: reports) }
-        let review = CodeReviewResult(summary: "ok", recommendedVerdict: .comment, comments: [
-            CodeInlineComment(path: "Sources/Cache.swift", line: 5, severity: .warning, title: "in diff", body: "kept inline"),
-            CodeInlineComment(path: "Sources/Cache.swift", line: 90, severity: .nit, title: "outside diff", body: "moved to summary")
-        ])
-
-        _ = try await connector.deliver(output: .codeReview(review), for: item, mode: .platformDraft, context: DeliveryContext(reportsDirectory: reports))
-
-        let diffRequest = try #require(transport.recorded.first { $0.httpMethod == "GET" })
-        #expect(diffRequest.value(forHTTPHeaderField: "Accept") == "application/vnd.github.v3.diff")
-        let post = try #require(transport.recorded.first { $0.httpMethod == "POST" })
-        let body = try #require(try JSONSerialization.jsonObject(with: post.httpBody ?? Data()) as? [String: Any])
-        let comments = try #require(body["comments"] as? [[String: Any]])
-        #expect(comments.map { $0["line"] as? Int } == [5])
-        #expect((body["body"] as? String)?.contains("outside diff") == true)
-    }
 }

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CollabDockCore
 
-@Suite("Catalogs & defaults — Lody catalog cache, legacy decoding, project matching, delivery modes, safe engine defaults")
+@Suite("Catalogs & defaults — Lody catalog cache, legacy decoding, project matching, Lody defaults")
 struct CatalogAndDefaultsTests {
     private func tempSettingsStore() -> (SettingsStore, URL) {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("collabdock-settings-\(UUID().uuidString)", isDirectory: true)
@@ -85,24 +85,8 @@ struct CatalogAndDefaultsTests {
         #expect(LodyAgentConfigOption(id: "d", name: "Mystery", agentType: "other", models: []).inferredUnderlyingEngine == nil)
     }
 
-    @Test("Delivery modes: code changes can be drafted on the platform; chat/issue items only get local drafts or replies")
-    func deliveryModeNegotiation() {
-        let pr = Fixtures.prItem()
-        let chat = Fixtures.chatItem()
-        #expect(ConnectorCatalog.defaultDeliveryMode(for: pr) == .platformDraft)
-        #expect(ConnectorCatalog.supportedDeliveryModes(for: pr).contains(.platformDraft))
-        #expect(ConnectorCatalog.defaultDeliveryMode(for: chat) == .localDraftOnly)
-        #expect(ConnectorCatalog.supportedDeliveryModes(for: chat) == [.localDraftOnly, .directReply])
-    }
-
-    @Test("Security: every direct engine defaults to a read-only mode that exists in its own mode list, and has default models")
-    func engineDefaultsAreSafe() {
-        let readOnly: [AgentEngine: String] = [.claudeCode: "plan", .antigravity: "plan", .codex: "read-only"]
-        for (engine, expected) in readOnly {
-            #expect(engine.defaultSafeModeID == expected)
-            #expect(engine.defaultModes.map(\.id).contains(expected), "\(engine) safe mode must be selectable")
-            #expect(!engine.defaultModels.isEmpty)
-        }
+    @Test("Lody ships default model and mode options for the confirmation card")
+    func lodyDefaults() {
         #expect(!AgentEngine.lody.defaultModels.isEmpty)
         #expect(!AgentEngine.lody.defaultModes.isEmpty)
     }

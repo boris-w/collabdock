@@ -6,60 +6,9 @@ import Testing
 struct AgentCommandBuilderTests {
     let builder = AgentCommandBuilder()
     let workspace = URL(fileURLWithPath: "/tmp/collabdock/worktree-482")
-    let schema = URL(fileURLWithPath: "/tmp/collabdock/schema.json")
 
-    @Test("Builds read-only sandboxed commands for Claude, Codex, and Antigravity")
-    func threeEnginesSandboxCommands() {
-        let claudeSpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .claudeCode, model: "opus", effort: .high),
-            prompt: "Analyze",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        #expect(claudeSpec.executable == "claude")
-        #expect(claudeSpec.arguments.contains("--permission-mode"))
-        #expect(claudeSpec.arguments.contains("plan"))
-        #expect(claudeSpec.arguments.contains("--json-schema"))
-
-        let outFile = URL(fileURLWithPath: "/tmp/collabdock/out.json")
-        let codexSpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .codex, model: "gpt-5.3-codex", effort: .xhigh),
-            prompt: "Analyze",
-            workspaceURL: workspace,
-            schemaFileURL: schema,
-            codexLastMessageURL: outFile
-        )
-        #expect(codexSpec.executable == "codex")
-        #expect(codexSpec.arguments.first == "exec")
-        #expect(codexSpec.arguments.contains("--sandbox"))
-        #expect(codexSpec.arguments.contains("read-only"))
-        #expect(codexSpec.outputFilePath == outFile)
-
-        let agySpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .antigravity, model: "gemini-4-neon-xhigh", effort: .medium),
-            prompt: "Analyze",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        #expect(agySpec.executable == "agy")
-        #expect(agySpec.arguments.contains("--mode"))
-        #expect(agySpec.arguments.contains("plan"))
-        #expect(agySpec.arguments.contains("--sandbox"))
-        // 模型 ID 已带 -xhigh 后缀时不应再传冲突的 --effort
-        #expect(!agySpec.arguments.contains("--effort"))
-
-        let agyBaseSpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .antigravity, model: "gemini-4-neon", effort: .high),
-            prompt: "Analyze",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        #expect(agyBaseSpec.arguments.contains("--effort"))
-        #expect(agyBaseSpec.arguments.contains("high"))
-    }
-
-    @Test("Selects code review schema for PR/MR and structured reply schema for chat/issue")
-    func dynamicSchemaAndPromptIsolation() {
+    @Test("PR and chat prompts keep external data inside the untrusted block")
+    func promptIsolationForPRAndChat() {
         let prItem = CollaborationItem(
             id: "pr-1",
             platform: .github,
@@ -85,8 +34,7 @@ struct AgentCommandBuilderTests {
                 )
             )
         )
-        #expect(builder.schema(for: prItem).contains("recommendedVerdict"))
-        let prPrompt = builder.buildSafePrompt(item: prItem, preset: TaskPreset.defaults[0], extraInstructions: "重点看并发")
+        let prPrompt = builder.buildSafePrompt(item: prItem, preset: TaskPreset.defaults[0], extraInstructions: "重点看并发", launchMode: .nativeBackgroundSession)
         #expect(prPrompt.contains("<untrusted_external_data>"))
         #expect(prPrompt.contains("</untrusted_external_data>"))
         #expect(prPrompt.contains("git diff origin/main...HEAD"))
@@ -111,38 +59,9 @@ struct AgentCommandBuilderTests {
                 )
             )
         )
-        #expect(builder.schema(for: chatItem).contains("replyMarkdown"))
-        let chatPrompt = builder.buildSafePrompt(item: chatItem, preset: TaskPreset.defaults[0], extraInstructions: "")
+        let chatPrompt = builder.buildSafePrompt(item: chatItem, preset: TaskPreset.defaults[0], extraInstructions: "", launchMode: .nativeBackgroundSession)
         #expect(chatPrompt.contains("飞书"))
         #expect(chatPrompt.contains("严禁修改任何本地文件"))
-    }
-
-    @Test("Builds native background dispatch commands and resume shell commands [ADR-006]")
-    func backgroundDispatchAndResumeCommands() {
-        let claudeBg = builder.buildBackgroundDispatchCommand(
-            plan: ExecutionPlan(engine: .claudeCode, model: "opus", effort: .high, launchMode: .nativeBackgroundSession),
-            prompt: "Review PR",
-            workspaceURL: workspace
-        )
-        #expect(claudeBg.arguments.contains("--bg"))
-        #expect(claudeBg.arguments.contains("--permission-mode"))
-        #expect(claudeBg.arguments.contains("plan"))
-
-        let bgHandle = AgentSessionHandle(
-            engine: .claudeCode,
-            sessionID: "sess_123",
-            workspacePath: "/tmp/wt",
-            launchMode: .nativeBackgroundSession
-        )
-        #expect(DirectCLIBackend().resumeShellCommand(for: bgHandle).contains("claude attach 'sess_123'"))
-
-        let managedHandle = AgentSessionHandle(
-            engine: .antigravity,
-            sessionID: "conv_999",
-            workspacePath: "/tmp/wt",
-            launchMode: .managedStructuredRun
-        )
-        #expect(DirectCLIBackend().resumeShellCommand(for: managedHandle).contains("agy --resume 'conv_999'"))
     }
 
     @Test("Builds Lody session create command with workspace, agent-config, model, mode, effort, repo, npx -y fallback, and deep link [REQ-014][ADR-007]")
@@ -285,7 +204,7 @@ struct AgentCommandBuilderTests {
         #expect(minimalPrompt.contains("<untrusted_external_data>"))
     }
 
-    @Test("Builds Lody session chat and CLI --resume commands + incremental diff prompt for follow-up re-reviews [TASK-015][ITER-013]")
+    @Test("Builds the Lody session chat command + incremental follow-up prompt for re-reviews [TASK-015][ITER-013]")
     func followUpReReviewContinuationAndIncrementalPrompt() {
         let prevLody = PreviousReviewContext(
             previousItemID: "gh:acme/backend#482:r1",
@@ -330,30 +249,6 @@ struct AgentCommandBuilderTests {
         #expect(chatSpec.arguments.contains("--mode"))
         #expect(chatSpec.arguments.contains("plan"))
         #expect(!chatSpec.arguments.contains("--worktree"))
-
-        // 验证本地 Claude 复审续聊附加 --resume
-        let prevClaude = PreviousReviewContext(
-            previousItemID: "gh:acme/backend#482:r1",
-            reviewedHeadSHA: "1111111",
-            reviewedAt: Date(),
-            engine: .claudeCode,
-            sessionID: "claude_sess_77"
-        )
-        let claudeResumePlan = ExecutionPlan(
-            engine: .claudeCode,
-            model: "opus",
-            effort: .high,
-            continuityMode: .continueSessionIncremental,
-            previousReview: prevClaude
-        )
-        let claudeSpec = builder.buildCommand(
-            plan: claudeResumePlan,
-            prompt: "Follow-up",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        #expect(claudeSpec.arguments.contains("--resume"))
-        #expect(claudeSpec.arguments.contains("claude_sess_77"))
 
         // 验证增量复审 Prompt 包含新增 Commit 日志、增量 Diff 及 force-push 提示
         let prItem = CollaborationItem(
@@ -482,8 +377,8 @@ struct AgentCommandBuilderTests {
         #expect(errorSnap?.isRunning == false)
     }
 
-    @Test("Passes user-selected execution mode across Lody, Claude, Agy and Codex and parses real Lody modes [ITER-016]")
-    func selectableExecutionModeAcrossEngines() throws {
+    @Test("Passes the user-selected Lody mode and parses real Lody modes [ITER-016]")
+    func selectableLodyMode() throws {
         // 1. 解析真实 Lody agent-config list 中的 modes
         let catalogJSON = """
         {
@@ -521,44 +416,14 @@ struct AgentCommandBuilderTests {
         let modeIdx = try #require(lodySpec.arguments.firstIndex(of: "--mode"))
         #expect(lodySpec.arguments[modeIdx + 1] == "auto")
 
-        // 3. 直连 Claude / Agy / Codex 均透传用户选定的 mode
-        let claudeSpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .claudeCode, model: "opus", effort: .high, mode: "acceptEdits"),
-            prompt: "Review",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        let claudeIdx = try #require(claudeSpec.arguments.firstIndex(of: "--permission-mode"))
-        #expect(claudeSpec.arguments[claudeIdx + 1] == "acceptEdits")
-
-        let agySpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .antigravity, model: "gemini-4-neon-xhigh", effort: .high, mode: "default"),
-            prompt: "Review",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        let agyIdx = try #require(agySpec.arguments.firstIndex(of: "--mode"))
-        #expect(agySpec.arguments[agyIdx + 1] == "default")
-
-        let codexSpec = builder.buildCommand(
-            plan: ExecutionPlan(engine: .codex, model: "gpt-5.3-codex", effort: .high, mode: "workspace-write"),
-            prompt: "Review",
-            workspaceURL: workspace,
-            schemaFileURL: schema
-        )
-        let codexIdx = try #require(codexSpec.arguments.firstIndex(of: "--sandbox"))
-        #expect(codexSpec.arguments[codexIdx + 1] == "workspace-write")
-
-        // 4. AppSettings 持久化与回读 defaultModes & lodyConfig.defaultModeByAgentConfig
+        // 3. AppSettings 持久化与回读 lodyConfig.defaultModeByAgentConfig
         var settings = AppSettings()
-        settings.defaultModes[.claudeCode] = "auto"
         settings.lodyConfig.defaultModeByAgentConfig["cfg-agy"] = "accept-edits"
         let encoded = try JSONEncoder().encode(settings)
         let decoded = try JSONDecoder().decode(AppSettings.self, from: encoded)
-        #expect(decoded.defaultModes[.claudeCode] == "auto")
         #expect(decoded.lodyConfig.defaultModeByAgentConfig["cfg-agy"] == "accept-edits")
 
-        // 5. GitHub 账号别名与头像解析
+        // 4. GitHub 账号别名与头像解析
         let ghProfileJSON = #"{"login":"boris-w","name":"Boris","avatar_url":"https://avatars.githubusercontent.com/u/37397984?v=4"}"#
         let parsedProfile = EnvironmentDetector.parseGitHubUserProfile(ghProfileJSON)
         #expect(parsedProfile?.login == "boris-w")

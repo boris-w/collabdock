@@ -7,8 +7,6 @@ import Testing
 /// 后台会话里的 agent 自己能执行 git（实测 Lody 的 Antigravity agent 在 plan 模式下会自己跑 `git diff`），
 /// 嵌入的 diff 只会让会话上下文越滚越大、超过上限时被截断。消息里只给：上一轮审查的提交、最新提交、新增提交列表，
 /// 以及「先拉取最新 PR 头，再对比」的指令（agent 的工作树还停在上一轮的提交上）。
-///
-/// 直连 CLI 的托管运行（一次性、结构化输出、要按行号回写）保持嵌入 diff —— 例如 `agy` 在只读 plan 模式下无法执行 git。
 @Suite("SPEC — background re-review prompts reference commits instead of inlining the diff")
 struct BackgroundReReviewPromptSpecTests {
     private let builder = AgentCommandBuilder()
@@ -124,15 +122,6 @@ struct BackgroundReReviewPromptSpecTests {
                 #expect(!line.contains("$("), "forcePushed=\(forcePushed): \(line)")
             }
             #expect(p.contains("pull/482/head"))
-        }
-    }
-
-    @Test("Safety net: one-shot managed runs keep the inlined incremental diff (agy cannot run git in plan mode)")
-    func managedRunsKeepTheDiff() {
-        for engine in [AgentEngine.antigravity, .claudeCode, .codex] {
-            let p = prompt(launchMode: .managedStructuredRun, engine: engine)
-            #expect(p.contains("<untrusted_incremental_diff>"), "\(engine)")
-            #expect(p.contains(diffBody), "\(engine)")
         }
     }
 
