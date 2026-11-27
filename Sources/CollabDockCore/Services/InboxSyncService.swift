@@ -186,10 +186,12 @@ public struct InboxSyncService: Sendable {
             try await store.loadCursor(for: source.platform)
         }
 
+        let trimmedHandle = request.currentHandle.trimmingCharacters(in: .whitespacesAndNewlines)
         let pollRequest = PollRequest(
             cursor: previousCursor,
             reconcileNow: shouldReconcile,
-            knownFingerprints: state.knownPRFingerprints
+            knownFingerprints: state.knownPRFingerprints,
+            viewerLogin: trimmedHandle.isEmpty ? nil : trimmedHandle
         )
 
         let batch: PollBatch

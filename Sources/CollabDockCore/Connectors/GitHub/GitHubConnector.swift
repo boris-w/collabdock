@@ -160,7 +160,12 @@ public struct GitHubConnector: CodeReviewConnector {
                 let threads = (try? JSONDecoder().decode([GHNotificationThread].self, from: notifData)) ?? []
                 for thread in threads where thread.subject.type == "PullRequest" {
                     guard let triggerKind = mapNotificationReason(thread.reason) else { continue }
-                    if let candidate = await hydrateFromNotificationThread(thread, triggerKind: triggerKind, token: token) {
+                    if let candidate = await hydrateFromNotificationThread(
+                        thread,
+                        triggerKind: triggerKind,
+                        viewerLogin: request.viewerLogin,
+                        token: token
+                    ) {
                         candidatesByKey[candidate.dedupeKey] = candidate
                     }
                 }
@@ -185,6 +190,7 @@ public struct GitHubConnector: CodeReviewConnector {
                 query: "is:pr is:open review-requested:@me",
                 triggerKind: .reviewRequested,
                 fetchLatestComment: false,
+                viewerLogin: request.viewerLogin,
                 token: token,
                 fingerprints: &updatedFingerprints
             )
@@ -198,12 +204,14 @@ public struct GitHubConnector: CodeReviewConnector {
             }
         }
 
-        // 3. 若缺少 notifications scope，自动降级拉取 mentions:@me（配合 updated_at 指纹跳过无变化 PR）
-        if notificationsForbidden && includeMentionsSearchFallback {
+        // 3. 缺少 notifications scope 或低频对齐周期时拉取 mentions:@me（通知走邮件返回 200 空列表时仍可兜底发现，配合 updated_at 指纹跳过无变化 PR）
+        let shouldRunMentionsSearch = includeMentionsSearchFallback && (notificationsForbidden || request.reconcileNow)
+        if shouldRunMentionsSearch {
             let (mentionCandidates, searchRL) = try await searchOpenPRs(
                 query: "is:pr is:open mentions:@me",
                 triggerKind: .mention,
                 fetchLatestComment: true,
+                viewerLogin: request.viewerLogin,
                 token: token,
                 fingerprints: &updatedFingerprints
             )
@@ -427,6 +435,7 @@ public struct GitHubConnector: CodeReviewConnector {
     private func hydrateFromNotificationThread(
         _ thread: GHNotificationThread,
         triggerKind: TriggerKind,
+        viewerLogin: String?,
         token: String
     ) async -> PolledCollaborationCandidate? {
         guard let subjectURLStr = thread.subject.url,
@@ -437,13 +446,20 @@ public struct GitHubConnector: CodeReviewConnector {
             return nil
         }
 
+        let repo = thread.repository.fullName
         var commentBody: String?
         var actor = pr.user.login
         var revisionKey: String
 
         if triggerKind == .reviewRequested {
-            // Re-request review 必须以 pr.head.sha 为去重基线（与 Search 通道保持一致），避免未发新评论时误用旧 comment.id 被去重吞掉
-            revisionKey = pr.head.sha
+            // Re-request review 以 pr.head.sha 为去重基线，并在本人提交过 review 后再次被请求时追加请求时间（与 Search 通道保持一致）
+            revisionKey = await resolveReviewRequestedRevisionKey(
+                repo: repo,
+                number: pr.number,
+                headSHA: pr.head.sha,
+                viewerLogin: viewerLogin,
+                token: token
+            )
         } else {
             revisionKey = thread.updatedAt
             if let latestCommentStr = thread.subject.latestCommentURL,
@@ -456,7 +472,6 @@ public struct GitHubConnector: CodeReviewConnector {
             }
         }
 
-        let repo = thread.repository.fullName
         let dedupeKey = "github:\(repo)#\(pr.number):\(triggerKind.rawValue):\(revisionKey)"
         return makeCandidate(
             dedupeKey: dedupeKey,
@@ -472,6 +487,7 @@ public struct GitHubConnector: CodeReviewConnector {
         query: String,
         triggerKind: TriggerKind,
         fetchLatestComment: Bool,
+        viewerLogin: String?,
         token: String,
         fingerprints: inout [String: String]
     ) async throws -> ([PolledCollaborationCandidate], RateLimitSnapshot?) {
@@ -535,6 +551,14 @@ public struct GitHubConnector: CodeReviewConnector {
                     commentBody = prBody
                     revisionKey = "prbody-\(pr.head.sha)"
                 }
+            } else if triggerKind == .reviewRequested {
+                revisionKey = await resolveReviewRequestedRevisionKey(
+                    repo: repo,
+                    number: pr.number,
+                    headSHA: pr.head.sha,
+                    viewerLogin: viewerLogin,
+                    token: token
+                )
             }
 
             let dedupeKey = "github:\(repo)#\(pr.number):\(triggerKind.rawValue):\(revisionKey)"
@@ -550,6 +574,61 @@ public struct GitHubConnector: CodeReviewConnector {
             )
         }
         return (results, rl)
+    }
+
+    private func resolveReviewRequestedRevisionKey(
+        repo: String,
+        number: Int,
+        headSHA: String,
+        viewerLogin: String?,
+        token: String
+    ) async -> String {
+        guard let viewer = viewerLogin?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !viewer.isEmpty else {
+            return headSHA
+        }
+        guard let events = await fetchIssueTimeline(repo: repo, number: number, token: token),
+              let reRequestAt = Self.reRequestTimestampAfterLatestReview(in: events, viewerLogin: viewer) else {
+            return headSHA
+        }
+        return "\(headSHA)@\(reRequestAt)"
+    }
+
+    private static func reRequestTimestampAfterLatestReview(
+        in events: [GHTimelineEvent],
+        viewerLogin: String
+    ) -> String? {
+        let target = viewerLogin.lowercased()
+        var latestReviewDate: Date?
+
+        for event in events where event.event?.lowercased() == "reviewed" {
+            guard event.user?.login?.lowercased() == target else { continue }
+            if event.state?.lowercased() == "pending" { continue }
+            guard let submittedStr = event.submittedAt ?? event.createdAt,
+                  let submittedDate = parseISO8601(submittedStr) else {
+                continue
+            }
+            if latestReviewDate == nil || submittedDate > latestReviewDate! {
+                latestReviewDate = submittedDate
+            }
+        }
+
+        guard let latestReviewDate else { return nil }
+
+        var latestReRequest: (date: Date, raw: String)?
+        for event in events where event.event?.lowercased() == "review_requested" {
+            guard event.requestedReviewer?.login?.lowercased() == target else { continue }
+            guard let raw = event.createdAt,
+                  let date = parseISO8601(raw),
+                  date > latestReviewDate else {
+                continue
+            }
+            if latestReRequest == nil || date > latestReRequest!.date {
+                latestReRequest = (date, raw)
+            }
+        }
+
+        return latestReRequest?.raw
     }
 
     private func makeCandidate(
@@ -632,6 +711,20 @@ public struct GitHubConnector: CodeReviewConnector {
         }
         let comments = (try? JSONDecoder().decode([GHComment].self, from: data)) ?? []
         return comments.last
+    }
+
+    private func fetchIssueTimeline(repo: String, number: Int, token: String) async -> [GHTimelineEvent]? {
+        let base = baseURL.appendingPathComponent("repos/\(repo)/issues/\(number)/timeline")
+        var comps = URLComponents(url: base, resolvingAgainstBaseURL: false)
+        comps?.queryItems = [
+            URLQueryItem(name: "per_page", value: "100")
+        ]
+        guard let finalURL = comps?.url else { return nil }
+        let req = makeRequest(url: finalURL, token: token)
+        guard let (data, resp) = try? await transport.data(for: req), resp.statusCode == 200 else {
+            return nil
+        }
+        return try? JSONDecoder().decode([GHTimelineEvent].self, from: data)
     }
 
     private func makeRequest(url: URL, token: String) -> URLRequest {
@@ -1053,4 +1146,24 @@ private struct GHComment: Decodable {
     let id: Int
     let body: String
     let user: GHUser
+}
+
+private struct GHOptionalUser: Decodable {
+    let login: String?
+}
+
+private struct GHTimelineEvent: Decodable {
+    let event: String?
+    let createdAt: String?
+    let submittedAt: String?
+    let state: String?
+    let user: GHOptionalUser?
+    let requestedReviewer: GHOptionalUser?
+
+    enum CodingKeys: String, CodingKey {
+        case event, state, user
+        case createdAt = "created_at"
+        case submittedAt = "submitted_at"
+        case requestedReviewer = "requested_reviewer"
+    }
 }
