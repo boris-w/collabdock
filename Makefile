@@ -18,7 +18,7 @@ test-unit:
 test-e2e:
 	swift test --filter CollabDockE2ETests
 
-# 全部测试 + CollabDockCore 行覆盖率门槛（默认 75%，可用 MIN_CORE_LINE_COVERAGE 覆盖）；CI 使用此目标
+# 全部测试 + CollabDockCore 行覆盖率门槛（默认 80%，可用 MIN_CORE_LINE_COVERAGE 覆盖）；CI 使用此目标
 coverage:
 	./scripts/coverage.sh
 
