@@ -387,7 +387,9 @@ struct AgentCommandBuilderTests {
         #expect(followUpPrompt.contains("第 2 轮复审"))
         #expect(followUpPrompt.contains("1111111"))
         #expect(followUpPrompt.contains("2222222 fix: handle nil token"))
-        #expect(followUpPrompt.contains("<untrusted_incremental_diff>"))
+        // 后台会话（Lody / claude --bg）的 agent 能自己拉取并 diff：续聊消息只给提交范围，不再嵌入 diff 正文（见 BackgroundReReviewPromptSpecTests）
+        #expect(!followUpPrompt.contains("<untrusted_incremental_diff>"))
+        #expect(followUpPrompt.contains("git diff"))
         #expect(followUpPrompt.contains("rebase / force-push"))
     }
 
