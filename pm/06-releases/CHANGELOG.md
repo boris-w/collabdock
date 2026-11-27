@@ -7,6 +7,7 @@
 ### Fixed
 - **修复同提交 Re-request review 漏报与通知仅走邮件时漏检 `@mention`** (`REQ-002`, `REQ-010`)：
   - `PollRequest` 新增 `viewerLogin`（由 `InboxSyncService` 从 `currentHandle` 透传）；`GitHubConnector` 在 Notifications 与 Search 两条通道拉取 `review_requested` PR 时查询 `/issues/{number}/timeline`，当本人最近一次提交 review 之后存在发给本人的新 `review_requested` 事件时，将请求时间追加到 revisionKey（其余情况及拉取失败保持原有 `head.sha` 键，升级零重报）。
+  - `GitHubConnector.evaluatePRAutoCompletion` 识别同提交第 N 轮复审卡片，避免把上一轮在同 SHA 上留下的 `CHANGES_REQUESTED` / `APPROVED` 旧结论套用到新卡片上。
   - `mentions:@me` 兜底搜索从仅 403 触发扩展为在 15 分钟 reconcile 周期同样执行（配合 `updated_at` 指纹跳过无变化 PR），解决 `/notifications` 返回 200 空列表（通知仅走邮件）时 `@mention` 从未被检出的问题。
 
 ### Changed

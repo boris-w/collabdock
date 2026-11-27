@@ -1019,8 +1019,25 @@ public struct GitHubConnector: CodeReviewConnector {
             return nil
         }()
 
-        // 防多轮复审误杀：必须命中当前轮次 commit 或提交时间不早于本轮入箱时间
+        // 同提交复审（本轮 headSHA 与上一轮已审查 SHA 相同）：不可按 commit OID 匹配，否则会继承上一轮在同 SHA 上留下的旧 verdict
+        let isSameCommitFollowUp: Bool = {
+            guard let prev = item.previousReview else { return false }
+            let prevSHA = prev.reviewedHeadSHA.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !prevSHA.isEmpty, let sha = itemHeadSHA, !sha.isEmpty else { return false }
+            return prevSHA.lowercased() == sha.lowercased()
+        }()
+
+        // 防多轮复审误杀：
+        // - 同提交复审：仅接受晚于上一轮审查且不早于本轮入箱时间的新 review
+        // - 其余情况：命中当前轮次 commit 或提交时间不早于本轮入箱时间
         let matchesCurrentRound: Bool = {
+            if isSameCommitFollowUp {
+                guard let submitted = latest.submittedAt else { return false }
+                if let prevReviewedAt = item.previousReview?.reviewedAt, submitted <= prevReviewedAt {
+                    return false
+                }
+                return submitted >= item.createdAt
+            }
             if let sha = itemHeadSHA, !sha.isEmpty, let oid = latest.commitOID, oid.lowercased() == sha.lowercased() {
                 return true
             }
