@@ -1,5 +1,28 @@
 import Foundation
 
+/// 原生持久会话句柄（用于一键 attach / resume 接管，关联 ADR-006）
+public struct AgentSessionHandle: Codable, Hashable, Sendable {
+    public let engine: AgentEngine
+    public let sessionID: String
+    public let workspacePath: String
+    public let launchMode: ExecutionLaunchMode
+    public let createdAt: Date
+
+    public init(
+        engine: AgentEngine,
+        sessionID: String,
+        workspacePath: String,
+        launchMode: ExecutionLaunchMode,
+        createdAt: Date = Date()
+    ) {
+        self.engine = engine
+        self.sessionID = sessionID
+        self.workspacePath = workspacePath
+        self.launchMode = launchMode
+        self.createdAt = createdAt
+    }
+}
+
 /// 执行后端类型：将「Agent 引擎」与「执行后端（本机直连 CLI vs Lody 编排层）」解耦
 public enum ExecutionBackendKind: String, Codable, CaseIterable, Hashable, Sendable {
     case directCLI
@@ -105,5 +128,22 @@ public protocol ExecutionBackend: Sendable {
 public extension ExecutionBackend {
     func supports(engine: AgentEngine) -> Bool {
         supportedEngines.contains(engine)
+    }
+
+    var supportedLaunchModes: [ExecutionLaunchMode] {
+        switch kind {
+        case .directCLI:
+            return [.managedStructuredRun, .nativeBackgroundSession]
+        case .lody:
+            return [.nativeBackgroundSession, .managedStructuredRun]
+        }
+    }
+
+    func defaultLaunchMode(fallback: ExecutionLaunchMode) -> ExecutionLaunchMode {
+        kind == .lody ? .nativeBackgroundSession : fallback
+    }
+
+    static func shellEscape(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

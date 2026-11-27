@@ -134,7 +134,7 @@ struct AgentCommandBuilderTests {
             workspacePath: "/tmp/wt",
             launchMode: .nativeBackgroundSession
         )
-        #expect(AgentDriverCatalog.resumeShellCommand(for: bgHandle).contains("claude attach 'sess_123'"))
+        #expect(DirectCLIBackend().resumeShellCommand(for: bgHandle).contains("claude attach 'sess_123'"))
 
         let managedHandle = AgentSessionHandle(
             engine: .antigravity,
@@ -142,7 +142,7 @@ struct AgentCommandBuilderTests {
             workspacePath: "/tmp/wt",
             launchMode: .managedStructuredRun
         )
-        #expect(AgentDriverCatalog.resumeShellCommand(for: managedHandle).contains("agy --resume 'conv_999'"))
+        #expect(DirectCLIBackend().resumeShellCommand(for: managedHandle).contains("agy --resume 'conv_999'"))
     }
 
     @Test("Builds Lody session create command with workspace, agent-config, model, mode, effort, repo, npx -y fallback, and deep link [REQ-014][ADR-007]")
@@ -229,17 +229,17 @@ struct AgentCommandBuilderTests {
         #expect(!directDirSpec.arguments.contains("--worktree"))
         #expect(!directDirSpec.arguments.contains("--branch"))
 
-        let deepLink = AgentDriverCatalog.lodySessionDeepLink(sessionID: "ses_abc", workspace: "ws_01")
-        #expect(deepLink?.absoluteString == "lody://session/ses_abc?workspace=ws_01")
-
+        let lodyBackend = LodyBackend(config: LodyConfig(workspace: "ws_01"))
         let lodyHandle = AgentSessionHandle(
             engine: .lody,
             sessionID: "ses_abc",
             workspacePath: "/tmp/wt",
             launchMode: .nativeBackgroundSession
         )
+        let deepLink = lodyBackend.sessionDeepLink(for: lodyHandle)
+        #expect(deepLink?.absoluteString == "lody://session/ses_abc?workspace=ws_01")
         #expect(
-            AgentDriverCatalog.resumeShellCommand(for: lodyHandle, lodyWorkspace: "ws_01")
+            lodyBackend.resumeShellCommand(for: lodyHandle)
             == "open 'lody://session/ses_abc?workspace=ws_01'"
         )
     }
