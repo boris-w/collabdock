@@ -15,6 +15,10 @@
 - 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
 
 ### Added
+- **同 PR 单卡片防重、上一轮自动归档与参与 Review 的 PR 免关键词 `@mention` 触发** (`REQ-002`, `REQ-003`)：
+  - 新增 `TaskCompletionReason.superseded` 与 `InboxSyncResult.supersededItems`：新一轮复审卡片入箱时，同 PR 仍停留在收件箱中的已处理卡片（草稿就绪 / 失败）自动归档至「已完成」并保留历史审查结果（界面展示「已进入第 N 轮」），同时通过 `previousReview` 与新一轮关联。
+  - 同一个 PR 在收件箱中已存在「待确认」卡片时，后续事件仅标记已见、不重复建卡也不重复通知；同一次同步内命中多个事件时只保留一张卡片且优先保留 `reviewRequested`。
+  - `IncomingCollaborationEvent` 新增 `viewerIsReviewer: Bool = false`：`GitHubConnector` 结合 PR `requested_reviewers` 与 issue timeline 判定当前用户是否为该 PR 的 reviewer（仍在请求列表或曾提交过非 pending review），命中时放行不带关键词的直接 `@我`（自 @、机器人、仓库黑名单、关闭提及等保护不变）。
 - **Codex 增量复审续聊上一轮会话** (`REQ-010`)：支持将上一轮 Codex 审查会话继续用于第 N 轮复审（`codex exec resume <SESSION_ID> <PROMPT>`），通过 `-c sandbox_mode="..."` 保持只读/所选沙箱策略并由隔离 worktree 作为进程工作目录，补齐 Claude Code / Antigravity / Lody / Codex 全引擎续聊闭环。
 - **猫坞 PeekCat 品牌图标与 6 态原生菜单栏矢量重塑** (`ITER-018`, `REQ-004`, `REQ-011`, `TASK-016`)：
   - 完成两轮交互式可爱系图标评选（归档于 `pm/05-iterations/assets/ITER-018/`），定稿「V2 暖杏小黑猫配色 × 歪头招手猫造型」1024×1024 母版（`Resources/AppIconMaster.png`），并升级 `scripts/generate-icon.swift` 采用 SwiftUI 原厂 `.continuous` 连续曲率 Squircle 生成 `Resources/AppIcon.icns`。

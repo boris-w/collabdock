@@ -980,6 +980,8 @@ private struct CompletedItemRowView: View {
             return ("arrow.triangle.merge", Color.purple.opacity(0.85))
         case .prClosed:
             return ("xmark.circle.fill", .secondary.opacity(0.7))
+        case .superseded:
+            return ("arrow.clockwise.circle.fill", Color.blue.opacity(0.8))
         case .manual, nil:
             return ("checkmark.circle.fill", CDTheme.statusGreen.opacity(0.85))
         }
@@ -987,6 +989,9 @@ private struct CompletedItemRowView: View {
 
     private var statusText: String {
         guard item.status == .completed else { return "已忽略" }
+        if item.completionReason == .superseded {
+            return "已进入第 \(item.reviewRound + 1) 轮"
+        }
         return (item.completionReason ?? .manual).displayLabel
     }
 
