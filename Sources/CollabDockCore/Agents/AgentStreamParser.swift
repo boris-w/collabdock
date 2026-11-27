@@ -34,7 +34,10 @@ public enum AgentStreamParser {
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             // 非 JSON 行：可能是 `claude --bg` 打印的纯文本 session id 或进度
             if let bgID = extractSessionIDFromPlainText(trimmed) {
-                return ParsedStreamLine(sessionID: bgID, progressHint: "后台会话已创建: \(bgID)")
+                return ParsedStreamLine(
+                    sessionID: bgID,
+                    progressHint: CoreL10n.format("Background session created: %@", bgID)
+                )
             }
             return ParsedStreamLine(progressHint: String(trimmed.prefix(120)))
         }
@@ -80,12 +83,12 @@ public enum AgentStreamParser {
                let params = toolInfo["parameters"] as? [String: Any],
                let target = firstString(in: params, keys: ["Path", "AbsolutePath", "file_path", "path", "Query", "CommandLine"]) {
                 let shortTarget = (target as NSString).lastPathComponent
-                progress = "正在 \(stepTool)：\(shortTarget)"
+                progress = CoreL10n.format("Running %@: %@", stepTool, shortTarget)
             } else {
-                progress = "正在调用工具：\(stepTool)"
+                progress = CoreL10n.format("Calling tool: %@", stepTool)
             }
         } else if let toolName = firstString(in: obj, keys: ["tool_name", "toolName", "name"]) {
-            progress = "正在调用工具：\(toolName)"
+            progress = CoreL10n.format("Calling tool: %@", toolName)
         } else if let message = obj["message"] as? [String: Any],
                   let content = message["content"] as? [[String: Any]] {
             for block in content {
@@ -94,20 +97,20 @@ public enum AgentStreamParser {
                     if let input = block["input"] as? [String: Any],
                        let filePath = firstString(in: input, keys: ["file_path", "path", "pattern", "command"]) {
                         let shortTarget = (filePath as NSString).lastPathComponent
-                        progress = "正在 \(name)：\(shortTarget)"
+                        progress = CoreL10n.format("Running %@: %@", name, shortTarget)
                     } else {
-                        progress = "正在执行 \(name)..."
+                        progress = CoreL10n.format("Running %@...", name)
                     }
                     break
                 } else if blockType == "text", let text = block["text"] as? String, !text.isEmpty {
                     finalText = text
-                    progress = "正在汇总审查结论..."
+                    progress = CoreL10n.string("Summarizing review findings...")
                 }
             }
         } else if type == "system" || type == "init" {
-            progress = "会话已初始化，开始分析代码..."
+            progress = CoreL10n.string("Session initialized, starting code analysis...")
         } else if type == "step_update", (stepUpdateObj?["step_type"] as? String) == "agent_response" {
-            progress = "正在生成审查结论..."
+            progress = CoreL10n.string("Generating review findings...")
         }
 
         let (usageMetrics, isFinalUsage) = extractUsage(from: obj, resultObj: resultObj, stepUpdateObj: stepUpdateObj, type: type)

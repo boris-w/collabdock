@@ -15,7 +15,8 @@ public enum CouncilSynthesizer {
     public static func synthesize(
         primary: CouncilContribution,
         secondary: CouncilContribution,
-        lineProximityThreshold: Int = 3
+        lineProximityThreshold: Int = 3,
+        language: ResolvedLanguage = .zhHans
     ) -> ExecutionOutput {
         switch (primary.output, secondary.output) {
         case (.codeReview(let r1), .codeReview(let r2)):
@@ -25,12 +26,13 @@ public enum CouncilSynthesizer {
                     review1: r1,
                     label2: secondary.label,
                     review2: r2,
-                    proximity: lineProximityThreshold
+                    proximity: lineProximityThreshold,
+                    language: language
                 )
             )
         default:
             return .structuredReply(
-                mergeStructuredReplies(primary: primary, secondary: secondary)
+                mergeStructuredReplies(primary: primary, secondary: secondary, language: language)
             )
         }
     }
@@ -40,7 +42,8 @@ public enum CouncilSynthesizer {
         review1: CodeReviewResult,
         label2: String,
         review2: CodeReviewResult,
-        proximity: Int
+        proximity: Int,
+        language: ResolvedLanguage
     ) -> CodeReviewResult {
         var matchedSecondIndices: Set<Int> = []
         var mergedComments: [CodeInlineComment] = []
@@ -57,18 +60,21 @@ public enum CouncilSynthesizer {
                 consensusCount += 1
                 let c2 = review2.comments[matchIdx]
                 let mergedSeverity = higherSeverity(c1.severity, c2.severity)
-                let combinedBody = """
-                **\(label1)**：\(c1.body)
-
-                **\(label2)**：\(c2.body)
-                """
+                let combinedBody = CoreL10n.format(
+                    "**%@**: %@\n\n**%@**: %@",
+                    language: language,
+                    label1,
+                    c1.body,
+                    label2,
+                    c2.body
+                )
                 mergedComments.append(
                     CodeInlineComment(
                         path: c1.path,
                         line: c1.line,
                         side: c1.side,
                         severity: mergedSeverity,
-                        title: "🤝 共识 · \(c1.title)",
+                        title: CoreL10n.format("🤝 Consensus · %@", language: language, c1.title),
                         body: combinedBody,
                         suggestion: c1.suggestion ?? c2.suggestion
                     )
@@ -113,12 +119,18 @@ public enum CouncilSynthesizer {
             return lhs.path < rhs.path
         }
 
-        let summary = """
-        **多模型会诊完成（\(label1) × \(label2)）**：共发现 \(mergedComments.count) 条意见，其中 **\(consensusCount) 条为双方共识问题**。
-
-        - **\(label1)**：\(review1.summary)
-        - **\(label2)**：\(review2.summary)
-        """
+        let summary = CoreL10n.format(
+            "**Multi-model council complete (%@ × %@)**: %lld findings in total, including **%lld consensus findings**.\n\n- **%@**: %@\n- **%@**: %@",
+            language: language,
+            label1,
+            label2,
+            mergedComments.count,
+            consensusCount,
+            label1,
+            review1.summary,
+            label2,
+            review2.summary
+        )
 
         let verdict: ReviewVerdict
         if review1.recommendedVerdict == .requestChanges || review2.recommendedVerdict == .requestChanges {
@@ -138,7 +150,8 @@ public enum CouncilSynthesizer {
 
     private static func mergeStructuredReplies(
         primary: CouncilContribution,
-        secondary: CouncilContribution
+        secondary: CouncilContribution,
+        language: ResolvedLanguage
     ) -> StructuredReplyResult {
         let s1 = primary.output.summaryText
         let s2 = secondary.output.summaryText
@@ -169,14 +182,22 @@ public enum CouncilSynthesizer {
             files2 = []
         }
 
-        let combinedSummary = "双模型会诊（\(primary.label) × \(secondary.label)）：\(s1) / \(s2)"
-        let combinedMarkdown = """
-        ### \(primary.label) 观点
-        \(md1)
-
-        ### \(secondary.label) 观点
-        \(md2)
-        """
+        let combinedSummary = CoreL10n.format(
+            "Two-model council (%@ × %@): %@ / %@",
+            language: language,
+            primary.label,
+            secondary.label,
+            s1,
+            s2
+        )
+        let combinedMarkdown = CoreL10n.format(
+            "### %@ Perspective\n%@\n\n### %@ Perspective\n%@",
+            language: language,
+            primary.label,
+            md1,
+            secondary.label,
+            md2
+        )
         let uniqueFiles = Array(NSOrderedSet(array: files1 + files2).compactMap { $0 as? String })
 
         return StructuredReplyResult(

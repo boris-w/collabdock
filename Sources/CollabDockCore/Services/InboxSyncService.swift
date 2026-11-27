@@ -427,7 +427,10 @@ public struct InboxSyncService: Sendable {
         existingItems: [CollaborationItem]
     ) async throws -> PRImportResult {
         guard let prFetcher else {
-            throw GitHubConnectorError.httpError(statusCode: 501, message: "当前连接器不支持手动拉取 PR")
+            throw GitHubConnectorError.httpError(
+                statusCode: 501,
+                message: CoreL10n.string("Current connector does not support manual PR fetching")
+            )
         }
 
         var item = try await prFetcher.fetchPullRequest(reference: reference)

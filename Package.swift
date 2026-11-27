@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CollabDock",
-    defaultLocalization: "zh-Hans",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -24,12 +24,18 @@ let package = Package(
     targets: [
         .target(
             name: "CollabDockCore",
-            path: "Sources/CollabDockCore"
+            path: "Sources/CollabDockCore",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .target(
             name: "CollabDockApp",
             dependencies: ["CollabDockCore"],
-            path: "Sources/CollabDockApp"
+            path: "Sources/CollabDockApp",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .executableTarget(
             name: "CollabDock",

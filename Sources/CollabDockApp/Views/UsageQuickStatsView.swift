@@ -56,7 +56,7 @@ struct UsageQuickStatsView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("收件箱")
+                    Text(L("Inbox"))
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
@@ -68,14 +68,14 @@ struct UsageQuickStatsView: View {
 
             Spacer()
 
-            Text("Review 用量统计")
+            Text(L("Review Usage"))
                 .font(.system(size: 12.5, weight: .semibold))
 
             Spacer()
 
             CDHoverIconButton(
                 systemImage: coordinator.isSyncingLodyUsage ? "hourglass" : "arrow.clockwise",
-                helpText: "回补已完成 Lody 会话的上下文用量"
+                helpText: L("Sync context usage from completed Lody sessions")
             ) {
                 Task { await coordinator.syncPendingLodyUsage() }
             }
@@ -94,7 +94,7 @@ struct UsageQuickStatsView: View {
                             selectedRange = range
                         }
                     } label: {
-                        Text(range.rawValue)
+                        Text(range.displayName)
                             .font(.system(size: 11, weight: selected ? .semibold : .medium))
                             .foregroundStyle(selected ? .primary : .secondary)
                             .padding(.horizontal, 9)
@@ -123,7 +123,7 @@ struct UsageQuickStatsView: View {
                     .background(CDTheme.subtleSurface(for: scheme), in: Capsule())
             }
             .buttonStyle(.plain)
-            .help("点击切换参考费用币种 (USD / CNY)")
+            .help(L("Switch estimated cost currency (USD / CNY)"))
         }
     }
 
@@ -131,16 +131,16 @@ struct UsageQuickStatsView: View {
         CDInsetCard {
             HStack(spacing: 0) {
                 kpiCell(
-                    title: "审查次数",
+                    title: L("Reviews"),
                     value: "\(report.totalRuns)",
-                    sub: report.reReviewCount > 0 ? "含 \(report.reReviewCount) 次复审" : "\(report.uniqueReviewTargetCount) 个 PR"
+                    sub: report.reReviewCount > 0 ? L("%lld re-reviews", report.reReviewCount) : L("%lld PRs", report.uniqueReviewTargetCount)
                 )
                 Rectangle()
                     .fill(CDTheme.hairlineBorder(for: scheme))
                     .frame(width: 0.5)
                     .padding(.vertical, 10)
                 kpiCell(
-                    title: "总 Token",
+                    title: L("Tokens"),
                     value: UsageAggregator.formatCompactTokens(report.totalTokens),
                     sub: tokenSubLabel
                 )
@@ -149,9 +149,9 @@ struct UsageQuickStatsView: View {
                     .frame(width: 0.5)
                     .padding(.vertical, 10)
                 kpiCell(
-                    title: "参考价值",
+                    title: L("Est. Cost"),
                     value: currency.format(usd: report.totalEstimatedCostUSD),
-                    sub: report.averageDurationSeconds.map { "均 \(UsageAggregator.formatDuration($0))" } ?? "API 等价"
+                    sub: report.averageDurationSeconds.map { L("Avg %@", UsageAggregator.formatDuration($0)) } ?? L("API equiv.")
                 )
             }
             .padding(.vertical, 10)
@@ -160,15 +160,15 @@ struct UsageQuickStatsView: View {
 
     private var tokenSubLabel: String {
         if let hit = report.cacheHitRate {
-            return String(format: "缓存命中 %.0f%%", hit * 100)
+            return L("Cache %.0f%%", hit * 100)
         }
         if report.contextWindowTokensTotal > 0 && report.exactTokensTotal == 0 {
-            return "Lody 上下文"
+            return L("Lody context")
         }
         if report.pendingSyncLodyCount > 0 {
-            return "\(report.pendingSyncLodyCount) 条待同步"
+            return L("%lld pending", report.pendingSyncLodyCount)
         }
-        return "实测累计"
+        return L("Measured")
     }
 
     private func kpiCell(title: String, value: String, sub: String) -> some View {
@@ -195,11 +195,11 @@ struct UsageQuickStatsView: View {
         let maxTokens = max(1, report.byModel.map(\.totalTokens).max() ?? 1)
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("按模型分布")
+                Text(L("By Model"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("次数 · Token · 参考价值")
+                Text(L("Runs · Tokens · Cost"))
                     .font(.system(size: 9.5))
                     .foregroundStyle(.tertiary)
             }
@@ -217,7 +217,7 @@ struct UsageQuickStatsView: View {
                                     .font(.system(size: 11.5, weight: .medium))
                                     .lineLimit(1)
                                 if bucket.metricKind == .contextWindow {
-                                    Text("上下文")
+                                    Text(bucket.metricKind.badgeLabel)
                                         .font(.system(size: 8.5, weight: .medium))
                                         .foregroundStyle(.secondary)
                                         .padding(.horizontal, 4)
@@ -225,7 +225,7 @@ struct UsageQuickStatsView: View {
                                         .background(CDTheme.subtleSurface(for: scheme), in: Capsule())
                                 }
                                 Spacer(minLength: 6)
-                                Text("\(bucket.runCount)次")
+                                Text(L("%lld×", bucket.runCount))
                                     .font(.system(size: 10.5).monospacedDigit())
                                     .foregroundStyle(.secondary)
                                 Text(UsageAggregator.formatCompactTokens(bucket.totalTokens))
@@ -265,7 +265,7 @@ struct UsageQuickStatsView: View {
 
     private var repoBreakdownCard: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("活跃仓库 Top 3")
+            Text(L("Top 3 Repositories"))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
@@ -278,7 +278,7 @@ struct UsageQuickStatsView: View {
                                 .font(.system(size: 11.5, design: .monospaced))
                                 .lineLimit(1)
                             Spacer()
-                            Text("\(scope.runCount) 次")
+                            Text(L("%lld runs", scope.runCount))
                                 .font(.system(size: 10.5).monospacedDigit())
                                 .foregroundStyle(.secondary)
                             Text("·")
@@ -305,15 +305,15 @@ struct UsageQuickStatsView: View {
                 Image(systemName: "chart.bar.xaxis")
                     .font(.system(size: 24, weight: .light))
                     .foregroundStyle(.tertiary)
-                Text("暂无审查用量记录")
+                Text(L("No review usage yet"))
                     .font(.system(size: 13, weight: .semibold))
-                Text("通过 CollabDock 确认执行 PR 审查后，会自动记录各模型消耗的 Token、耗时与参考价值。")
+                Text(L("Token usage, duration, and estimated cost will be recorded automatically after you confirm a PR review."))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
                 if coordinator.settings.developerModeEnabled {
-                    CDPillButton(title: "加载示例统计数据", systemImage: "sparkles") {
+                    CDPillButton(title: L("Load Sample Stats"), systemImage: "sparkles") {
                         coordinator.loadDemoUsageRuns()
                     }
                     .padding(.top, 4)
@@ -329,7 +329,7 @@ struct UsageQuickStatsView: View {
                 Button {
                     coordinator.clearDemoUsageRuns()
                 } label: {
-                    Text("DEV 示例 · 清空")
+                    Text(L("DEV Sample · Clear"))
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(CDTheme.statusAmber)
                         .padding(.horizontal, 6)
@@ -337,13 +337,13 @@ struct UsageQuickStatsView: View {
                         .background(CDTheme.statusAmber.opacity(0.14), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("当前包含开发者模式示例统计（点击一键清空，不影响真实 SQLite 数据）")
+                .help(L("Includes Developer Mode sample stats (click to clear; real SQLite data is untouched)"))
             } else if report.pendingSyncLodyCount > 0 {
-                Text("\(report.pendingSyncLodyCount) 条 Lody 会话待回补")
+                Text(L("%lld Lody sessions pending sync", report.pendingSyncLodyCount))
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             } else {
-                Text("100% 本地 SQLite 统计")
+                Text(L("Stored locally in SQLite"))
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
             }
@@ -354,7 +354,7 @@ struct UsageQuickStatsView: View {
                 onOpenFullStats()
             } label: {
                 HStack(spacing: 3) {
-                    Text("完整图表与明细")
+                    Text(L("Full Charts & Log"))
                         .font(.system(size: 11.5, weight: .medium))
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9.5, weight: .semibold))

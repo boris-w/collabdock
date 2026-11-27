@@ -4,7 +4,7 @@ import ServiceManagement
 import UserNotifications
 import CollabDockCore
 
-/// macOS 系统集成能力协议（通知、开机自启、接管会话与打开本地报告），用于 `AppCoordinator` 依赖注入与单测隔离
+/// macOS 系统集成能力协议（通知、开机自启、界面语言覆盖、接管会话与打开本地报告），用于 `AppCoordinator` 依赖注入与单测隔离
 @MainActor
 public protocol SystemIntegrating: AnyObject {
     var onNotificationSelectedItem: ((String) -> Void)? { get set }
@@ -12,8 +12,14 @@ public protocol SystemIntegrating: AnyObject {
     func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool)
     func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool)
     func setLaunchAtLogin(_ enabled: Bool) -> String?
+    func applyInterfaceLanguage(_ appleLanguages: [String]?)
+    func relaunchApplication()
     func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?)
     func openLocalReport(path: String)
+}
+
+public extension SystemIntegrating {
+    func relaunchApplication() {}
 }
 
 /// macOS 原生系统集成服务：UNUserNotificationCenter 通知、SMAppService 开机自启、一键接管会话与打开本地报告（关联 REQ-004, REQ-010, TASK-010, TASK-015）
@@ -58,7 +64,7 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
     public func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool) {
         guard enabled, isRunningInsideAppBundle else { return }
         let content = UNMutableNotificationContent()
-        content.title = "CollabDock · 草稿已就绪"
+        content.title = L("CollabDock · Draft Ready")
         content.subtitle = "\(item.platform.displayName) · \(item.displayContextTag)"
         content.body = String(summary.prefix(140))
         content.sound = .default
@@ -98,7 +104,7 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
 
     public func setLaunchAtLogin(_ enabled: Bool) -> String? {
         guard isRunningInsideAppBundle else {
-            return "开机自启需从打包后的 CollabDock.app 运行时生效"
+            return L("Launch at login requires running from the packaged CollabDock.app")
         }
         do {
             if enabled {
@@ -108,7 +114,30 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
             }
             return nil
         } catch {
-            return "开机自启设置失败：\(error.localizedDescription)"
+            return L("Failed to configure launch at login: %@", error.localizedDescription)
+        }
+    }
+
+    // MARK: - 界面语言覆盖（App 级 AppleLanguages，重启后生效）
+
+    public func applyInterfaceLanguage(_ appleLanguages: [String]?) {
+        if let langs = appleLanguages, !langs.isEmpty {
+            UserDefaults.standard.set(langs, forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        }
+        UserDefaults.standard.synchronize()
+    }
+
+    public func relaunchApplication() {
+        guard isRunningInsideAppBundle else { return }
+        let bundleURL = Bundle.main.bundleURL
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: bundleURL, configuration: config) { _, _ in
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
         }
     }
 

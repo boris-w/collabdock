@@ -9,18 +9,16 @@
 
 A macOS menu bar app that collects the GitHub PRs waiting for your review into one inbox. After you confirm, it runs a local AI CLI (Claude Code / Codex / Antigravity / Lody) in a read-only, isolated git worktree and writes the result back as a GitHub pending review that only you can see.
 
-> **Note:** the user interface is currently available in Simplified Chinese only.
-
 <p align="center">
-  <img src="docs/images/showcase-02-pending-multiplatform-light.png" width="380" alt="Inbox">
-  <img src="docs/images/showcase-07-detail-confirm-dark.png" width="380" alt="Confirmation before running">
+  <img src="docs/images/en/showcase-02-pending-multiplatform-light.png" width="380" alt="Inbox">
+  <img src="docs/images/en/showcase-07-detail-confirm-dark.png" width="380" alt="Confirmation before running">
 </p>
 <p align="center">
-  <img src="docs/images/showcase-08-detail-rereview-dark.png" width="380" alt="Incremental re-review">
-  <img src="docs/images/settings-stats-light.png" width="380" alt="Usage statistics">
+  <img src="docs/images/en/showcase-08-detail-rereview-dark.png" width="380" alt="Incremental re-review">
+  <img src="docs/images/en/settings-stats-light.png" width="380" alt="Usage statistics">
 </p>
 <p align="center">
-  <img src="docs/images/menubar-icons-peekcat.png" width="560" alt="Menu bar icon states">
+  <img src="docs/images/en/menubar-icons-peekcat.png" width="560" alt="Menu bar icon states">
 </p>
 
 ## Features
@@ -36,6 +34,7 @@ A macOS menu bar app that collects the GitHub PRs waiting for your review into o
 - **Auto-archive**: once you approve on GitHub, or the PR is merged or closed, the item moves to "Done". PRs where you requested changes stay in the inbox.
 - **Usage stats**: per-run token counts (input/output/cache/reasoning), duration and estimated cost, grouped by day, model and repository; CSV export; USD or CNY.
 - **Session takeover**: reopen the session in a terminal (`claude --resume`, `codex resume`, `agy --resume`) or jump to Lody Desktop via a `lody://` link.
+- **English & Simplified Chinese + Review Language**: interface follows macOS system language (falling back to English) or can be switched in Settings → Workspace; review language for GitHub pending reviews, inline comments, local reports and council consensus can follow the UI or be set independently.
 - **Also**: native notifications, launch at login, pause, team config import/export (JSON).
 
 ## How it works
@@ -104,10 +103,10 @@ Drag `build/CollabDock.app` to `/Applications`. `make dmg` additionally produces
 ## Quick start
 
 1. After launch, the CollabDock icon appears in the menu bar. Open Settings:
-   - **协作来源 (Sources)**: check that `gh` is logged in with the right account
-   - **工作区 (Workspace)**: set the directories to search for local clones (default `~/work`, `~/projects`), or bind `owner/repo` to a directory manually
-   - **AI 引擎 (Engines)**: choose the default engine, model, effort and mode
-   - **触发规则 (Rules)**: adjust keywords and repository scope
+   - **Sources**: check that `gh` is logged in with the right account
+   - **Workspace**: set interface/review language, directories to search for local clones (default `~/work`, `~/projects`), or bind `owner/repo` to a directory manually
+   - **AI Engines**: choose the default engine, model, effort and mode
+   - **Rules**: adjust keywords and repository scope
 2. When someone `@mentions` you in a PR comment (with a keyword) or requests your review, the PR shows up in the inbox with a notification. You can also import a PR with `+`.
 3. Open the item, check the parameters on the confirmation card (an isolated worktree and a pending draft are the defaults), and confirm.
 4. When it finishes, open the PR's Files tab on GitHub, edit the draft and submit it yourself. You can also open the local report, or take over the session in a terminal.
@@ -160,7 +159,7 @@ Requirements (`REQ-xxx`), architecture decisions (`ADR-001` to `ADR-007`) and pe
 
 ## Notes
 
-- The UI is Simplified Chinese only for now.
+- Interface and review output support both English and Simplified Chinese (with English as the fallback language).
 - This project is not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, Google or Lody. Product names and trademarks belong to their respective owners.
 - Costs and data handling of each AI CLI are governed by that provider's terms.
 

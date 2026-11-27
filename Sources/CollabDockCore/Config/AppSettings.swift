@@ -242,6 +242,10 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var developerModeEnabled: Bool
     /// 当收件箱中的 PR 在 GitHub 被你 Approve、或已合并/关闭时自动归档至「已完成」（Request Changes 保留跟进，关联 ITER-017）
     public var autoCompleteApprovedOrClosedPRs: Bool
+    /// 界面语言（跟随系统 / 简体中文 / English，重启后生效，关联 issue #4）
+    public var appLanguage: AppLanguage
+    /// 审查语言（写回 GitHub 的正文、行内评论、本地报告与会诊合并文案，默认跟随界面语言，关联 issue #4）
+    public var reviewLanguage: ReviewLanguage
     public var presets: [TaskPreset]
 
     public init(
@@ -273,6 +277,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         usageCurrency: UsageCurrency = .usd,
         developerModeEnabled: Bool = false,
         autoCompleteApprovedOrClosedPRs: Bool = true,
+        appLanguage: AppLanguage = .system,
+        reviewLanguage: ReviewLanguage = .followUI,
         presets: [TaskPreset] = TaskPreset.defaults
     ) {
         self.pollIntervalSeconds = max(60, pollIntervalSeconds)
@@ -293,6 +299,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.usageCurrency = usageCurrency
         self.developerModeEnabled = developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = autoCompleteApprovedOrClosedPRs
+        self.appLanguage = appLanguage
+        self.reviewLanguage = reviewLanguage
         self.presets = presets
     }
 
@@ -301,7 +309,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         case globalTriggerRules, defaultEngine, defaultModels, defaultModes, defaultEffort
         case defaultLaunchMode, injectPresetPrompt, lodyConfig
         case customExecutablePaths, workspaceSearchRoots, repositoryDirectoryOverrides
-        case usageCurrency, developerModeEnabled, autoCompleteApprovedOrClosedPRs, presets
+        case usageCurrency, developerModeEnabled, autoCompleteApprovedOrClosedPRs
+        case appLanguage, reviewLanguage, presets
     }
 
     /// 向后兼容解码：版本升级新增字段时绝不丢弃用户原有配置
@@ -361,6 +370,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.usageCurrency = (try? c.decodeIfPresent(UsageCurrency.self, forKey: .usageCurrency)) ?? fallback.usageCurrency
         self.developerModeEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .developerModeEnabled)) ?? fallback.developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = (try? c.decodeIfPresent(Bool.self, forKey: .autoCompleteApprovedOrClosedPRs)) ?? fallback.autoCompleteApprovedOrClosedPRs
+        self.appLanguage = (try? c.decodeIfPresent(AppLanguage.self, forKey: .appLanguage)) ?? fallback.appLanguage
+        self.reviewLanguage = (try? c.decodeIfPresent(ReviewLanguage.self, forKey: .reviewLanguage)) ?? fallback.reviewLanguage
         var decodedPresets = (try? c.decodeIfPresent([TaskPreset].self, forKey: .presets)) ?? fallback.presets
         // 若用户从未改过旧版 6 条出厂预制，平滑精简为新版极简默认；若用户自定义过任何模板则 100% 保留
         if decodedPresets == TaskPreset.legacyFactoryDefaults {

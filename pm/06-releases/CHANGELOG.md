@@ -21,6 +21,11 @@
 - 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
 
 ### Added
+- **英文一等界面语言与独立审查语言支持** (`issue #4`)：
+  - 新增 `ResolvedLanguage`（`zhHans` / `en`）、`AppLanguage`（跟随系统 / 简体中文 / English，无匹配系统语言时回退英文）与 `ReviewLanguage`（跟随界面语言 / 简体中文 / English），持久化至 `AppSettings`（旧配置与未知字段值平滑回退默认值）。
+  - `CollabDockCore` 与 `CollabDockApp` 各自提供完整 String Catalog（`Localizable.xcstrings`），全量覆盖界面文案、模型/模式/状态标签、错误提示与流式进度，并将 `Package.swift` `defaultLocalization` 与 `Info.plist` `CFBundleDevelopmentRegion` 设为 `en`（同时声明 `en` / `zh-Hans`）。
+  - `GitHubReviewFormatter`、`CouncilSynthesizer`、`DeliveryContext` 与 `ReviewExecutionRequest` 支持按 `reviewLanguage` 输出 Pending Review 正文、行内评论严重度标签、本地 Markdown 报告及双模型会诊合并文案（兼容旧调用默认 `.zhHans`）。
+  - 「设置 → 工作区」新增「界面语言」（写入 App 级 `AppleLanguages` 覆盖并提供「立即重启」）与「审查语言」选择器；`scripts/package-app.sh` 同步打包 SwiftPM 资源 bundle 与 `.lproj` 目录；离屏截图工具与 `README.en.md` 同步支持中英文双语截图。
 - **同 PR 单卡片防重、上一轮自动归档与参与 Review 的 PR 免关键词 `@mention` 触发** (`REQ-002`, `REQ-003`)：
   - 新增 `TaskCompletionReason.superseded` 与 `InboxSyncResult.supersededItems`：新一轮复审卡片入箱时，同 PR 仍停留在收件箱中的已处理卡片（草稿就绪 / 失败）自动归档至「已完成」并保留历史审查结果（界面展示「已进入第 N 轮」），同时通过 `previousReview` 与新一轮关联。
   - 同一个 PR 在收件箱中已存在「待确认」卡片时，后续事件仅标记已见、不重复建卡也不重复通知；同一次同步内命中多个事件时只保留一张卡片且优先保留 `reviewRequested`。

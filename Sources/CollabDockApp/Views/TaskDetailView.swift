@@ -45,7 +45,7 @@ struct TaskDetailView: View {
     private var selectedModeOption: AgentModeOption {
         let current = plan.mode ?? coordinator.preferredMode(for: plan.engine, lodyAgentConfig: effectiveLodyAgentConfig)
         return modesForEngine.first(where: { $0.id == current })
-            ?? AgentModeOption(id: current, displayName: current == "__agent_default__" ? "跟随 Agent 默认" : current)
+            ?? AgentModeOption(id: current, displayName: current == "__agent_default__" ? L("Follow Agent Default") : current)
     }
 
     private var availablePresets: [TaskPreset] {
@@ -80,15 +80,15 @@ struct TaskDetailView: View {
     }
 
     private var directorySummaryLabel: String {
-        let modeSuffix = plan.useIsolatedWorktree ? "独立 Worktree" : "主目录"
+        let modeSuffix = plan.useIsolatedWorktree ? L("Worktree") : L("Main Dir")
         return "\(resolvedDirectory.displayName) · \(modeSuffix)"
     }
 
     private var actionVerb: String {
         switch item.payload {
-        case .codeChange: return "审查"
-        case .issueTicket: return "排查"
-        case .conversation: return "分析"
+        case .codeChange: return L("Review")
+        case .issueTicket: return L("Triage")
+        case .conversation: return L("Analyze")
         }
     }
 
@@ -123,7 +123,7 @@ struct TaskDetailView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("收件箱")
+                    Text(L("Inbox"))
                         .font(.system(size: 12, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
@@ -149,7 +149,7 @@ struct TaskDetailView: View {
 
             CDHoverIconButton(
                 systemImage: "arrow.up.right.square",
-                helpText: "在 \(item.platform.displayName) 中打开"
+                helpText: L("Open in %@", item.platform.displayName)
             ) {
                 openURL(item.url)
             }
@@ -182,8 +182,8 @@ struct TaskDetailView: View {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(CDTheme.statusAmber)
-                    let oldShort = prev.reviewedHeadSHA.isEmpty ? "上轮" : String(prev.reviewedHeadSHA.prefix(7))
-                    Text("第 \(item.reviewRound) 轮复审 · 上次于 \(oldShort) 用 \(prev.engine.shortName) 审过")
+                    let oldShort = prev.reviewedHeadSHA.isEmpty ? L("prior") : String(prev.reviewedHeadSHA.prefix(7))
+                    Text(L("Round %1$lld re-review · last at %2$@ via %3$@", item.reviewRound, oldShort, prev.engine.shortName))
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -208,7 +208,7 @@ struct TaskDetailView: View {
                             .foregroundStyle(.primary.opacity(0.9))
                             .fixedSize(horizontal: false, vertical: true)
                         if item.suggestedModel != nil || item.suggestedPresetID != nil {
-                            Label("已按触发内容预填建议选项，确认前可随时更改", systemImage: "sparkles")
+                            Label(L("Pre-filled from trigger comment — adjust anytime before confirming"), systemImage: "sparkles")
                                 .font(.system(size: 10))
                                 .foregroundStyle(.secondary)
                         }
@@ -276,32 +276,32 @@ struct TaskDetailView: View {
 
     private var ctaButtonTitle: String {
         if let partner = plan.councilPartner {
-            return "双模型会诊 (\(plan.engine.shortName)×\(partner.engine.shortName))"
+            return L("Council (%1$@ × %2$@)", plan.engine.shortName, partner.engine.shortName)
         }
         if plan.continuityMode == .continueSessionIncremental,
            let prev = item.previousReview,
            prev.engine == plan.engine,
            prev.canContinueSameSession {
-            return "续聊原 \(plan.engine.shortName) 会话复审"
+            return L("Continue %@ Session", plan.engine.shortName)
         }
-        let verb = (item.previousReview != nil) ? "复审" : actionVerb
+        let verb = (item.previousReview != nil) ? L("Re-review") : actionVerb
         if plan.engine == .lody {
             if !plan.model.isEmpty && plan.model != "default" {
-                return "Lody · \(compactModelLabel) \(verb)"
+                return L("%1$@ · Lody (%2$@)", verb, compactModelLabel)
             }
             if !effectiveLodyAgentConfig.isEmpty && effectiveLodyAgentConfig != "default" {
-                return "Lody · \(coordinator.lodyAgentConfigDisplayName(for: effectiveLodyAgentConfig)) \(verb)"
+                return L("%1$@ · Lody (%2$@)", verb, coordinator.lodyAgentConfigDisplayName(for: effectiveLodyAgentConfig))
             }
-            return "派发到 Lody \(verb)"
+            return L("%@ with Lody", verb)
         }
-        return "用 \(compactModelLabel) \(verb)"
+        return L("%1$@ with %2$@", verb, compactModelLabel)
     }
 
     // MARK: - 本地 AI 引擎四宫格选择瓷砖
 
     private var engineTileRow: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("选择本地 AI 引擎 / 编排端")
+            Text(L("Local AI Engine / Orchestrator"))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
 
@@ -392,7 +392,7 @@ struct TaskDetailView: View {
                     let allowedModes: [ReviewContinuityMode] = canContinue
                         ? [.continueSessionIncremental, .freshSessionIncremental, .freshSessionFull]
                         : [.freshSessionIncremental, .freshSessionFull]
-                    inlineMenuRow(label: "复审策略", value: plan.continuityMode.shortLabel) {
+                    inlineMenuRow(label: L("Re-review"), value: plan.continuityMode.shortLabel) {
                         ForEach(allowedModes) { mode in
                             Button {
                                 plan.continuityMode = mode
@@ -420,9 +420,9 @@ struct TaskDetailView: View {
                             plan.mode = coordinator.preferredLodyMode(forAgentConfig: "default")
                         } label: {
                             if effectiveLodyAgentConfig == "default" || effectiveLodyAgentConfig.isEmpty {
-                                Label("Workspace 默认 Agent", systemImage: "checkmark")
+                                Label(L("Workspace Default Agent"), systemImage: "checkmark")
                             } else {
-                                Text("Workspace 默认 Agent")
+                                Text(L("Workspace Default Agent"))
                             }
                         }
                         Divider()
@@ -432,7 +432,7 @@ struct TaskDetailView: View {
                                 plan.model = coordinator.preferredLodyModel(forAgentConfig: agent.id)
                                 plan.mode = coordinator.preferredLodyMode(forAgentConfig: agent.id)
                             } label: {
-                                let labelText = agent.models.isEmpty ? agent.name : "\(agent.name)（\(agent.models.count) 模型）"
+                                let labelText = agent.models.isEmpty ? agent.name : L("%@ (%lld models)", agent.name, agent.models.count)
                                 if effectiveLodyAgentConfig == agent.id
                                     || effectiveLodyAgentConfig.lowercased() == agent.name.lowercased()
                                     || effectiveLodyAgentConfig.lowercased() == agent.agentType?.lowercased() {
@@ -448,7 +448,7 @@ struct TaskDetailView: View {
                 }
 
                 inlineMenuRow(
-                    label: "模型",
+                    label: L("Model"),
                     value: selectedModelOption.displayName
                 ) {
                     ForEach(modelsForEngine) { option in
@@ -467,7 +467,7 @@ struct TaskDetailView: View {
                 CDHairlineDivider()
 
                 HStack {
-                    Text("强度")
+                    Text(L("Effort"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -505,7 +505,7 @@ struct TaskDetailView: View {
                 CDHairlineDivider()
 
                 inlineMenuRow(
-                    label: "模式",
+                    label: L("Mode"),
                     value: selectedModeOption.displayName
                 ) {
                     ForEach(modesForEngine) { modeOpt in
@@ -524,7 +524,7 @@ struct TaskDetailView: View {
                 if isContinuingExistingLodySession, let sid = item.previousReview?.sessionID {
                     CDHairlineDivider()
                     HStack {
-                        Text("续聊目标")
+                        Text(L("Resume Target"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -532,7 +532,7 @@ struct TaskDetailView: View {
                             Image(systemName: "cube.transparent")
                                 .font(.system(size: 9.5, weight: .semibold))
                                 .foregroundStyle(AgentEngine.lody.brandAccent)
-                            Text("原 Lody 会话 · \(String(sid.prefix(8)))")
+                            Text(L("Existing Lody · %@", String(sid.prefix(8))))
                                 .font(.system(size: 11.5, weight: .medium, design: .monospaced))
                                 .foregroundStyle(.primary)
                         }
@@ -549,8 +549,8 @@ struct TaskDetailView: View {
                     CDHairlineDivider()
 
                     inlineMenuRow(
-                        label: "任务模板",
-                        value: coordinator.settings.injectPresetPrompt ? selectedPreset.name : "未启用注入"
+                        label: L("Prompt Preset"),
+                        value: coordinator.settings.injectPresetPrompt ? selectedPreset.name : L("Injection disabled")
                     ) {
                         ForEach(availablePresets) { preset in
                             Button {
@@ -568,23 +568,23 @@ struct TaskDetailView: View {
                     CDHairlineDivider()
 
                     if item.payload.linkedRepository != nil {
-                        inlineMenuRow(label: "项目目录", value: directorySummaryLabel) {
+                        inlineMenuRow(label: L("Directory"), value: directorySummaryLabel) {
                             Button {
                                 plan.useIsolatedWorktree = true
                             } label: {
                                 if plan.useIsolatedWorktree {
-                                    Label("独立 Git Worktree（默认，不碰当前分支）", systemImage: "checkmark")
+                                    Label(L("Isolated Git Worktree (default, keeps your branch untouched)"), systemImage: "checkmark")
                                 } else {
-                                    Text("独立 Git Worktree（默认，不碰当前分支）")
+                                    Text(L("Isolated Git Worktree (default, keeps your branch untouched)"))
                                 }
                             }
                             Button {
                                 plan.useIsolatedWorktree = false
                             } label: {
                                 if !plan.useIsolatedWorktree {
-                                    Label("直接在项目主目录中审查", systemImage: "checkmark")
+                                    Label(L("Review directly in main project directory"), systemImage: "checkmark")
                                 } else {
-                                    Text("直接在项目主目录中审查")
+                                    Text(L("Review directly in main project directory"))
                                 }
                             }
 
@@ -595,19 +595,20 @@ struct TaskDetailView: View {
                                         plan.targetDirectoryOverride = cand.path
                                     } label: {
                                         let isCurrent = resolvedDirectory.path == cand.path
+                                        let candidateLabel = L("%@ (%@)", cand.displayName, cand.sourceLabel)
                                         if isCurrent {
-                                            Label("\(cand.displayName)（\(cand.sourceLabel)）", systemImage: "checkmark")
+                                            Label(candidateLabel, systemImage: "checkmark")
                                         } else {
-                                            Text("\(cand.displayName)（\(cand.sourceLabel)）")
+                                            Text(candidateLabel)
                                         }
                                     }
                                 }
                             }
 
                             Divider()
-                            Button("选择其他本地目录...") {
+                            Button(L("Choose Another Folder...")) {
                                 let panel = NSOpenPanel()
-                                panel.title = "选择本次审查使用的本地项目目录"
+                                panel.title = L("Select local project folder for this review")
                                 panel.canChooseFiles = false
                                 panel.canChooseDirectories = true
                                 panel.allowsMultipleSelection = false
@@ -625,7 +626,7 @@ struct TaskDetailView: View {
 
                     if plan.engine == .lody {
                         HStack {
-                            Text("会话模式")
+                            Text(L("Session Mode"))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -633,7 +634,7 @@ struct TaskDetailView: View {
                                 Image(systemName: "cube.transparent")
                                     .font(.system(size: 9.5, weight: .semibold))
                                     .foregroundStyle(AgentEngine.lody.brandAccent)
-                                Text("Lody 工作区会话 · Markdown")
+                                Text(L("Lody Workspace · Markdown"))
                                     .font(.system(size: 11.5, weight: .medium))
                                     .foregroundStyle(.primary)
                             }
@@ -647,7 +648,7 @@ struct TaskDetailView: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8.5)
                     } else {
-                        inlineMenuRow(label: "交付方式", value: plan.deliveryMode.shortLabel(for: item.platform)) {
+                        inlineMenuRow(label: L("Delivery"), value: plan.deliveryMode.shortLabel(for: item.platform)) {
                             ForEach(supportedDeliveryModes) { mode in
                                 Button {
                                     plan.deliveryMode = mode
@@ -663,7 +664,7 @@ struct TaskDetailView: View {
 
                         CDHairlineDivider()
 
-                        inlineMenuRow(label: "唤起方式", value: plan.launchMode.shortLabel) {
+                        inlineMenuRow(label: L("Launch Mode"), value: plan.launchMode.shortLabel) {
                             ForEach(ExecutionLaunchMode.allCases) { mode in
                                 Button {
                                     plan.launchMode = mode
@@ -731,7 +732,7 @@ struct TaskDetailView: View {
                     HStack(spacing: 4) {
                         Image(systemName: showExtraInstructions ? "chevron.down" : "plus")
                             .font(.system(size: 10, weight: .semibold))
-                        Text(showExtraInstructions ? "收起补充指令" : "补充指令")
+                        Text(showExtraInstructions ? L("Hide Note") : L("Add Note"))
                             .font(.system(size: 11.5, weight: .medium))
                     }
                     .foregroundStyle(.secondary)
@@ -754,7 +755,7 @@ struct TaskDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: plan.councilPartner == nil ? "person.2" : "person.2.fill")
                                 .font(.system(size: 10, weight: .semibold))
-                            Text(plan.councilPartner == nil ? "双模型会诊" : "已开启双模型会诊")
+                            Text(plan.councilPartner == nil ? L("Council") : L("Council On"))
                                 .font(.system(size: 11.5, weight: .medium))
                         }
                         .foregroundStyle(plan.councilPartner == nil ? Color.secondary : Color.accentColor)
@@ -772,7 +773,7 @@ struct TaskDetailView: View {
                     HStack(spacing: 3) {
                         Image(systemName: showPromptPreview ? "eye.slash" : "doc.plaintext")
                             .font(.system(size: 10, weight: .semibold))
-                        Text(showPromptPreview ? "隐藏提示词" : "预览提示词")
+                        Text(showPromptPreview ? L("Hide Prompt") : L("Prompt"))
                             .font(.system(size: 11, weight: .medium))
                     }
                     .foregroundStyle(showPromptPreview ? Color.accentColor : Color.secondary)
@@ -787,7 +788,7 @@ struct TaskDetailView: View {
 
                 CDInsetCard {
                     HStack(spacing: 8) {
-                        Text("会诊搭档")
+                        Text(L("Partner"))
                             .font(.system(size: 11.5))
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -846,7 +847,7 @@ struct TaskDetailView: View {
             }
 
             if showExtraInstructions {
-                TextField("例如：重点关注 Redis 缓存一致性与事务回滚...", text: $plan.extraInstructions, axis: .vertical)
+                TextField(L("e.g. Focus on Redis cache consistency and transaction rollback..."), text: $plan.extraInstructions, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11.5))
                     .lineLimit(2...4)
@@ -873,7 +874,7 @@ struct TaskDetailView: View {
                     continuityMode: plan.continuityMode
                 )
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(coordinator.settings.injectPresetPrompt ? "实际唤起提示词（已注入安全约束与模板）" : "实际唤起提示词（精简模式，未注入模板）")
+                    Text(coordinator.settings.injectPresetPrompt ? L("Effective prompt (with safety guardrails and preset)") : L("Effective prompt (minimal mode, no preset injected)"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                     ScrollView {
@@ -896,7 +897,7 @@ struct TaskDetailView: View {
 
     private var bottomActionBar: some View {
         HStack(spacing: 8) {
-            Button("忽略") {
+            Button(L("Dismiss")) {
                 coordinator.dismissItem(id: item.id)
                 onBack()
             }

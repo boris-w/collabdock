@@ -8,9 +8,9 @@ public enum SQLiteStoreError: Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .openFailed(let msg): return "SQLite 打开失败: \(msg)"
-        case .prepareFailed(let msg): return "SQLite 预处理失败: \(msg)"
-        case .stepFailed(let msg): return "SQLite 执行失败: \(msg)"
+        case .openFailed(let msg): return CoreL10n.format("SQLite open failed: %@", msg)
+        case .prepareFailed(let msg): return CoreL10n.format("SQLite prepare failed: %@", msg)
+        case .stepFailed(let msg): return CoreL10n.format("SQLite execution failed: %@", msg)
         }
     }
 }

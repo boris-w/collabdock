@@ -29,7 +29,7 @@ public struct PersistenceError: Error, LocalizedError, Equatable, Sendable {
     }
 
     public var errorDescription: String? {
-        "本地存储操作失败（\(operation.rawValue)）：\(underlyingDescription)"
+        CoreL10n.format("Local storage operation failed (%@): %@", operation.rawValue, underlyingDescription)
     }
 }
 

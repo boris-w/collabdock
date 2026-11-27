@@ -37,6 +37,10 @@ public final class AppCoordinator {
             if oldValue.launchAtLogin != settings.launchAtLogin {
                 lastSystemNotice = systemIntegration.setLaunchAtLogin(settings.launchAtLogin)
             }
+            if oldValue.appLanguage != settings.appLanguage {
+                systemIntegration.applyInterfaceLanguage(settings.appLanguage.appleLanguagesOverride)
+                needsRestartForLanguageChange = true
+            }
             if oldValue.workspaceSearchRoots != settings.workspaceSearchRoots {
                 refreshDiscoveredLocalRepos()
             }
@@ -61,6 +65,7 @@ public final class AppCoordinator {
     public var lastSyncDiagnostic: String?
     public var lastSyncError: String?
     public var lastSystemNotice: String?
+    public var needsRestartForLanguageChange: Bool = false
     public var latestRateLimit: RateLimitSnapshot?
     public var lastSyncWas304: Bool = false
     public var rateLimitedUntil: Date?
@@ -98,10 +103,21 @@ public final class AppCoordinator {
     private var isReconcilingPRStates: Bool = false
 
     public enum PopoverTab: String, CaseIterable, Identifiable {
-        case inbox = "收件箱"
-        case completed = "已完成"
+        case inbox = "inbox"
+        case completed = "completed"
 
         public var id: String { rawValue }
+
+        public var displayName: String {
+            switch self {
+            case .inbox: return L("Inbox")
+            case .completed: return L("Done")
+            }
+        }
+    }
+
+    public func relaunchApp() {
+        systemIntegration.relaunchApplication()
     }
 
     public init(
@@ -150,7 +166,7 @@ public final class AppCoordinator {
                     self.taskStore = try makeDefaultTaskStore()
                 } catch {
                     self.taskStore = nil
-                    self.lastSystemNotice = "本地数据库打开失败（本次运行数据不会持久化）：\(error.localizedDescription)"
+                    self.lastSystemNotice = L("Failed to open local database (data will not persist for this run): %@", error.localizedDescription)
                 }
             }
             if autoStart {
@@ -560,7 +576,7 @@ public final class AppCoordinator {
                         displayName: proj.name,
                         repositoryFullName: proj.repositoryFullName?.lowercased(),
                         lodyLocalProjectID: proj.id,
-                        sourceLabel: "源自 Lody"
+                        sourceLabel: L("From Lody")
                     )
                 )
             }
@@ -578,7 +594,7 @@ public final class AppCoordinator {
                         displayName: url.lastPathComponent,
                         repositoryFullName: repoName.lowercased(),
                         lodyLocalProjectID: nil,
-                        sourceLabel: "代码目录扫描"
+                        sourceLabel: L("Workspace scan")
                     )
                 )
             }
@@ -648,7 +664,7 @@ public final class AppCoordinator {
         }
 
         guard let chosenPath else {
-            return (nil, "自动缓存克隆", nil)
+            return (nil, L("Auto shallow clone"), nil)
         }
         let normalized = URL(fileURLWithPath: (chosenPath as NSString).expandingTildeInPath).standardizedFileURL.path
         if let matched = discoveredLocalRepos.first(where: { $0.path == normalized }) {
@@ -681,7 +697,7 @@ public final class AppCoordinator {
     func lodyAgentConfigDisplayName(for selector: String) -> String {
         let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "default" {
-            return "Workspace 默认 Agent"
+            return L("Workspace Default Agent")
         }
         if let matched = lodyCatalog?.matchAgentConfig(selector: trimmed) {
             return matched.name
@@ -803,7 +819,7 @@ public final class AppCoordinator {
             return
         }
         guard let store = taskStore else {
-            lastSyncError = "本地数据库不可用，无法执行收件箱同步"
+            lastSyncError = L("Local database unavailable; cannot sync inbox")
             return
         }
 
@@ -1143,10 +1159,10 @@ public final class AppCoordinator {
 
     public func importPullRequest(reference: String) async -> Result<CollaborationItem, Error> {
         guard !isPreviewMode else {
-            return .failure(NSError(domain: "CollabDock", code: 1, userInfo: [NSLocalizedDescriptionKey: "预览模式下无法联网拉取 PR"]))
+            return .failure(NSError(domain: "CollabDock", code: 1, userInfo: [NSLocalizedDescriptionKey: L("Cannot fetch PR over network in preview mode")]))
         }
         guard let store = taskStore else {
-            let err = NSError(domain: "CollabDock", code: 2, userInfo: [NSLocalizedDescriptionKey: "本地数据库不可用，无法导入 PR"])
+            let err = NSError(domain: "CollabDock", code: 2, userInfo: [NSLocalizedDescriptionKey: L("Local database unavailable; cannot import PR")])
             return .failure(err)
         }
         let connectorContext = ConnectorBuildContext(
@@ -1233,11 +1249,11 @@ public final class AppCoordinator {
     func importTeamPresetJSON(_ jsonString: String) -> Result<String, Error> {
         do {
             guard let data = jsonString.data(using: .utf8) else {
-                return .failure(NSError(domain: "CollabDock", code: 1, userInfo: [NSLocalizedDescriptionKey: "无效的 UTF-8 文本"]))
+                return .failure(NSError(domain: "CollabDock", code: 1, userInfo: [NSLocalizedDescriptionKey: L("Invalid UTF-8 text")]))
             }
             let preset = try settingsStore.decodeTeamPreset(from: data)
             settings.applyTeamPreset(preset)
-            return .success("已成功合并团队「\(preset.teamName)」配置（保留了你的个人模型与目录偏好）")
+            return .success(L("Merged team \"%@\" settings (kept your personal model and path preferences)", preset.teamName))
         } catch {
             return .failure(error)
         }
@@ -1267,7 +1283,7 @@ public final class AppCoordinator {
         let targetItem = items[idx]
         items[idx].status = .preparing
         items[idx].errorMessage = nil
-        items[idx].progressMessage = "正在准备隔离上下文..."
+        items[idx].progressMessage = CoreL10n.string("Preparing isolated context...")
 
         let ticket = runRegistry.begin(itemID: itemID)
 
@@ -1283,6 +1299,7 @@ public final class AppCoordinator {
         let lodyCatalogSnapshot = lodyCatalog
         let injectPreset = settings.injectPresetPrompt
         let notifyEnabled = settings.notificationsEnabled
+        let resolvedReviewLanguage = settings.reviewLanguage.resolved(uiLanguage: settings.appLanguage.resolved())
         let lodyAgentDisplayName: String? = (plan.engine == .lody)
             ? lodyAgentConfigDisplayName(for: plan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig)
             : nil
@@ -1301,7 +1318,7 @@ public final class AppCoordinator {
             if let updatedIdx = items.firstIndex(where: { $0.id == itemID }) {
                 items[updatedIdx].status = .failed
                 items[updatedIdx].progressMessage = nil
-                items[updatedIdx].errorMessage = "本地数据库不可用，无法执行审查"
+                items[updatedIdx].errorMessage = L("Local database unavailable; cannot run review")
             }
             return nil
         }
@@ -1338,7 +1355,7 @@ public final class AppCoordinator {
                     throw NSError(
                         domain: "CollabDock",
                         code: 3,
-                        userInfo: [NSLocalizedDescriptionKey: "未找到 \(targetItem.platform.displayName) 的交付连接器"]
+                        userInfo: [NSLocalizedDescriptionKey: L("No delivery connector found for %@", targetItem.platform.displayName)]
                     )
                 }
                 let executionService = ReviewExecutionService(
@@ -1357,7 +1374,8 @@ public final class AppCoordinator {
                     preferredLocalPath: resolvedDirInfo.path,
                     environment: envSnapshot,
                     injectPresetPrompt: injectPreset,
-                    lodyAgentDisplayName: lodyAgentDisplayName
+                    lodyAgentDisplayName: lodyAgentDisplayName,
+                    reviewLanguage: resolvedReviewLanguage
                 )
 
                 let outcome = try await executionService.execute(executionRequest) { [weak self] progress in
@@ -1388,7 +1406,9 @@ public final class AppCoordinator {
                     } else {
                         systemIntegration.postCompletionNotification(
                             for: dispatched,
-                            summary: continued ? "已续聊原 \(plan.engine.displayName) 会话复审" : "已派发至 \(plan.engine.displayName) 原生后台会话",
+                            summary: continued
+                                ? L("Continued existing %@ session for follow-up review", plan.engine.displayName)
+                                : L("Dispatched to native %@ background session", plan.engine.displayName),
                             enabled: notifyEnabled
                         )
                     }
@@ -1403,7 +1423,7 @@ public final class AppCoordinator {
                     selectedTab = delivered.status.isInboxActive ? .inbox : .completed
                     systemIntegration.postCompletionNotification(
                         for: delivered,
-                        summary: delivered.executionOutput?.summaryText ?? "审查已完成",
+                        summary: delivered.executionOutput?.summaryText ?? L("Review completed"),
                         enabled: notifyEnabled
                     )
                 }
@@ -1514,7 +1534,7 @@ public final class AppCoordinator {
                     self.items[idx].remoteSessionStatus = .failed
                     self.items[idx].executionOutput = .structuredReply(
                         StructuredReplyResult(
-                            summary: "Lody 后台会话执行异常，请点击「打开 Lody」查看详情。",
+                            summary: L("Lody background session encountered an error. Click \"Open Lody\" to inspect."),
                             replyMarkdown: ""
                         )
                     )
@@ -1529,12 +1549,12 @@ public final class AppCoordinator {
                         .map { self.usageRuns[$0].createdAt }
                     let roundDuration = dispatchedAt.flatMap { snap.roundDurationSeconds(since: $0) }
                         ?? (dispatchedAt == nil ? snap.durationSeconds : nil)
-                    var parts: [String] = ["\(modelLabel) 已完成审查"]
+                    var parts: [String] = [L("%@ finished review", modelLabel)]
                     if let dur = roundDuration, dur > 0 {
-                        parts.append("耗时 \(UsageAggregator.formatDuration(dur))")
+                        parts.append(L("Duration %@", UsageAggregator.formatDuration(dur)))
                     }
                     if snap.contextUsedTokens > 0 {
-                        parts.append("上下文 \(UsageAggregator.formatCompactTokens(snap.contextUsedTokens))")
+                        parts.append(L("Context %@", UsageAggregator.formatCompactTokens(snap.contextUsedTokens)))
                     }
                     let summary = parts.joined(separator: " · ")
                     self.items[idx].executionOutput = .structuredReply(
@@ -1555,9 +1575,9 @@ public final class AppCoordinator {
                 self.items[idx].remoteSessionStatus = .running
                 let liveSummary: String
                 if snap.contextUsedTokens > 0 {
-                    liveSummary = "\(modelLabel) 正在后台审查中 · 已用上下文 \(UsageAggregator.formatCompactTokens(snap.contextUsedTokens))"
+                    liveSummary = L("%@ reviewing in background · Context %@", modelLabel, UsageAggregator.formatCompactTokens(snap.contextUsedTokens))
                 } else {
-                    liveSummary = "\(modelLabel) 正在后台审查中，可点「打开 Lody」实时查看。"
+                    liveSummary = L("%@ reviewing in background. Click \"Open Lody\" to view live progress.", modelLabel)
                 }
                 self.items[idx].executionOutput = .structuredReply(
                     StructuredReplyResult(summary: liveSummary, replyMarkdown: "")
@@ -1653,7 +1673,7 @@ public final class AppCoordinator {
 
     private func runDemoSimulation(ticket: ExecutionRunTicket, targetItem: CollaborationItem, plan: ExecutionPlan) -> Task<Void, Never> {
         let itemID = ticket.itemID
-        updateProgress(for: ticket, status: .running, message: "[演示] 模拟 \(plan.engine.displayName) (\(plan.model)) 在只读沙箱中分析...")
+        updateProgress(for: ticket, status: .running, message: L("[Demo] Simulating %@ (%@) in read-only sandbox...", plan.engine.displayName, plan.model))
         return Task {
             defer {
                 self.runRegistry.finish(ticket)
@@ -1672,7 +1692,7 @@ public final class AppCoordinator {
             )
             items[idx].executionOutput = .codeReview(
                 CodeReviewResult(
-                    summary: "[演示] 真实 GitHub PR 确认后将自动创建隔离 Worktree、运行 \(plan.engine.displayName) 并写入 Pending Review 草稿。",
+                    summary: L("[Demo] Real GitHub PRs will automatically create an isolated worktree, run %@, and save a Pending Review draft.", plan.engine.displayName),
                     recommendedVerdict: .comment,
                     comments: [
                         CodeInlineComment(
@@ -1680,8 +1700,8 @@ public final class AppCoordinator {
                             line: 42,
                             side: .right,
                             severity: .warning,
-                            title: "JWKS 刷新缺少并发去重保护",
-                            body: "高并发缓存失效时可能触发缓存击穿，建议合并在途刷新请求。"
+                            title: L("Missing singleflight guard on JWKS refresh"),
+                            body: L("Concurrent cache expiration can trigger a thundering herd; coalesce in-flight refresh requests.")
                         )
                     ]
                 )
@@ -1891,7 +1911,7 @@ public final class AppCoordinator {
                 author: "alice",
                 triggeredBy: "alice",
                 triggerKind: .mention,
-                triggerBody: "@dev 帮忙 review 一下鉴权边界和缓存失效 --focus security",
+                triggerBody: L("@dev please review the auth boundaries and cache invalidation --focus security"),
                 payload: .codeChange(
                     CodeChangePayload(
                         repository: "acme/backend",
@@ -1935,19 +1955,22 @@ public final class AppCoordinator {
                 id: "demo-feishu-oncall",
                 platform: .feishu,
                 itemKind: .conversation,
-                scope: "#支付值班群",
-                externalRef: "话题",
-                title: "线上回调偶发 504，疑似重试队列堆积",
+                scope: L("#payments-oncall"),
+                externalRef: L("Thread"),
+                title: L("Intermittent 504 on production callbacks, suspected retry queue backlog"),
                 url: URL(string: "https://open.feishu.cn/")!,
                 author: "diana",
                 triggeredBy: "diana",
                 triggerKind: .mention,
-                triggerBody: "@dev 帮忙排查一下 webhook 回调超时是不是重试逻辑死循环了",
+                triggerBody: L("@dev please check if webhook callback timeouts are looping on retries"),
                 payload: .conversation(
                     ConversationPayload(
-                        channelName: "#支付值班群",
+                        channelName: L("#payments-oncall"),
                         threadID: "om_991827",
-                        recentSnippets: ["近 10 分钟 p99 升到 8.2s", "日志集中在 webhook_dispatcher.go"],
+                        recentSnippets: [
+                            L("p99 rose to 8.2s over the last 10 minutes"),
+                            L("Logs point to webhook_dispatcher.go")
+                        ],
                         linkedRepository: "acme/backend"
                     )
                 ),
@@ -1964,7 +1987,7 @@ public final class AppCoordinator {
                 author: "charlie",
                 triggeredBy: "charlie",
                 triggerKind: .mention,
-                triggerBody: "@dev cr 一下批处理背压逻辑",
+                triggerBody: L("@dev please review the batch backpressure logic"),
                 payload: .codeChange(
                     CodeChangePayload(
                         repository: "acme/sync-engine",
@@ -1980,29 +2003,29 @@ public final class AppCoordinator {
                 status: .draftReady,
                 executionOutput: .codeReview(
                     CodeReviewResult(
-                        summary: "批处理主链路清晰，发现 1 处并发取消时未释放信号量的边界问题及 2 处建议优化。",
+                        summary: L("Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements."),
                         recommendedVerdict: .requestChanges,
                         comments: [
                             CodeInlineComment(
                                 path: "Sources/Queue/BatchFlusher.swift",
                                 line: 88,
                                 severity: .critical,
-                                title: "Task 取消分支未释放并发许可",
-                                body: "建议将 release 移入 defer 块。"
+                                title: L("Task cancellation path does not release concurrency permit"),
+                                body: L("Move the release call into a defer block.")
                             ),
                             CodeInlineComment(
                                 path: "Sources/Queue/BatchFlusher.swift",
                                 line: 112,
                                 severity: .warning,
-                                title: "最大重试退避未设上限",
-                                body: "建议封顶 30s。"
+                                title: L("Maximum retry backoff is uncapped"),
+                                body: L("Cap the backoff at 30s.")
                             ),
                             CodeInlineComment(
                                 path: "Sources/Queue/BatchFlusher.swift",
                                 line: 134,
                                 severity: .warning,
-                                title: "日志缺少 batchID",
-                                body: "便于线上追踪。"
+                                title: L("Missing batchID in logs"),
+                                body: L("Include batchID for production tracing.")
                             )
                         ]
                     )

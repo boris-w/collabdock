@@ -42,7 +42,8 @@ public enum GitHubReviewFormatter {
         review: CodeReviewResult,
         commitSHA: String,
         unifiedDiff: String?,
-        mode: DeliveryMode
+        mode: DeliveryMode,
+        language: ResolvedLanguage = .zhHans
     ) -> GitHubReviewRequestPayload {
         let validator = DiffLineValidator()
         let partitioned: ValidatedReviewPayload
@@ -62,15 +63,25 @@ public enum GitHubReviewFormatter {
                 path: comment.path,
                 line: comment.line,
                 side: comment.side.rawValue,
-                body: formatInlineCommentBody(comment)
+                body: formatInlineCommentBody(comment, language: language)
             )
         }
 
         var bodySections: [String] = [review.summary]
         if !partitioned.fallbackSummaryComments.isEmpty {
-            var lines: [String] = ["", "### 补充审查意见（变更行范围外）"]
+            var lines: [String] = ["", CoreL10n.string("### Additional Review Comments (outside changed lines)", language: language)]
             for c in partitioned.fallbackSummaryComments {
-                lines.append("- **\(severityLabel(c.severity)) · `\(c.path):\(c.line)`** — **\(c.title)**：\(c.body)")
+                lines.append(
+                    CoreL10n.format(
+                        "- **%@ · `%@:%lld`** — **%@**: %@",
+                        language: language,
+                        severityLabel(c.severity, language: language),
+                        c.path,
+                        c.line,
+                        c.title,
+                        c.body
+                    )
+                )
             }
             bodySections.append(lines.joined(separator: "\n"))
         }
@@ -89,8 +100,11 @@ public enum GitHubReviewFormatter {
         )
     }
 
-    public static func formatInlineCommentBody(_ comment: CodeInlineComment) -> String {
-        var text = "**[\(severityLabel(comment.severity))] \(comment.title)**\n\n\(comment.body)"
+    public static func formatInlineCommentBody(
+        _ comment: CodeInlineComment,
+        language: ResolvedLanguage = .zhHans
+    ) -> String {
+        var text = "**[\(severityLabel(comment.severity, language: language))] \(comment.title)**\n\n\(comment.body)"
         if let suggestion = comment.suggestion?.trimmingCharacters(in: .whitespacesAndNewlines), !suggestion.isEmpty {
             text += "\n\n```suggestion\n\(suggestion)\n```"
         }
@@ -100,31 +114,40 @@ public enum GitHubReviewFormatter {
     public static func renderLocalMarkdownReport(
         item: CollaborationItem,
         output: ExecutionOutput,
-        plan: ExecutionPlan?
+        plan: ExecutionPlan?,
+        language: ResolvedLanguage = .zhHans
     ) -> String {
         var lines: [String] = [
             "# \(item.title)",
             "",
-            "- **来源**：\(item.platform.displayName) · `\(item.displayContextTag)`",
-            "- **链接**：\(item.url.absoluteString)",
-            "- **触发者**：@\(item.triggeredBy)（\(item.triggerKind.badgeText)）"
+            CoreL10n.format("- **Source**: %@ · `%@`", language: language, item.platform.displayName(in: language), item.displayContextTag),
+            CoreL10n.format("- **Link**: %@", language: language, item.url.absoluteString),
+            CoreL10n.format("- **Triggered by**: @%@ (%@)", language: language, item.triggeredBy, item.triggerKind.badgeText)
         ]
         if let plan {
-            lines.append("- **执行引擎**：\(plan.engine.displayName) · `\(plan.model)`（\(plan.effort.displayName)）")
+            lines.append(
+                CoreL10n.format(
+                    "- **Engine**: %@ · `%@` (%@)",
+                    language: language,
+                    plan.engine.displayName,
+                    plan.model,
+                    plan.effort.displayName
+                )
+            )
         }
         lines.append("")
 
         switch output {
         case .codeReview(let review):
-            lines.append("## 总体结论（建议：\(review.recommendedVerdict.rawValue)）")
+            lines.append(CoreL10n.format("## Summary (Recommended: %@)", language: language, review.recommendedVerdict.rawValue))
             lines.append("")
             lines.append(review.summary)
             lines.append("")
             if !review.comments.isEmpty {
-                lines.append("## 行级审查意见（共 \(review.comments.count) 条）")
+                lines.append(CoreL10n.format("## Inline Comments (%lld)", language: language, review.comments.count))
                 lines.append("")
                 for c in review.comments {
-                    lines.append("### [\(severityLabel(c.severity))] `\(c.path):\(c.line)` — \(c.title)")
+                    lines.append("### [\(severityLabel(c.severity, language: language))] `\(c.path):\(c.line)` — \(c.title)")
                     lines.append("")
                     lines.append(c.body)
                     if let suggestion = c.suggestion, !suggestion.isEmpty {
@@ -138,23 +161,23 @@ public enum GitHubReviewFormatter {
             }
 
         case .structuredReply(let reply):
-            lines.append("## 摘要")
+            lines.append(CoreL10n.string("## Summary", language: language))
             lines.append("")
             lines.append(reply.summary)
             lines.append("")
-            lines.append("## 建议回复草稿")
+            lines.append(CoreL10n.string("## Suggested Reply Draft", language: language))
             lines.append("")
             lines.append(reply.replyMarkdown)
             if !reply.keyPoints.isEmpty {
                 lines.append("")
-                lines.append("## 关键要点")
+                lines.append(CoreL10n.string("## Key Points", language: language))
                 for p in reply.keyPoints {
                     lines.append("- \(p)")
                 }
             }
             if !reply.referencedFiles.isEmpty {
                 lines.append("")
-                lines.append("## 关联文件")
+                lines.append(CoreL10n.string("## Referenced Files", language: language))
                 for f in reply.referencedFiles {
                     lines.append("- `\(f)`")
                 }
@@ -185,11 +208,11 @@ public enum GitHubReviewFormatter {
         return fileURL
     }
 
-    private static func severityLabel(_ severity: FindingSeverity) -> String {
+    private static func severityLabel(_ severity: FindingSeverity, language: ResolvedLanguage) -> String {
         switch severity {
-        case .critical: return "🔴 严重"
-        case .warning: return "🟡 建议"
-        case .nit: return "⚪ 细节"
+        case .critical: return CoreL10n.string("🔴 Critical", language: language)
+        case .warning: return CoreL10n.string("🟡 Warning", language: language)
+        case .nit: return CoreL10n.string("⚪ Nit", language: language)
         }
     }
 }

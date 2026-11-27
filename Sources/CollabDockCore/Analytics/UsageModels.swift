@@ -58,9 +58,9 @@ public enum TokenMetricKind: String, Codable, Hashable, Sendable {
 
     public var badgeLabel: String {
         switch self {
-        case .exact: return "精确"
-        case .contextWindow: return "上下文"
-        case .pendingSync: return "待同步"
+        case .exact: return CoreL10n.string("Exact")
+        case .contextWindow: return CoreL10n.string("Context")
+        case .pendingSync: return CoreL10n.string("Pending Sync")
         }
     }
 }
@@ -182,7 +182,7 @@ public struct ReviewUsageRun: Identifiable, Codable, Hashable, Sendable {
 
     public var displayModelKey: String {
         if engine == .lody {
-            let cleanModel = (model.isEmpty || model == "default") ? (lodyAgentName ?? "Workspace 默认") : model
+            let cleanModel = (model.isEmpty || model == "default") ? (lodyAgentName ?? CoreL10n.string("Workspace Default")) : model
             return "Lody · \(cleanModel)"
         }
         return model.isEmpty ? engine.displayName : model
@@ -190,12 +190,21 @@ public struct ReviewUsageRun: Identifiable, Codable, Hashable, Sendable {
 }
 
 public enum UsageTimeRange: String, CaseIterable, Identifiable, Sendable {
-    case today = "今日"
-    case last7Days = "7 天"
-    case last30Days = "30 天"
-    case allTime = "全部"
+    case today = "today"
+    case last7Days = "7d"
+    case last30Days = "30d"
+    case allTime = "all"
 
     public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .today: return CoreL10n.string("Today")
+        case .last7Days: return CoreL10n.string("7 Days")
+        case .last30Days: return CoreL10n.string("30 Days")
+        case .allTime: return CoreL10n.string("All")
+        }
+    }
 
     public func cutoffDate(from now: Date = Date(), calendar: Calendar = .current) -> Date? {
         switch self {

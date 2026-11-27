@@ -112,20 +112,23 @@ public struct ConnectorCapabilities: Hashable, Sendable {
     }
 }
 
-/// 交付回写上下文（将执行计划、Diff 行号校验输入与本地报告目录收拢为统一值对象）
+/// 交付回写上下文（将执行计划、Diff 行号校验输入、本地报告目录与审查语言收拢为统一值对象）
 public struct DeliveryContext: Sendable {
     public let plan: ExecutionPlan?
     public let unifiedDiff: String?
     public let reportsDirectory: URL?
+    public let language: ResolvedLanguage
 
     public init(
         plan: ExecutionPlan? = nil,
         unifiedDiff: String? = nil,
-        reportsDirectory: URL? = nil
+        reportsDirectory: URL? = nil,
+        language: ResolvedLanguage = .zhHans
     ) {
         self.plan = plan
         self.unifiedDiff = unifiedDiff
         self.reportsDirectory = reportsDirectory
+        self.language = language
     }
 }
 
@@ -228,7 +231,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .platformDraft,
                 requiresGitWorktree: true,
                 isImplementedInV1: true,
-                summary: "条件轮询 Notifications / PR Review，支持 Pending 草稿回写"
+                summary: CoreL10n.string("Conditional polling for Notifications / PR Reviews with Pending draft write-back")
             )
         case .gitlab:
             return ConnectorCapabilities(
@@ -237,7 +240,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .platformDraft,
                 requiresGitWorktree: true,
                 isImplementedInV1: false,
-                summary: "Merge Request @mention 与 Draft Notes（规划扩展）"
+                summary: CoreL10n.string("Merge Request @mentions and Draft Notes (planned)")
             )
         case .feishu:
             return ConnectorCapabilities(
@@ -246,7 +249,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: "飞书群聊 / 文档评论 @我，本地生成排查回复草稿（规划扩展）"
+                summary: CoreL10n.string("Feishu group chats / doc comment @mentions with local troubleshooting drafts (planned)")
             )
         case .slack:
             return ConnectorCapabilities(
@@ -255,7 +258,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: "Slack Thread @mention，支持关联本地代码库只读排查（规划扩展）"
+                summary: CoreL10n.string("Slack thread @mentions with read-only local repo investigation (planned)")
             )
         case .linear:
             return ConnectorCapabilities(
@@ -264,7 +267,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: "Linear Issue 指派与评论触发，输出根因分析与方案（规划扩展）"
+                summary: CoreL10n.string("Linear issue assignments and comments for root-cause analysis (planned)")
             )
         case .jira:
             return ConnectorCapabilities(
@@ -273,7 +276,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: "Jira 工单评论与指派触发（规划扩展）"
+                summary: CoreL10n.string("Jira ticket comments and assignments (planned)")
             )
         case .customWebhook:
             return ConnectorCapabilities(
@@ -282,7 +285,7 @@ public enum ConnectorCatalog {
                 defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: "自定义 Webhook / SSE 桥接接入任意团队内部系统（规划扩展）"
+                summary: CoreL10n.string("Custom Webhook / SSE bridge for internal team systems (planned)")
             )
         }
     }
