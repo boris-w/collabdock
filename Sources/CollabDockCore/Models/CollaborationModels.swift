@@ -179,12 +179,15 @@ public enum CollaborationPayload: Codable, Hashable, Sendable {
 
 // MARK: - AI 执行引擎与计划模型（关联 REQ-007, ADR-003）
 
-/// 支持的本地 AI CLI 与会话编排引擎（关联 REQ-007, REQ-014, ADR-003, ADR-007）
+/// AI 执行引擎标识（当前仅提供 Lody 编排层；保留旧直连引擎 raw case 以兼容历史任务、用量账本与复审上下文解码）
 public enum AgentEngine: String, CaseIterable, Codable, Sendable, Identifiable {
     case claudeCode = "claude"
     case codex = "codex"
     case antigravity = "agy"
     case lody = "lody"
+
+    /// 当前界面与执行层可选的引擎（Lody-only）
+    public static let selectableEngines: [AgentEngine] = [.lody]
 
     public var id: String { rawValue }
 
@@ -228,42 +231,11 @@ public enum AgentEngine: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
-    /// 各引擎可选执行模式（Mode）：默认优先只读/规划，同时支持用户按需切到 Default / Accept edits / Auto / Agent 等模式（关联 ITER-016）
+    /// 默认执行模式占位（实际由 Lody Agent 自身目录或按 agentType 回退提供）
     public var defaultModes: [AgentModeOption] {
-        switch self {
-        case .claudeCode:
-            return [
-                AgentModeOption(id: "plan", displayName: CoreL10n.string("Plan (read-only)")),
-                AgentModeOption(id: "default", displayName: CoreL10n.string("Manual (ask before edits)")),
-                AgentModeOption(id: "acceptEdits", displayName: CoreL10n.string("Accept edits (auto edit)")),
-                AgentModeOption(id: "auto", displayName: CoreL10n.string("Auto (auto decide)"))
-            ]
-        case .antigravity:
-            return [
-                AgentModeOption(id: "plan", displayName: CoreL10n.string("Plan (read-only)")),
-                AgentModeOption(id: "default", displayName: CoreL10n.string("Default (ask by default)")),
-                AgentModeOption(id: "accept-edits", displayName: CoreL10n.string("Accept edits (auto edit)")),
-                AgentModeOption(id: "auto", displayName: CoreL10n.string("Auto (auto execute)"))
-            ]
-        case .codex:
-            return [
-                AgentModeOption(id: "read-only", displayName: CoreL10n.string("Read-only (sandbox)")),
-                AgentModeOption(id: "workspace-write", displayName: CoreL10n.string("Workspace write")),
-                AgentModeOption(id: "danger-full-access", displayName: CoreL10n.string("Full access"))
-            ]
-        case .lody:
-            return [
-                AgentModeOption(id: "__agent_default__", displayName: CoreL10n.string("Follow Agent Default Mode"))
-            ]
-        }
-    }
-
-    public var defaultSafeModeID: String {
-        switch self {
-        case .claudeCode, .antigravity: return "plan"
-        case .codex: return "read-only"
-        case .lody: return "__agent_default__"
-        }
+        [
+            AgentModeOption(id: "__agent_default__", displayName: CoreL10n.string("Follow Agent Default Mode"))
+        ]
     }
 }
 
@@ -619,66 +591,12 @@ public enum ExecutionSandboxPolicy: String, Codable, Hashable, Sendable {
     case readOnly
 }
 
-/// 唤起本地 AI 的驱动方式（关联 ADR-006）
+/// 唤起 AI 的驱动方式（当前仅使用 `.nativeBackgroundSession`；保留 `.managedStructuredRun` 仅用于解码历史持久化数据）
 public enum ExecutionLaunchMode: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
-    /// 持久化无头执行 + 流式进度 + JSON Schema 自动交付草稿，同时保留 sessionID 供随时接管
     case managedStructuredRun
-    /// 直接派发为引擎原生后台会话（如 claude --bg / 未来 codex app-server / agy acp）
     case nativeBackgroundSession
 
     public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .managedStructuredRun:
-            return CoreL10n.string("Managed run with draft (resume anytime)")
-        case .nativeBackgroundSession:
-            return CoreL10n.string("Dispatch as native background session")
-        }
-    }
-
-    public var shortLabel: String {
-        switch self {
-        case .managedStructuredRun:
-            return CoreL10n.string("Managed + Draft")
-        case .nativeBackgroundSession:
-            return CoreL10n.string("Background Session")
-        }
-    }
-}
-
-/// 跨平台通用交付模式（由各 Connector 决定支持子集，关联 ADR-004, ADR-005）
-public enum DeliveryMode: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
-    /// 平台原生草稿（如 GitHub / GitLab Pending Review）
-    case platformDraft
-    /// 仅在本地生成报告/回复草稿（可一键复制或审阅）
-    case localDraftOnly
-    /// 直接回复到源平台评论/话题
-    case directReply
-
-    public var id: String { rawValue }
-
-    public func displayName(for platform: PlatformKind) -> String {
-        switch self {
-        case .platformDraft:
-            return CoreL10n.format("%@ Pending Draft (recommended, only visible to you)", platform.displayName)
-        case .localDraftOnly:
-            return CoreL10n.string("Local draft / report only")
-        case .directReply:
-            return CoreL10n.format("Reply directly on %@", platform.displayName)
-        }
-    }
-
-    public func shortLabel(for platform: PlatformKind) -> String {
-        switch self {
-        case .platformDraft:
-            return CoreL10n.string("Pending Draft")
-        case .localDraftOnly:
-            return CoreL10n.string("Local Draft Only")
-        case .directReply:
-            return CoreL10n.string("Direct Reply")
-        }
-    }
 }
 
 public enum CollaborationTaskStatus: String, Codable, Hashable, Sendable {
@@ -763,7 +681,7 @@ public struct PreviousReviewContext: Codable, Hashable, Sendable {
         guard let sid = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines), !sid.isEmpty else {
             return false
         }
-        return engine == .lody || engine == .claudeCode || engine == .antigravity || engine == .codex
+        return engine == .lody
     }
 }
 
@@ -943,61 +861,43 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-/// 多模型会诊搭档配置（关联 REQ-010, TASK-017）
-public struct CouncilPartner: Codable, Hashable, Sendable {
-    public var engine: AgentEngine
-    public var model: String
-    public var effort: ReasoningEffort
-
-    public init(engine: AgentEngine, model: String, effort: ReasoningEffort = .high) {
-        self.engine = engine
-        self.model = model
-        self.effort = effort
-    }
-}
-
-/// 本地人工确认后生成的执行计划（关联 REQ-005, REQ-010, ADR-006, ADR-007, ITER-012）
+/// 本地人工确认后生成的执行计划（Lody-only，关联 REQ-005, REQ-010, ADR-007, ITER-012）
 public struct ExecutionPlan: Codable, Hashable, Sendable {
     public var engine: AgentEngine
-    /// 实际传给 AI 引擎或 Lody `--model` 的模型 ID（`"default"` 表示跟随 Agent 默认模型）
+    /// 实际传给 Lody `--model` 的模型 ID（`"default"` 表示跟随 Agent 默认模型）
     public var model: String
-    /// 仅当 `engine == .lody` 时生效：目标 Lody Agent Config 的 ID 或名称（`"default"` / `nil` 表示跟随 Workspace 默认 Agent）
+    /// 目标 Lody Agent Config 的 ID 或名称（`"default"` / `nil` 表示跟随 Workspace 默认 Agent）
     public var lodyAgentConfig: String?
     public var effort: ReasoningEffort
-    /// 可选执行模式（如 Lody/Antigravity/Claude 的 `plan`/`default`/`accept-edits`/`auto`，或 Codex 的 `read-only`/`agent`/`workspace-write`）
+    /// 可选 Lody ACP 执行模式（如 `plan` / `default` / `accept-edits` / `auto` / `read-only`）
     public var mode: String?
     public var presetID: String
-    public var deliveryMode: DeliveryMode
     public var launchMode: ExecutionLaunchMode
     public var sandboxPolicy: ExecutionSandboxPolicy
     /// 可选：本次任务临时指定或覆写的本地项目目录路径（nil 表示按仓库映射自动解析）
     public var targetDirectoryOverride: String?
     /// 是否使用独立 Git Worktree 隔离审查（默认 true，绝不切掉当前开发分支；设为 false 则直接在项目主目录中运行）
     public var useIsolatedWorktree: Bool
-    /// 同 PR 复审策略（首次审查恒为 freshSessionFull；检测到历史审查时可续聊原会话或只审增量 Diff）
+    /// 同 PR 复审策略（首次审查恒为 freshSessionFull；检测到历史 Lody 审查时可续聊原会话或只审增量 Diff）
     public var continuityMode: ReviewContinuityMode
     /// 关联的上一轮审查上下文（用于续聊会话 ID 与增量 Diff 基线 SHA）
     public var previousReview: PreviousReviewContext?
     public var extraInstructions: String
-    /// 可选：启用双引擎并行会诊时的第二引擎配置（共享同一只读 Worktree）
-    public var councilPartner: CouncilPartner?
 
     public init(
-        engine: AgentEngine,
-        model: String,
+        engine: AgentEngine = .lody,
+        model: String = "default",
         lodyAgentConfig: String? = nil,
         effort: ReasoningEffort = .high,
         mode: String? = nil,
         presetID: String = "code-review-general",
-        deliveryMode: DeliveryMode = .platformDraft,
-        launchMode: ExecutionLaunchMode = .managedStructuredRun,
+        launchMode: ExecutionLaunchMode = .nativeBackgroundSession,
         sandboxPolicy: ExecutionSandboxPolicy = .readOnly,
         targetDirectoryOverride: String? = nil,
         useIsolatedWorktree: Bool = true,
         continuityMode: ReviewContinuityMode = .freshSessionFull,
         previousReview: PreviousReviewContext? = nil,
-        extraInstructions: String = "",
-        councilPartner: CouncilPartner? = nil
+        extraInstructions: String = ""
     ) {
         self.engine = engine
         self.model = model
@@ -1005,7 +905,6 @@ public struct ExecutionPlan: Codable, Hashable, Sendable {
         self.effort = effort
         self.mode = mode
         self.presetID = presetID
-        self.deliveryMode = deliveryMode
         self.launchMode = launchMode
         self.sandboxPolicy = sandboxPolicy
         self.targetDirectoryOverride = targetDirectoryOverride
@@ -1013,7 +912,6 @@ public struct ExecutionPlan: Codable, Hashable, Sendable {
         self.continuityMode = continuityMode
         self.previousReview = previousReview
         self.extraInstructions = extraInstructions
-        self.councilPartner = councilPartner
     }
 }
 

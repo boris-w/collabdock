@@ -7,7 +7,7 @@
 
 简体中文 | [English](README.en.md)
 
-macOS 菜单栏应用：把 GitHub 上找你 Review 的 PR 收进一个收件箱，经你确认后，用本机的 AI CLI（Claude Code / Codex / Antigravity / Lody）在只读的隔离 worktree 里审查，结果写回为只有你自己可见的 GitHub Pending Review 草稿。
+macOS 菜单栏应用：把 GitHub 上找你 Review 的 PR 收进一个收件箱，经你确认后，通过 [Lody](https://lody.ai)（可选 Claude Code、Codex、Antigravity 等 Agent 与模型）在隔离的 git worktree 中启动后台审查会话，并实时跟踪会话状态与上下文用量。
 
 <p align="center">
   <img src="docs/images/showcase-02-pending-multiplatform-light.png" width="380" alt="收件箱">
@@ -23,18 +23,15 @@ macOS 菜单栏应用：把 GitHub 上找你 Review 的 PR 收进一个收件箱
 
 ## 功能
 
-- **GitHub 收件箱**：轮询 `/notifications`（`If-Modified-Since` 条件请求，304 不计配额）；token 缺 `notifications` scope 时自动降级为 Search API。也可以点 `+` 直接粘贴 PR 链接或 `owner/repo#123`。
-- **触发规则**：分别开关 `@我` 评论（可要求包含关键词，如 `review`、`cr`、`帮忙看`）、Request Review、团队指派；支持仓库白/黑名单（`owner/*` 通配）、忽略 Draft PR 和 Bot。
-- **执行前人工确认**：每个任务都要你选好引擎、模型、思考强度、模式、项目目录和交付方式，点「确认执行」后才会启动 CLI。可以先预览完整提示词。
-- **四种本地引擎**：`claude`、`codex`、`agy`、`lody`（找不到时回退到 `npx lody`）。模型列表尽量从 CLI 实时获取（如 `agy models`、`lody agent-config list`）。
-- **隔离 worktree**：按 `owner/repo` 自动匹配本地仓库（找不到则浅克隆到缓存目录），用 `git worktree add --detach` 检出 PR head，不动你当前的分支和未提交修改。
-- **Pending Review 草稿**：行内评论先按 diff hunk 校验行号，越界的并入总结，避免 GitHub 返回 422；代码建议转成 ```` ```suggestion ```` 块。也可以选择只生成本地 Markdown 报告，或直接发表评论。
-- **增量复审**：PR 有新提交后再次请求 Review，会标为「第 N 轮复审」，可以选择续聊原会话只看增量 diff、新开会话看增量 diff，或重新全量审查；检测到 rebase / force-push 时回退为全量。
-- **双模型会诊**：同一 PR 并行跑两个引擎/模型，标出双方都指出的问题（共识）与各自的独立发现。
-- **自动归档**：你在 GitHub 上 Approve，或 PR 被合并/关闭后，条目自动移到「已完成」；Request Changes 的 PR 留在收件箱。
-- **用量统计**：本地记录每次运行的 token（输入/输出/缓存/思考）、耗时和估算成本，按天、模型、仓库汇总，可导出 CSV，币种可选 USD / CNY。
-- **会话接管**：一键在终端打开对应会话（`claude --resume`、`codex resume`、`agy --resume`），或通过 `lody://` 链接跳到 Lody Desktop。
-- **双语界面与独立审查语言**：界面支持简体中文与英文（默认跟随系统，无匹配时回退英文），可在「设置 → 工作区」手动切换；写回 GitHub 的审查标题、严重度、本地报告与会诊汇总文案支持单独设置「审查语言」。
+- **GitHub 收件箱**：轮询 `/notifications`（`If-Modified-Since` 条件请求，304 不计配额）；token 缺 `notifications` scope 时自动降级为 Search API（每 180 秒对齐，打开弹窗距上次对齐超 60 秒自动同步）。也可以点 `+` 直接粘贴 PR 链接或 `owner/repo#123`。
+- **触发规则**：分别开关 `@我` 评论（可要求包含关键词，如 `review`、`cr`、`帮忙看`；你已是 reviewer 的 PR 免关键词放行）、Request Review、团队指派；支持仓库白/黑名单（`owner/*` 通配）、忽略 Draft PR 和 Bot。
+- **执行前人工确认**：每个任务都要你在确认卡片上选好 Lody Agent（如 Claude Code / Codex / Antigravity）、模型、思考强度、提示词模板和项目目录，点确认后才会派发会话。可以先预览完整提示词。
+- **Lody 编排执行**：通过本机 `lody` CLI（未全局安装时自动回退到 `npx -y lody@latest`）实时拉取工作区、Agent、模型、本地项目与已绑定 GitHub 仓库目录，后台派发会话并持续轮询进度，一键通过 `lody://` 链接在 Lody Desktop 中打开或继续追问。
+- **隔离 worktree**：自动路由到本地 Lody 项目（使用 Lody 原生 `--worktree --branch` 隔离分支）、云端已绑定仓库或本地自动创建的隔离 worktree，不动你当前的工作分支和未提交修改。
+- **增量复审**：PR 有新提交后再次请求 Review，旧卡片自动归档为「已进入第 N 轮」，新卡片标为「第 N 轮复审」，默认续聊上一轮 Lody 会话（`lody session chat`）只看增量改动，也可以新开增量或全量会话；检测到 rebase / force-push 时自动回退为全量范围。
+- **自动归档**：你在 GitHub 上 Approve，或 PR 被合并/关闭后，条目自动移到「已完成」；Request Changes 的 PR 留在收件箱并标示「待修复」。
+- **用量统计**：本地 SQLite 记录每次审查的 Lody 上下文用量（续聊轮次仅记相对上一轮的新增上下文）、本轮耗时和估算 API 价值，按天、模型、仓库汇总，可导出 CSV，币种可选 USD / CNY。
+- **双语界面**：支持简体中文与英文（默认跟随 macOS 系统语言，无匹配时回退英文），可在「设置 → 工作区」手动切换并重启生效。
 - **其他**：macOS 原生通知、开机自启、暂停监听、团队配置包（JSON）导入导出。
 
 ## 工作原理
@@ -43,31 +40,24 @@ macOS 菜单栏应用：把 GitHub 上找你 Review 的 PR 收进一个收件箱
 GitHub 通知 / 待审 PR
   → 触发规则过滤、SQLite 去重
   → 菜单栏收件箱
-  → 你在确认卡片里选好参数并点击执行
-  → 隔离 git worktree + 以只读模式运行本地 AI CLI（输出受 JSON Schema 约束）
-  → 校验行号 → GitHub Pending Review 草稿 / 本地 Markdown 报告
-  → 你在 GitHub 上修改、提交（或丢弃）草稿
+  → 你在确认卡片里选择 Lody Agent、模型、目录并确认
+  → 刷新本地项目分支引用 / 准备隔离 worktree → 派发 Lody 后台会话
+  → 实时跟踪会话状态与上下文用量 → 一键在 Lody Desktop 查看结论并继续对话
 ```
 
-使用 Lody 时，任务会派发为一个 Lody 后台会话。审查结论在 Lody 里查看和继续对话；CollabDock 负责跟踪会话状态和用量，不会把结果写回 GitHub。
+CollabDock 自身对 GitHub 保持只读，不直接向 GitHub 写入审查评论或草稿；审查过程和后续操作都在 Lody 会话中完成。
 
 ## 安全模型
 
-PR 标题、评论和 diff 都是外部可控的输入。CollabDock 的防护分为几层：
+PR 标题、评论和提交信息都是外部可控的输入。CollabDock 的防护分为几层：
 
-1. **人工门控**：不会自动执行任何东西。只有你在确认卡片上点击「确认执行」，才会启动 AI 子进程。
-2. **默认只读**：
-   - Claude Code：`--permission-mode plan`，`--allowedTools` 只放行 `Read,Grep,Glob` 和 `git diff/log/show`
-   - Codex：`codex exec --sandbox read-only`
-   - Antigravity：`agy --mode plan --sandbox`
-   - Lody：使用所选 Agent 的只读 / plan 模式（如果该 Agent 提供）
+1. **人工门控**：不会自动执行任何东西。只有你在确认卡片上点击确认，才会派发 Lody 会话。
+2. **默认只读模式**：若所选 Lody Agent 提供只读 / plan 模式（如 `plan`、`read-only`），派发时会自动传入该只读模式。
+3. **不可信输入隔离**：外部内容在提示词里包在 `<untrusted_external_data>` 标签中（并先中和伪造的闭合标签），复审消息中的 git 命令仅使用整数 PR 编号和校验后的十六进制 SHA，绝不将不可信分支名拼入命令。这能降低提示词与命令注入风险，但不能替代人工审查。
+4. **GitHub token 与宿主会话隔离**：token 由 `gh auth token` 获取，只在应用进程内用于只读查询 GitHub API。启动 `lody` 子进程前会剥离 `GITHUB_TOKEN`、`GH_TOKEN`、`GH_ENTERPRISE_TOKEN` 以及 `ELECTRON_RUN_AS_NODE`、`LODY_*` 宿主环境变量，并在中性临时目录启动，防止目标仓库内同名 `package.json` 劫持 `npx`。
+5. **不直接写 GitHub**：CollabDock 自身不发起任何 GitHub 评论或 Review 写请求。
 
-   模式可以在设置或确认卡片里改成可写模式（如 Codex `workspace-write`、Claude `acceptEdits`）。改了之后，上面的只读保证就不再成立。
-3. **不可信输入隔离**：外部内容在提示词里包在 `<untrusted_external_data>` / `<untrusted_pr_diff>` 标签中，并明确要求模型不得把其中的文字当作指令。这只能降低提示词注入的风险，不能根除。
-4. **GitHub token 不交给 AI 子进程**：token 由 `gh auth token` 获取，只在应用进程内用于调用 GitHub API。启动 AI 子进程前会从环境变量中移除 `GITHUB_TOKEN`、`GH_TOKEN`、`GH_ENTERPRISE_TOKEN`。所有写 GitHub 的操作都由应用自身在校验结构化输出后完成。
-5. **默认只写草稿**：默认的交付方式是不带 `event` 的 Pending Review，提交之前只有你自己能看到。
-
-需要说明的边界：AI CLI 仍然以你的系统用户身份运行。如果把它切到可写或可执行任意 shell 的模式，它就有可能读到你本机的其他凭据（例如 `gh` 自己保存的登录信息）。CollabDock 本身没有服务端，也没有遥测，只访问 GitHub API；AI CLI 自身的网络访问由各 CLI 决定。
+需要说明的边界：Lody 会话中的 Agent 仍以你的系统用户身份运行，其权限与网络访问由对应 Lody Agent 配置决定。CollabDock 本身没有服务端，也没有遥测，只访问 GitHub API 和本机 Lody CLI。
 
 发现安全问题请看 [SECURITY.md](SECURITY.md)。
 
@@ -77,7 +67,7 @@ PR 标题、评论和 diff 都是外部可控的输入。CollabDock 的防护分
 - 从源码构建：Xcode 16 或更高版本（Swift 6 工具链）
 - [GitHub CLI](https://cli.github.com) 已登录：`gh auth login`
   - 建议补充 `notifications` 权限：`gh auth refresh -s notifications`（没有的话会降级为 Search API，轮询间隔 180 秒）
-- 至少安装并登录以下一种 CLI：`claude`（Claude Code）、`codex`（OpenAI Codex CLI）、`agy`（Google Antigravity CLI）、`lody`（或可用的 `npx`）
+- [Lody](https://lody.ai) CLI 已登录（全局 `lody` 或可用的 `npx`，可执行 `npx -y lody@latest login`）
 - `git`
 
 ## 安装
@@ -104,12 +94,12 @@ make run        # 构建并启动
 
 1. 启动后，菜单栏会出现 CollabDock 图标。打开「设置」：
    - **协作来源**：确认 `gh` 已登录、显示的账号正确
-   - **工作区**：设置本地代码搜索目录（默认 `~/work`、`~/projects`），或手动把 `owner/repo` 绑定到某个目录
-   - **AI 引擎**：选择默认引擎、模型、思考强度和模式
+   - **Lody**：选择目标 Workspace、默认 Lody Agent（如 Claude Code / Codex / Antigravity）、默认模型与思考强度
+   - **工作区**：设置界面语言与本地代码搜索目录（默认 `~/work`、`~/projects`），或手动把 `owner/repo` 绑定到某个目录
    - **触发规则**：按需调整关键词和仓库范围
 2. 有人在 PR 评论里 `@你`（且包含关键词）或给你 Request Review 时，PR 会出现在收件箱，同时弹出系统通知。也可以点 `+` 手动导入一个 PR。
-3. 点开条目，在确认卡片里检查参数（项目目录默认使用独立 worktree，交付方式默认是 Pending 草稿），然后点「确认执行」。
-4. 完成后，点击打开 GitHub 的 Files 页面查看草稿，修改后由你自己提交；也可以打开本地报告，或在终端里接管会话继续追问。
+3. 点开条目，在确认卡片里选择 Lody Agent、模型、思考强度与项目目录（默认使用隔离 worktree），点击确认派发。
+4. 派发后卡片会实时显示 Lody 审查进度与上下文用量；随时点击「打开 Lody」跳转到 Lody Desktop 查看结论并继续对话。
 
 ## 开发
 
@@ -117,7 +107,7 @@ make run        # 构建并启动
 make build      # swift build（Debug）
 make test       # 运行全部测试
 make test-unit  # 只跑单元测试
-make test-e2e   # 端到端管线测试：假 GitHub HTTP + 假 agent CLI + 真实临时 git 仓库，不需要网络和 AI
+make test-e2e   # 端到端管线测试：假 GitHub HTTP + 假 lody CLI + 真实临时 git 仓库，不需要网络和 AI
 make coverage   # 全部测试 + CollabDockCore 行覆盖率门槛（CI 使用）
 make run        # 打包 .app 并重启
 ```
@@ -125,25 +115,24 @@ make run        # 打包 .app 并重启
 DEBUG 构建自带两个调试入口（不会编进 Release 包）：
 
 ```bash
-# 离屏渲染各个界面的 Light/Dark 截图，用于视觉回归
+# 离屏渲染中英文界面的 Light/Dark 截图，用于视觉回归
 swift run CollabDock --snapshot-dir /tmp/collabdock-snapshots
 
-# 对一个真实 PR 跑完整链路（会真的调用本地 AI CLI；默认只生成本地报告）
-swift run CollabDock --e2e-pr owner/repo#123 --engine claude   # 可选：claude | codex | agy | lody
+# 对一个真实 PR 跑完整 Lody 派发链路（会真的调用本机 Lody CLI）
+swift run CollabDock --e2e-pr owner/repo#123 --agent claude --model opus
 ```
-
-`--e2e-pr` 还支持 `--model <id>` 和 `--delivery <localDraftOnly|platformDraft|directReply>`。
 
 参与贡献请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 项目结构
 
 ```text
-Sources/CollabDockCore/   纯 Swift 业务库，不依赖 SwiftUI：GitHub 连接器、规则引擎、
-                          CLI 命令构造与流式解析、worktree 管理、SQLite 存储、用量统计
+Sources/CollabDockCore/   纯 Swift 业务库，不依赖 SwiftUI：GitHub 只读连接器、规则引擎、
+                          Lody 命令构造与输出解析、worktree 管理、SQLite 存储、用量统计
 Sources/CollabDockApp/    SwiftUI 菜单栏应用：界面、设计系统、系统集成、DEBUG 调试工具
-Tests/CollabDockCoreTests/ 单元测试
-Tests/CollabDockE2ETests/  端到端管线测试（假 GitHub HTTP + 假 agent CLI + 临时 git 仓库）
+Tests/CollabDockCoreTests/ Core 单元测试
+Tests/CollabDockAppTests/  App 协调层测试
+Tests/CollabDockE2ETests/  端到端管线测试（假 GitHub HTTP + 假 lody CLI + 临时 git 仓库）
 scripts/                  打包 .app / .dmg、生成图标
 packaging/homebrew/       Homebrew Cask 模板
 pm/                       设计文档：PRD、架构、ADR、迭代记录、变更日志
@@ -153,15 +142,15 @@ pm/                       设计文档：PRD、架构、ADR、迭代记录、变
 
 ## 路线图
 
-- 第二个协作连接器（如 GitLab MR、飞书群聊/文档）。核心层已经按 `CollaborationSource` / `CollaborationSink` 抽象，但目前只实现了 GitHub。
-- Claude Code / Codex / Antigravity 原生插件：在 CLI 会话里浏览和认领同一个任务队列。
+- 更多协作连接器（如 GitLab MR、飞书群聊/文档）。核心层已按 `CollaborationSource` 抽象，目前实现了 GitHub。
+- 以新架构重新接入其他执行后端与 CLI 插件。
 - 签名公证的正式发布、Homebrew tap 和自动更新。
 
 ## 说明
 
-- 界面与写回 GitHub 的审查文案均支持简体中文与英文（默认跟随系统，无匹配时回退英文）。
+- 界面支持简体中文与英文（默认跟随系统，无匹配时回退英文）。
 - 本项目与 Anthropic、OpenAI、Google、Lody 均无关联，也未获得其认可。各产品名称和商标归各自所有者。
-- 使用各 AI CLI 产生的费用和数据处理遵循各自服务条款。
+- 使用 Lody 及各 AI Agent 产生的费用和数据处理遵循各自服务条款。
 
 ## 许可证
 

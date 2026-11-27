@@ -1,6 +1,6 @@
 import Foundation
 
-/// Core 层审查执行管线输入请求
+/// Core 层审查执行管线输入请求（Lody-only）
 public struct ReviewExecutionRequest: Sendable {
     public let item: CollaborationItem
     public let plan: ExecutionPlan
@@ -10,9 +10,7 @@ public struct ReviewExecutionRequest: Sendable {
     public let preferredLocalPath: String?
     public let environment: EnvironmentSnapshot?
     public let injectPresetPrompt: Bool
-    public let reportsDirectory: URL?
     public let lodyAgentDisplayName: String?
-    public let reviewLanguage: ResolvedLanguage
 
     public init(
         item: CollaborationItem,
@@ -23,9 +21,7 @@ public struct ReviewExecutionRequest: Sendable {
         preferredLocalPath: String? = nil,
         environment: EnvironmentSnapshot? = nil,
         injectPresetPrompt: Bool = true,
-        reportsDirectory: URL? = nil,
-        lodyAgentDisplayName: String? = nil,
-        reviewLanguage: ResolvedLanguage = .zhHans
+        lodyAgentDisplayName: String? = nil
     ) {
         self.item = item
         self.plan = plan
@@ -35,9 +31,7 @@ public struct ReviewExecutionRequest: Sendable {
         self.preferredLocalPath = preferredLocalPath
         self.environment = environment
         self.injectPresetPrompt = injectPresetPrompt
-        self.reportsDirectory = reportsDirectory
         self.lodyAgentDisplayName = lodyAgentDisplayName
-        self.reviewLanguage = reviewLanguage
     }
 }
 
@@ -61,67 +55,70 @@ public struct ReviewExecutionProgress: Equatable, Sendable {
     }
 }
 
-/// 审查管线终态输出
+/// 审查管线终态输出（当前只剩 Lody 后台会话派发与用户中止）
 public enum ReviewExecutionOutcome: Sendable {
-    /// 完成结构化分析并通过连接器完成交付（单引擎或双模型会诊）
-    case delivered(
-        item: CollaborationItem,
-        receipt: DeliveryReceipt,
-        usageRuns: [ReviewUsageRun]
-    )
-    /// 已派发至原生后台会话（如 Lody 持久会话或 `claude --bg`），无需同步等待交付
+    /// 已派发至 Lody 持久后台会话
     case backgroundDispatched(
         item: CollaborationItem,
         handle: AgentSessionHandle?,
         continuedExistingSession: Bool,
         usageRuns: [ReviewUsageRun]
     )
-    /// 经由 `ExecutionRunTicket` 中止（不回写平台、不写入失败状态）
+    /// 经由 `ExecutionRunTicket` 中止（不写入失败状态）
     case cancelled(itemID: String, runID: UUID)
 }
 
-/// Core 层审查执行编排服务（零 SwiftUI/AppKit 依赖）：
-/// 串联「准备上下文 → 单引擎/双模型会诊后端执行 → 记账 → 交付回写 → 持久化」，全程以 `ExecutionRunTicket` 控制取消。
+/// Core 层审查执行编排服务（零 SwiftUI/AppKit 依赖，Lody-only）：
+/// 串联「准备 Lody 上下文 → 派发 Lody 后台会话 → 记账 → 持久化」，全程以 `ExecutionRunTicket` 控制取消。
 /// 约束：所有 `TaskStore` 写入失败（`upsertItem` / `upsertUsageRun`）必须抛出 `PersistenceError`，严禁 `try?` 静默吞错。
 public struct ReviewExecutionService: Sendable {
-    public let directBackend: any ExecutionBackend
-    public let lodyBackend: any ExecutionBackend
-    public let sink: any CollaborationSink
+    public let backend: any ExecutionBackend
     public let store: any TaskStore
     public let clock: any ClockProviding
 
     public init(
-        directBackend: any ExecutionBackend = DirectCLIBackend(),
-        lodyBackend: any ExecutionBackend = LodyBackend(),
-        sink: any CollaborationSink,
+        backend: any ExecutionBackend = LodyBackend(),
         store: any TaskStore,
         clock: any ClockProviding = SystemClock()
     ) {
-        self.directBackend = directBackend
-        self.lodyBackend = lodyBackend
-        self.sink = sink
+        self.backend = backend
         self.store = store
         self.clock = clock
     }
 
-    /// 按引擎选择对应的执行后端（`.lody` → `lodyBackend`，其余直连引擎 → `directBackend`）
-    public func backend(for engine: AgentEngine) -> any ExecutionBackend {
-        engine == .lody ? lodyBackend : directBackend
-    }
-
     /// 执行完整审查流水线：
-    /// 1. `backend.prepareWorkspace` 准备上下文（单引擎或双引擎共享同一只读 Worktree）
-    /// 2. `backend.execute` 运行单引擎或双模型会诊（并行传 `ticket.primary` / `ticket.secondary`，会诊由 `CouncilSynthesizer` 汇总）
-    /// 3. 记录 `ReviewUsageRun` 至 `store`（失败抛出 `PersistenceError`）
-    /// 4. 后台派发直接持久化并返回 `.backgroundDispatched`；托管运行调用 `sink.deliver(..., context:)` 交付后持久化并返回 `.delivered`
-    /// 5. 任意阶段检测到 `ticket.isCancelled` 即立即中止并返回 `.cancelled`，不交付且不落失败态
+    /// 1. 规整执行计划（始终落到 Lody 后台会话；外来引擎计划重置 model 为 `"default"`；外来上一轮会话降级为 `.freshSessionIncremental`）
+    /// 2. `backend.prepareWorkspace` 准备 Lody 工作区上下文
+    /// 3. `backend.execute` 派发至 Lody 后台会话（使用 `ticket.primary`）
+    /// 4. 记录 `ReviewUsageRun` 至 `store`（失败抛出 `PersistenceError`）
+    /// 5. 持久化被跟踪的卡片状态并返回 `.backgroundDispatched`；任意阶段取消即返回 `.cancelled`
     public func execute(
         _ request: ReviewExecutionRequest,
         onProgress: @escaping @Sendable (ReviewExecutionProgress) -> Void = { _ in }
     ) async throws -> ReviewExecutionOutcome {
         let ticket = request.ticket
         let item = request.item
-        let plan = request.plan
+        var plan = request.plan
+
+        if plan.engine != .lody {
+            plan.engine = .lody
+            plan.model = "default"
+        }
+        plan.launchMode = .nativeBackgroundSession
+
+        let canContinuePreviousLody: Bool = {
+            guard let prev = plan.previousReview,
+                  prev.engine == .lody,
+                  let sid = prev.sessionID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !sid.isEmpty else {
+                return false
+            }
+            return true
+        }()
+        if plan.continuityMode == .continueSessionIncremental && !canContinuePreviousLody {
+            plan.continuityMode = .freshSessionIncremental
+        }
+        let isResumingSameLody = (plan.continuityMode == .continueSessionIncremental && canContinuePreviousLody)
 
         let emit: @Sendable (CollaborationTaskStatus, String) -> Void = { status, message in
             guard !ticket.isCancelled else { return }
@@ -139,9 +136,8 @@ public struct ReviewExecutionService: Sendable {
             return .cancelled(itemID: item.id, runID: ticket.runID)
         }
 
-        // 1. 准备隔离上下文（双模型会诊固定走 directBackend 共享只读 Worktree）
+        // 1. 准备 Lody 工作区上下文
         emit(.preparing, CoreL10n.string("Preparing isolated context..."))
-        let prepBackend = (plan.councilPartner != nil) ? directBackend : backend(for: plan.engine)
         let prepRequest = WorkspacePreparationRequest(
             item: item,
             plan: plan,
@@ -152,7 +148,7 @@ public struct ReviewExecutionService: Sendable {
 
         let preparedContext: PreparedWorkspaceContext
         do {
-            preparedContext = try await prepBackend.prepareWorkspace(for: prepRequest) { line in
+            preparedContext = try await backend.prepareWorkspace(for: prepRequest) { line in
                 emit(.preparing, line)
             }
         } catch {
@@ -167,225 +163,29 @@ public struct ReviewExecutionService: Sendable {
             return .cancelled(itemID: item.id, runID: ticket.runID)
         }
 
-        // 2. 启动单引擎或双模型并行会诊
-        let finalOutput: ExecutionOutput
-        let primaryHandle: AgentSessionHandle?
-        var usageRuns: [ReviewUsageRun] = []
-
-        if let partner = plan.councilPartner {
-            emit(
-                .running,
-                CoreL10n.format(
-                    "Running two-model council: %@ (%@) × %@ (%@)...",
-                    plan.engine.displayName,
-                    plan.model,
-                    partner.engine.displayName,
-                    partner.model
-                )
-            )
-
-            var primaryPlan = plan
-            primaryPlan.launchMode = .managedStructuredRun
-            var partnerPlan = plan
-            partnerPlan.engine = partner.engine
-            partnerPlan.model = partner.model
-            partnerPlan.effort = partner.effort
-            partnerPlan.launchMode = .managedStructuredRun
-
-            let primaryRunReq = AgentRunRequest(
-                item: item,
-                plan: primaryPlan,
-                preset: request.preset,
-                workspace: preparedContext,
-                environment: request.environment,
-                injectPresetPrompt: request.injectPresetPrompt,
-                cancellationToken: ticket.primary
-            )
-            let partnerRunReq = AgentRunRequest(
-                item: item,
-                plan: partnerPlan,
-                preset: request.preset,
-                workspace: preparedContext,
-                environment: request.environment,
-                injectPresetPrompt: request.injectPresetPrompt,
-                cancellationToken: ticket.secondary
-            )
-
-            let primaryEngineName = primaryPlan.engine.displayName
-            let partnerEngineName = partnerPlan.engine.displayName
-            let primaryExecBackend = backend(for: primaryPlan.engine)
-            let partnerExecBackend = backend(for: partnerPlan.engine)
-
-            let (resA, resB): (AgentRunResult, AgentRunResult)
-            do {
-                async let runA = primaryExecBackend.execute(primaryRunReq) { line in
-                    emit(.running, "[\(primaryEngineName)] \(line)")
-                }
-                async let runB = partnerExecBackend.execute(partnerRunReq) { line in
-                    emit(.running, "[\(partnerEngineName)] \(line)")
-                }
-                (resA, resB) = try await (runA, runB)
-            } catch {
-                if ticket.isCancelled {
-                    return .cancelled(itemID: item.id, runID: ticket.runID)
-                }
-                try await persistFailedItem(item, error: error)
-                throw error
-            }
-
-            if ticket.isCancelled {
-                return .cancelled(itemID: item.id, runID: ticket.runID)
-            }
-
-            let runRecordA = makeUsageRun(
-                request: request,
-                plan: primaryPlan,
-                engine: primaryPlan.engine,
-                model: primaryPlan.model,
-                effort: primaryPlan.effort,
-                result: resA,
-                isCouncilSecondary: false
-            )
-            let runRecordB = makeUsageRun(
-                request: request,
-                plan: partnerPlan,
-                engine: partnerPlan.engine,
-                model: partnerPlan.model,
-                effort: partnerPlan.effort,
-                result: resB,
-                isCouncilSecondary: true
-            )
-            try await persist(.upsertUsageRun) { try await store.upsertUsageRun(runRecordA) }
-            try await persist(.upsertUsageRun) { try await store.upsertUsageRun(runRecordB) }
-            usageRuns = [runRecordA, runRecordB]
-
-            guard let outA = resA.output, let outB = resB.output else {
-                let err = AgentRunnerError.unparseableOutput(resA.rawOutputText + "\n" + resB.rawOutputText)
-                try await persistFailedItem(item, error: err)
-                throw err
-            }
-
-            finalOutput = CouncilSynthesizer.synthesize(
-                primary: CouncilContribution(label: "\(primaryPlan.engine.displayName)/\(primaryPlan.model)", output: outA),
-                secondary: CouncilContribution(label: "\(partnerPlan.engine.displayName)/\(partnerPlan.model)", output: outB),
-                language: request.reviewLanguage
-            )
-            primaryHandle = resA.sessionHandle ?? resB.sessionHandle
-        } else {
-            let isResumingSameLody = (plan.engine == .lody
-                && plan.continuityMode == .continueSessionIncremental
-                && plan.previousReview?.engine == .lody)
-            emit(
-                .running,
-                isResumingSameLody
-                    ? CoreL10n.format("Sending round %lld follow-up review to the existing Lody session...", item.reviewRound)
-                    : CoreL10n.format("Starting %@ (%@)...", plan.engine.displayName, plan.model)
-            )
-
-            let runRequest = AgentRunRequest(
-                item: item,
-                plan: plan,
-                preset: request.preset,
-                workspace: preparedContext,
-                environment: request.environment,
-                injectPresetPrompt: request.injectPresetPrompt,
-                cancellationToken: ticket.primary
-            )
-
-            let execBackend = backend(for: plan.engine)
-            let runResult: AgentRunResult
-            do {
-                runResult = try await execBackend.execute(runRequest) { line in
-                    emit(.running, line)
-                }
-            } catch {
-                if ticket.isCancelled {
-                    return .cancelled(itemID: item.id, runID: ticket.runID)
-                }
-                try await persistFailedItem(item, error: error)
-                throw error
-            }
-
-            if ticket.isCancelled {
-                return .cancelled(itemID: item.id, runID: ticket.runID)
-            }
-
-            let runRecord = makeUsageRun(
-                request: request,
-                plan: plan,
-                engine: plan.engine,
-                model: plan.model,
-                effort: plan.effort,
-                result: runResult,
-                isCouncilSecondary: false
-            )
-            try await persist(.upsertUsageRun) { try await store.upsertUsageRun(runRecord) }
-            usageRuns = [runRecord]
-
-            if runResult.wasBackgroundDispatched {
-                var dispatched = item
-                dispatched.status = .draftReady
-                dispatched.progressMessage = nil
-                dispatched.errorMessage = nil
-                dispatched.sessionHandle = runResult.sessionHandle
-                dispatched.sessionID = runResult.sessionHandle?.sessionID
-                dispatched.remoteSessionStatus = (plan.engine == .lody) ? .running : .completed
-
-                let summaryText: String
-                if plan.engine == .lody {
-                    summaryText = isResumingSameLody
-                        ? CoreL10n.format("Sent round %lld incremental re-review to the existing Lody session; analyzing in background...", item.reviewRound)
-                        : CoreL10n.string("Lody is reviewing in the background. Click \"Open Lody\" anytime to view live progress.")
-                } else {
-                    summaryText = isResumingSameLody
-                        ? CoreL10n.format("Sent round %1$lld follow-up review to the existing %2$@ session. Click \"Resume Session\" to inspect.", item.reviewRound, plan.engine.displayName)
-                        : CoreL10n.format("Dispatched as a native %@ background session. Click \"Resume Session\" to inspect.", plan.engine.displayName)
-                }
-                dispatched.executionOutput = .structuredReply(
-                    StructuredReplyResult(summary: summaryText, replyMarkdown: "")
-                )
-
-                try await persist(.upsertItem) { try await store.upsertItem(dispatched) }
-                return .backgroundDispatched(
-                    item: dispatched,
-                    handle: runResult.sessionHandle,
-                    continuedExistingSession: isResumingSameLody,
-                    usageRuns: usageRuns
-                )
-            }
-
-            guard let output = runResult.output else {
-                let err = AgentRunnerError.unparseableOutput(runResult.rawOutputText)
-                try await persistFailedItem(item, error: err)
-                throw err
-            }
-            finalOutput = output
-            primaryHandle = runResult.sessionHandle
-        }
-
-        // 3. 交付结果（非代码托管平台始终只落本地草稿）
-        emit(.publishing, CoreL10n.format("Validating diff lines and generating %@...", plan.deliveryMode.shortLabel(for: item.platform)))
-
-        let deliveryMode: DeliveryMode = (
-            item.platform == sink.platform
-            && ConnectorCatalog.capabilities(for: item.platform).requiresGitWorktree
-        ) ? plan.deliveryMode : .localDraftOnly
-
-        let deliveryContext = DeliveryContext(
-            plan: plan,
-            unifiedDiff: preparedContext.unifiedDiff,
-            reportsDirectory: request.reportsDirectory,
-            language: request.reviewLanguage
+        // 2. 派发 Lody 后台会话
+        emit(
+            .running,
+            isResumingSameLody
+                ? CoreL10n.format("Sending round %lld follow-up review to the existing Lody session...", item.reviewRound)
+                : CoreL10n.format("Starting %@ (%@)...", AgentEngine.lody.displayName, plan.model)
         )
 
-        let receipt: DeliveryReceipt
+        let runRequest = AgentRunRequest(
+            item: item,
+            plan: plan,
+            preset: request.preset,
+            workspace: preparedContext,
+            environment: request.environment,
+            injectPresetPrompt: request.injectPresetPrompt,
+            cancellationToken: ticket.primary
+        )
+
+        let runResult: AgentRunResult
         do {
-            receipt = try await sink.deliver(
-                output: finalOutput,
-                for: item,
-                mode: deliveryMode,
-                context: deliveryContext
-            )
+            runResult = try await backend.execute(runRequest) { line in
+                emit(.running, line)
+            }
         } catch {
             if ticket.isCancelled {
                 return .cancelled(itemID: item.id, runID: ticket.runID)
@@ -398,35 +198,48 @@ public struct ReviewExecutionService: Sendable {
             return .cancelled(itemID: item.id, runID: ticket.runID)
         }
 
-        var delivered = item
-        delivered.status = (receipt.deliveredMode == .platformDraft || receipt.deliveredMode == .localDraftOnly)
-            ? .draftReady
-            : .completed
-        delivered.progressMessage = nil
-        delivered.executionOutput = finalOutput
-        delivered.sessionHandle = primaryHandle
-        delivered.sessionID = primaryHandle?.sessionID
-        delivered.localReportPath = receipt.localReportPath?.path
-        delivered.deliveryURL = receipt.destinationURL
-        delivered.errorMessage = nil
+        // 3. 记录用量并落盘
+        let runRecord = makeUsageRun(
+            request: request,
+            plan: plan,
+            result: runResult
+        )
+        try await persist(.upsertUsageRun) { try await store.upsertUsageRun(runRecord) }
+        let usageRuns = [runRecord]
 
-        try await persist(.upsertItem) { try await store.upsertItem(delivered) }
-        return .delivered(item: delivered, receipt: receipt, usageRuns: usageRuns)
+        var dispatched = item
+        dispatched.status = .draftReady
+        dispatched.progressMessage = nil
+        dispatched.errorMessage = nil
+        dispatched.sessionHandle = runResult.sessionHandle
+        dispatched.sessionID = runResult.sessionHandle?.sessionID
+        dispatched.remoteSessionStatus = .running
+
+        let summaryText = isResumingSameLody
+            ? CoreL10n.format("Sent round %lld incremental re-review to the existing Lody session; analyzing in background...", item.reviewRound)
+            : CoreL10n.string("Lody is reviewing in the background. Click \"Open Lody\" anytime to view live progress.")
+        dispatched.executionOutput = .structuredReply(
+            StructuredReplyResult(summary: summaryText, replyMarkdown: "")
+        )
+
+        try await persist(.upsertItem) { try await store.upsertItem(dispatched) }
+        return .backgroundDispatched(
+            item: dispatched,
+            handle: runResult.sessionHandle,
+            continuedExistingSession: isResumingSameLody,
+            usageRuns: usageRuns
+        )
     }
 
     private func makeUsageRun(
         request: ReviewExecutionRequest,
         plan: ExecutionPlan,
-        engine: AgentEngine,
-        model: String,
-        effort: ReasoningEffort,
-        result: AgentRunResult,
-        isCouncilSecondary: Bool
+        result: AgentRunResult
     ) -> ReviewUsageRun {
         let now = clock.now
         let effectiveUsage = result.usage ?? AgentUsageMetrics(
             durationSeconds: result.durationSeconds,
-            metricKind: engine == .lody ? .pendingSync : .exact
+            metricKind: .pendingSync
         )
         return ReviewUsageRun(
             itemID: request.item.id,
@@ -436,12 +249,12 @@ public struct ReviewExecutionService: Sendable {
             title: request.item.title,
             reviewRound: request.item.reviewRound,
             continuityMode: plan.continuityMode,
-            engine: engine,
-            lodyAgentName: engine == .lody ? request.lodyAgentDisplayName : nil,
-            model: model,
-            effort: effort,
+            engine: .lody,
+            lodyAgentName: request.lodyAgentDisplayName,
+            model: plan.model,
+            effort: plan.effort,
             sessionID: result.sessionHandle?.sessionID,
-            isCouncilSecondary: isCouncilSecondary,
+            isCouncilSecondary: false,
             usage: effectiveUsage,
             succeeded: true,
             createdAt: now,

@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+### Removed
+- **收拢为仅 Lody 执行路径，移除直连 CLI 引擎及相关托管/回写链路** (`PR #14`)：
+  - 移除直连 Claude Code / Codex / Antigravity (`agy`) CLI 后端（`DirectCLIBackend`）、直连命令构建（含 `claude --bg` 与 `agy --resume`）、托管结构化运行（managed structured run）及 JSON Schema 输出。
+  - 移除双模型会诊（`CouncilSynthesizer` / `CouncilPartner` / `ExecutionPlan.councilPartner`）。
+  - 移除 CollabDock 侧 GitHub Pending Review 回写、行内评论校验与本地 Markdown 报告生成（`CollaborationSink`、`DeliveryContext`、`DeliveryMode`、`GitHubReviewFormatter`、`DiffLineValidator`、`GitHubConnector.deliver` / `fetchPullRequestDiff` 与打开本地报告操作）。
+  - 移除独立「审查语言」（`ReviewLanguage`）、`agy` 模型发现（`fetchAgyModels` / `parseAgyModelsOutput`）以及 Claude / agy 结构化流式输出解析。
+  - 移除菜单栏确认卡片与设置页中的 4 引擎卡片、模式（Mode）、交付方式（Delivery）、运行模式（Launch Mode）、会诊（Council）及审查语言控件，设置页「AI 引擎」精简为「Lody」。
+
+### Changed
+- **全链路默认并统一走 Lody 后台会话（兼容旧数据平滑反序列化）** (`PR #14`)：
+  - `AgentEngine.selectableEngines` 收拢为 `[.lody]`，`ExecutionBackendKind` 仅保留 `.lody`，`ReviewExecutionService` 仅注入单个 Lody `backend` 且结果统一为 `.backgroundDispatched`；历史旧数据中的 `claude` / `codex` / `agy` 引擎记录、`managedStructuredRun`、`.codeReview` 输出、`localReportPath` / `deliveryURL`、旧版设置键与用量账本标签均保持平滑解码，非 Lody 上一轮复审记录自动降级为新开 Lody 增量会话。
+  - 菜单栏确认卡片将 **Lody Agent**（来自 `lody agent-config list`，支持工作区默认或指定 Agent）提升为主选项，同时保留工作区目录、复审策略与附加指示控制；`TriggerRuleEngine` 忽略 `--engine`/`--cli` 对已移除直连引擎的指定并不再从 `--model` 反推引擎；`EnvironmentDetector` 仅探测 `git`、`gh` 与 `lody`。
+
 ### Fixed
 - **修复手动导入 PR 新一轮时未自动归档上一轮已处理卡片的问题** (`REQ-002`)：`InboxSyncService` 抽出共用归档规则 `archiveSupersededRounds` 并新增 `importPullRequestResult` 返回被归档条目，`AppCoordinator.importPullRequest` 同步更新列表，使手动「+」导入与自动同步一致保持同 PR 仅一张活跃卡片。
 - **修复 Lody 续聊复审及超 1 小时审查耗时丢失与累计上下文重复计入问题** (`REQ-014`)：

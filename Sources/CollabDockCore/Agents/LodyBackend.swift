@@ -1,9 +1,8 @@
 import Foundation
 
-/// Lody 编排层执行后端：隔离封装所有 Lody 专属概念（catalog、workspace target、中性临时 cwd、npx -y lody@latest 回退、Deep Link 与标题格式）
+/// Lody 编排层执行后端：封装 Lody 工作区路由、中性临时 cwd、npx -y lody@latest 回退、Deep Link 与标题格式
 public struct LodyBackend: ExecutionBackend {
     public let kind: ExecutionBackendKind = .lody
-    public let supportedEngines: [AgentEngine] = [.lody]
 
     public let config: LodyConfig
     public let catalog: LodyCatalogSnapshot?
@@ -130,9 +129,7 @@ public struct LodyBackend: ExecutionBackend {
 
     public func buildCommand(
         for request: AgentRunRequest,
-        prompt: String,
-        schemaFileURL: URL,
-        outputFileURL: URL? = nil
+        prompt: String
     ) throws -> AgentCommandSpec {
         let plan = request.plan
         let resolvedBinary = resolveBinary(environment: request.environment)
@@ -184,12 +181,6 @@ public struct LodyBackend: ExecutionBackend {
         _ request: AgentRunRequest,
         onProgress: @escaping @Sendable (String) -> Void = { _ in }
     ) async throws -> AgentRunResult {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("collabdock-lody-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-
-        let schemaURL = tempDir.appendingPathComponent("schema.json")
         let prompt = commandBuilder.buildSafePrompt(
             item: request.item,
             preset: request.preset,
@@ -206,13 +197,11 @@ public struct LodyBackend: ExecutionBackend {
 
         let spec = try buildCommand(
             for: request,
-            prompt: prompt,
-            schemaFileURL: schemaURL,
-            outputFileURL: nil
+            prompt: prompt
         )
 
         let sanitizedEnv = AgentSessionRunner.sanitizedEnvironment(from: request.environment)
-        onProgress(CoreL10n.format("Starting %@ (%@)...", request.plan.engine.displayName, request.plan.model))
+        onProgress(CoreL10n.format("Starting %@ (%@)...", AgentEngine.lody.displayName, request.plan.model))
 
         let startedAt = Date()
         let execResult = try await AgentSessionRunner.executeStreaming(

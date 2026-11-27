@@ -500,7 +500,7 @@ public struct InboxSyncService: Sendable {
     public static func findPreviousReview(
         for item: CollaborationItem,
         in existingItems: [CollaborationItem],
-        defaultEngine: AgentEngine = .claudeCode
+        defaultEngine: AgentEngine = .lody
     ) -> PreviousReviewContext? {
         let targetScope = item.scope.lowercased()
         let targetRef = item.externalRef.lowercased()

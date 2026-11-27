@@ -68,67 +68,22 @@ public struct PollBatch: Sendable {
     }
 }
 
-public struct DeliveryReceipt: Codable, Hashable, Sendable {
-    public let deliveredMode: DeliveryMode
-    public let destinationURL: URL?
-    public let localReportPath: URL?
-    public let deliveredAt: Date
-
-    public init(
-        deliveredMode: DeliveryMode,
-        destinationURL: URL? = nil,
-        localReportPath: URL? = nil,
-        deliveredAt: Date = Date()
-    ) {
-        self.deliveredMode = deliveredMode
-        self.destinationURL = destinationURL
-        self.localReportPath = localReportPath
-        self.deliveredAt = deliveredAt
-    }
-}
-
 public struct ConnectorCapabilities: Hashable, Sendable {
     public let platform: PlatformKind
-    public let supportedDeliveryModes: [DeliveryMode]
-    public let defaultDeliveryMode: DeliveryMode
     public let requiresGitWorktree: Bool
     public let isImplementedInV1: Bool
     public let summary: String
 
     public init(
         platform: PlatformKind,
-        supportedDeliveryModes: [DeliveryMode],
-        defaultDeliveryMode: DeliveryMode,
         requiresGitWorktree: Bool,
         isImplementedInV1: Bool,
         summary: String
     ) {
         self.platform = platform
-        self.supportedDeliveryModes = supportedDeliveryModes
-        self.defaultDeliveryMode = defaultDeliveryMode
         self.requiresGitWorktree = requiresGitWorktree
         self.isImplementedInV1 = isImplementedInV1
         self.summary = summary
-    }
-}
-
-/// 交付回写上下文（将执行计划、Diff 行号校验输入、本地报告目录与审查语言收拢为统一值对象）
-public struct DeliveryContext: Sendable {
-    public let plan: ExecutionPlan?
-    public let unifiedDiff: String?
-    public let reportsDirectory: URL?
-    public let language: ResolvedLanguage
-
-    public init(
-        plan: ExecutionPlan? = nil,
-        unifiedDiff: String? = nil,
-        reportsDirectory: URL? = nil,
-        language: ResolvedLanguage = .zhHans
-    ) {
-        self.plan = plan
-        self.unifiedDiff = unifiedDiff
-        self.reportsDirectory = reportsDirectory
-        self.language = language
     }
 }
 
@@ -178,28 +133,6 @@ public extension CollaborationSource {
     }
 }
 
-/// 结果回写协议（各平台按自身原生能力落草稿或发回复，支持传入 Diff / Plan / 报告目录上下文）
-public protocol CollaborationSink: Sendable {
-    var platform: PlatformKind { get }
-    func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode]
-    func deliver(
-        output: ExecutionOutput,
-        for item: CollaborationItem,
-        mode: DeliveryMode,
-        context: DeliveryContext
-    ) async throws -> DeliveryReceipt
-}
-
-public extension CollaborationSink {
-    func deliver(
-        output: ExecutionOutput,
-        for item: CollaborationItem,
-        mode: DeliveryMode
-    ) async throws -> DeliveryReceipt {
-        try await deliver(output: output, for: item, mode: mode, context: DeliveryContext())
-    }
-}
-
 /// 支持按链接或 `owner/repo#number` 手动拉取单条 PR / MR 的连接器能力
 public protocol PullRequestFetching: Sendable {
     var platform: PlatformKind { get }
@@ -212,12 +145,12 @@ public protocol PRStatusQuerying: Sendable {
     func fetchPRStatusSnapshots(targets: [PRStateReconciler.Target]) async throws -> PRStatusBatchResult
 }
 
-/// 组合型连接器协议（Source + Sink + 能力声明）
-public protocol CollaborationConnector: CollaborationSource, CollaborationSink {
+/// 组合型连接器协议（Source + 能力声明）
+public protocol CollaborationConnector: CollaborationSource {
     var capabilities: ConnectorCapabilities { get }
 }
 
-/// 代码托管平台完整连接器协议（轮询 + 含 Diff 交付 + 单条 PR 拉取 + 远端状态批量对齐）
+/// 代码托管平台完整连接器协议（轮询 + 单条 PR 拉取 + 远端状态批量对齐）
 public protocol CodeReviewConnector: CollaborationConnector, PullRequestFetching, PRStatusQuerying {}
 
 /// 内置连接器能力目录，驱动 UI 与执行策略自适应，避免各处硬编码 if platform == .github
@@ -227,35 +160,27 @@ public enum ConnectorCatalog {
         case .github:
             return ConnectorCapabilities(
                 platform: .github,
-                supportedDeliveryModes: [.platformDraft, .localDraftOnly, .directReply],
-                defaultDeliveryMode: .platformDraft,
                 requiresGitWorktree: true,
                 isImplementedInV1: true,
-                summary: CoreL10n.string("Conditional polling for Notifications / PR Reviews with Pending draft write-back")
+                summary: CoreL10n.string("Conditional polling for Notifications / PR Reviews with Lody session dispatch")
             )
         case .gitlab:
             return ConnectorCapabilities(
                 platform: .gitlab,
-                supportedDeliveryModes: [.platformDraft, .localDraftOnly, .directReply],
-                defaultDeliveryMode: .platformDraft,
                 requiresGitWorktree: true,
                 isImplementedInV1: false,
-                summary: CoreL10n.string("Merge Request @mentions and Draft Notes (planned)")
+                summary: CoreL10n.string("Merge Request @mentions and review tracking (planned)")
             )
         case .feishu:
             return ConnectorCapabilities(
                 platform: .feishu,
-                supportedDeliveryModes: [.localDraftOnly, .directReply],
-                defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
-                summary: CoreL10n.string("Feishu group chats / doc comment @mentions with local troubleshooting drafts (planned)")
+                summary: CoreL10n.string("Feishu group chats / doc comment @mentions for read-only investigation (planned)")
             )
         case .slack:
             return ConnectorCapabilities(
                 platform: .slack,
-                supportedDeliveryModes: [.localDraftOnly, .directReply],
-                defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
                 summary: CoreL10n.string("Slack thread @mentions with read-only local repo investigation (planned)")
@@ -263,8 +188,6 @@ public enum ConnectorCatalog {
         case .linear:
             return ConnectorCapabilities(
                 platform: .linear,
-                supportedDeliveryModes: [.localDraftOnly, .directReply],
-                defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
                 summary: CoreL10n.string("Linear issue assignments and comments for root-cause analysis (planned)")
@@ -272,8 +195,6 @@ public enum ConnectorCatalog {
         case .jira:
             return ConnectorCapabilities(
                 platform: .jira,
-                supportedDeliveryModes: [.localDraftOnly, .directReply],
-                defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
                 summary: CoreL10n.string("Jira ticket comments and assignments (planned)")
@@ -281,30 +202,10 @@ public enum ConnectorCatalog {
         case .customWebhook:
             return ConnectorCapabilities(
                 platform: .customWebhook,
-                supportedDeliveryModes: [.localDraftOnly, .directReply],
-                defaultDeliveryMode: .localDraftOnly,
                 requiresGitWorktree: false,
                 isImplementedInV1: false,
                 summary: CoreL10n.string("Custom Webhook / SSE bridge for internal team systems (planned)")
             )
-        }
-    }
-
-    public static func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode] {
-        switch item.payload {
-        case .codeChange:
-            return capabilities(for: item.platform).supportedDeliveryModes
-        case .issueTicket, .conversation:
-            return [.localDraftOnly, .directReply]
-        }
-    }
-
-    public static func defaultDeliveryMode(for item: CollaborationItem) -> DeliveryMode {
-        switch item.payload {
-        case .codeChange:
-            return capabilities(for: item.platform).defaultDeliveryMode
-        case .issueTicket, .conversation:
-            return .localDraftOnly
         }
     }
 }

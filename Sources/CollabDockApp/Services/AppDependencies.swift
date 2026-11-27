@@ -23,10 +23,9 @@ public protocol ConnectorFactory: Sendable {
     func makeSource(context: ConnectorBuildContext) -> (any CollaborationSource)?
     func makePRStatusQuery(context: ConnectorBuildContext) -> (any PRStatusQuerying)?
     func makePRFetcher(context: ConnectorBuildContext) -> (any PullRequestFetching)?
-    func makeSink(context: ConnectorBuildContext) -> (any CollaborationSink)?
 }
 
-/// 生产默认连接器工厂：为 GitHub 提供完整连接器能力，为非代码平台提供本地报告交付回退
+/// 生产默认连接器工厂：为 GitHub 提供只读轮询、状态对齐与单条拉取能力
 public struct DefaultConnectorFactory: ConnectorFactory {
     private let detector: any EnvironmentDetecting
 
@@ -49,11 +48,6 @@ public struct DefaultConnectorFactory: ConnectorFactory {
         return makeGitHubConnector(context: context)
     }
 
-    public func makeSink(context: ConnectorBuildContext) -> (any CollaborationSink)? {
-        // GitHubConnector 的 deliver 对非代码平台会以 .localDraftOnly 写本地 Markdown 报告
-        makeGitHubConnector(context: context)
-    }
-
     private func makeGitHubConnector(context: ConnectorBuildContext) -> GitHubConnector {
         let knownHasNotifScope: Bool? = context.environment?.githubAuth.tokenSource == .ghCLI
             ? context.environment?.githubAuth.hasNotificationsScope
@@ -70,9 +64,8 @@ public struct DefaultConnectorFactory: ConnectorFactory {
     }
 }
 
-/// 执行后端构造工厂协议（默认返回生产 `DirectCLIBackend` 与 `LodyBackend`，供 App 层单测注入 FakeBackend）
+/// 执行后端构造工厂协议（Lody-only，供 App 层单测注入 FakeBackend）
 public protocol ExecutionBackendFactory: Sendable {
-    func makeDirectBackend() -> any ExecutionBackend
     func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend
 }
 
@@ -82,10 +75,6 @@ public struct DefaultExecutionBackendFactory: ExecutionBackendFactory {
 
     public init(worktreeManager: any WorktreeManaging = WorktreeManager()) {
         self.worktreeManager = worktreeManager
-    }
-
-    public func makeDirectBackend() -> any ExecutionBackend {
-        DirectCLIBackend(worktreeManager: worktreeManager)
     }
 
     public func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend {

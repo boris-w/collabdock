@@ -37,7 +37,7 @@ public enum AgentRunnerError: Error, LocalizedError {
             if name == "lody" {
                 return CoreL10n.string("lody CLI or npx not found. Install Node.js (with npx) or global lody CLI and retry.")
             }
-            return CoreL10n.format("Executable not found: %@. Check installation status in Settings → AI Engines.", name)
+            return CoreL10n.format("Executable not found: %@. Check installation status in Settings → Lody.", name)
         case .processFailed(let code, let stderr):
             let brief = String(stderr.trimmingCharacters(in: .whitespacesAndNewlines).prefix(220))
             return CoreL10n.format("AI process exited with error (code %lld): %@", Int(code), brief)
@@ -92,27 +92,23 @@ public final class ProcessCancellationToken: @unchecked Sendable {
     }
 }
 
-/// 真实四引擎流式调度执行器（强制剥离 GitHub 写 Token、流式回调进度、支持安全中止，关联 REQ-007, REQ-008, TASK-012）
+/// Lody 子进程流式调度执行器（强制剥离 GitHub 写 Token 与宿主会话变量、支持安全中止，关联 REQ-007, REQ-008, REQ-014）
 public struct AgentSessionRunner: Sendable {
-    private let commandBuilder = AgentCommandBuilder()
-    public let directBackend: any ExecutionBackend
     public let lodyBackend: any ExecutionBackend
 
     public init(
-        directBackend: any ExecutionBackend = DirectCLIBackend(),
         lodyBackend: any ExecutionBackend = LodyBackend()
     ) {
-        self.directBackend = directBackend
         self.lodyBackend = lodyBackend
     }
 
-    /// 新版收拢参数入口：接受后端无关的 `AgentRunRequest`，按引擎路由至 `DirectCLIBackend` 或 `LodyBackend`
+    /// 接受后端无关的 `AgentRunRequest` 并通过 Lody 后端执行
     public func run(
         _ request: AgentRunRequest,
         backend: (any ExecutionBackend)? = nil,
         onProgress: @escaping @Sendable (String) -> Void = { _ in }
     ) async throws -> AgentRunResult {
-        let chosen = backend ?? (request.plan.engine == .lody ? lodyBackend : directBackend)
+        let chosen = backend ?? lodyBackend
         return try await chosen.execute(request, onProgress: onProgress)
     }
 
@@ -149,15 +145,12 @@ public struct AgentSessionRunner: Sendable {
             injectPresetPrompt: injectPresetPrompt,
             cancellationToken: cancellationToken
         )
-        if plan.engine == .lody {
-            let backend = LodyBackend(
-                config: lodyConfig,
-                catalog: lodyCatalog,
-                workspaceTargetOverride: lodyWorkspaceTarget
-            )
-            return try await backend.execute(request, onProgress: onProgress)
-        }
-        return try await directBackend.execute(request, onProgress: onProgress)
+        let backend = LodyBackend(
+            config: lodyConfig,
+            catalog: lodyCatalog,
+            workspaceTargetOverride: lodyWorkspaceTarget
+        )
+        return try await backend.execute(request, onProgress: onProgress)
     }
 
     // MARK: - Shared Subprocess Streaming & Environment Sanitization
@@ -339,46 +332,38 @@ public struct AgentSessionRunner: Sendable {
         return "\(prefix) \(shortScope) \(ref) \(cleanTitle)"
     }
 
-    /// 统一解析各引擎最终可执行路径（Lody 优先全局 `lody`，缺失时自动无感回退 `npx -y lody`，不受冷启动环境未就绪影响）
+    /// 统一解析 Lody 可执行路径（优先全局 `lody`，缺失时自动无感回退 `npx -y lody`，不受冷启动环境未就绪影响）
     public static func resolveExecutionBinary(
-        engine: AgentEngine,
+        engine: AgentEngine = .lody,
         probedPath: String?,
         resolvedPATH: String?,
         fileExists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
     ) -> ResolvedExecutionBinary {
-        if engine == .lody {
-            if let probedPath,
-               !probedPath.hasSuffix("/npx"),
-               !probedPath.hasSuffix(".app"),
-               fileExists(probedPath) {
-                return ResolvedExecutionBinary(executablePath: probedPath, usesNPXFallback: false)
-            }
-            if let directLody = findInPATH("lody", path: resolvedPATH, fileExists: fileExists) {
-                return ResolvedExecutionBinary(executablePath: directLody, usesNPXFallback: false)
-            }
-            if let probedPath,
-               probedPath.hasSuffix("/npx"),
-               fileExists(probedPath) {
-                return ResolvedExecutionBinary(executablePath: probedPath, usesNPXFallback: true)
-            }
-            if let npxPath = findInPATH("npx", path: resolvedPATH, fileExists: fileExists) {
-                return ResolvedExecutionBinary(executablePath: npxPath, usesNPXFallback: true)
-            }
-            return ResolvedExecutionBinary(executablePath: nil, usesNPXFallback: false)
-        }
-
-        if let probedPath, fileExists(probedPath) {
+        if let probedPath,
+           !probedPath.hasSuffix("/npx"),
+           !probedPath.hasSuffix(".app"),
+           fileExists(probedPath) {
             return ResolvedExecutionBinary(executablePath: probedPath, usesNPXFallback: false)
         }
-        let found = findInPATH(engine.defaultExecutableName, path: resolvedPATH, fileExists: fileExists)
-        return ResolvedExecutionBinary(executablePath: found, usesNPXFallback: false)
+        if let directLody = findInPATH("lody", path: resolvedPATH, fileExists: fileExists) {
+            return ResolvedExecutionBinary(executablePath: directLody, usesNPXFallback: false)
+        }
+        if let probedPath,
+           probedPath.hasSuffix("/npx"),
+           fileExists(probedPath) {
+            return ResolvedExecutionBinary(executablePath: probedPath, usesNPXFallback: true)
+        }
+        if let npxPath = findInPATH("npx", path: resolvedPATH, fileExists: fileExists) {
+            return ResolvedExecutionBinary(executablePath: npxPath, usesNPXFallback: true)
+        }
+        return ResolvedExecutionBinary(executablePath: nil, usesNPXFallback: false)
     }
 
     /// 从非零退出的 CLI stdout / stderr 中提取真实错误信息（兼容 `--json` 将 `{"ok":false,"error":"..."}` 输出到 stdout 且 stderr 为空的场景）
     public static func extractFailureMessage(
         stderr: String,
         stdout: String,
-        engine: AgentEngine
+        engine: AgentEngine = .lody
     ) -> String {
         let jsonErr = extractJSONErrorString(from: stdout) ?? extractJSONErrorString(from: stderr)
         let rawDetail: String
@@ -400,16 +385,14 @@ public struct AgentSessionRunner: Sendable {
         }
 
         let lower = rawDetail.lowercased()
-        if engine == .lody && (
-            lower.contains("token is invalid")
+        if lower.contains("token is invalid")
             || lower.contains("token expired")
             || lower.contains("lody login")
             || lower.contains("not logged in")
-            || lower.contains("unauthorized")
-        ) {
+            || lower.contains("unauthorized") {
             return CoreL10n.format("Lody CLI login expired. Run `npx -y lody@latest login` in Terminal, then click Retry. (%@)", rawDetail)
         }
-        if engine == .lody && lower.contains("local project branch not found") {
+        if lower.contains("local project branch not found") {
             return CoreL10n.format("Target branch ref not found in the local project. Check `git fetch` or switch to \"Project Directory\" and retry. (%@)", rawDetail)
         }
         return rawDetail

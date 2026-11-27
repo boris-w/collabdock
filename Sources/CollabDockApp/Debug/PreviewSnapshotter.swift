@@ -121,27 +121,16 @@ public enum PreviewSnapshotter {
             view: SettingsView(coordinator: settingsCoord, initialTab: .engines),
             scheme: .light,
             width: 684,
-            height: 580,
+            height: 560,
             language: language,
             to: dir.appendingPathComponent("settings-lody-engines-light.png")
-        )
-
-        let claudeSettingsCoord = AppCoordinator(previewMode: true)
-        claudeSettingsCoord.settings.defaultEngine = .claudeCode
-        renderWindow(
-            view: SettingsView(coordinator: claudeSettingsCoord, initialTab: .engines),
-            scheme: .light,
-            width: 684,
-            height: 580,
-            language: language,
-            to: dir.appendingPathComponent("settings-claude-engines-light.png")
         )
 
         renderWindow(
             view: SettingsView(coordinator: settingsCoord, initialTab: .workspaces),
             scheme: .light,
             width: 684,
-            height: 580,
+            height: 560,
             language: language,
             to: dir.appendingPathComponent("settings-workspaces-light.png")
         )
@@ -202,11 +191,7 @@ public enum PreviewSnapshotter {
             resolvedPATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
             git: CLIProbeStatus(name: "git", isInstalled: true, executablePath: "/usr/bin/git", version: "2.48"),
             gh: CLIProbeStatus(name: "gh", isInstalled: true, executablePath: "/opt/homebrew/bin/gh", version: "2.65"),
-            // 四个引擎都标记为已安装，否则确认卡片里的引擎格子会显示为禁用
             engines: [
-                .claudeCode: CLIProbeStatus(name: "claude", isInstalled: true, executablePath: "/opt/homebrew/bin/claude", version: "2.1"),
-                .codex: CLIProbeStatus(name: "codex", isInstalled: true, executablePath: "/opt/homebrew/bin/codex", version: "0.98"),
-                .antigravity: CLIProbeStatus(name: "agy", isInstalled: true, executablePath: "/opt/homebrew/bin/agy", version: "1.4"),
                 .lody: CLIProbeStatus(name: "lody", isInstalled: true, executablePath: "/opt/homebrew/bin/lody", version: "0.9")
             ],
             githubAuth: GitHubAuthSnapshot(
@@ -224,11 +209,11 @@ public enum PreviewSnapshotter {
         func makeBaseCoord() -> AppCoordinator {
             let c = AppCoordinator(previewMode: true)
             c.environment = previewEnv
-            // README 演示以本机直连的 Codex CLI 为主
-            c.settings.defaultEngine = .codex
-            c.settings.lodyConfig.defaultAgentConfig = "lody-antigravity"
+            // README 演示以 Lody（选择 Claude Code / Antigravity / Codex Agent）为主
+            c.settings.defaultEngine = .lody
+            c.settings.lodyConfig.defaultAgentConfig = "lody-claude"
+            c.setPreferredLodyModel("opus", forAgentConfig: "lody-claude")
             c.setPreferredLodyModel("gemini-4-neon", forAgentConfig: "lody-antigravity")
-            c.setPreferredLodyMode("plan", forAgentConfig: "lody-antigravity")
             if !isZH {
                 c.settings.presets = [
                     TaskPreset(
@@ -276,7 +261,7 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("showcase-02-pending-multiplatform-light.png")
         )
 
-        // 3. 正在执行 + Lody 后台「审查中」+ 执行失败（暗色）
+        // 3. 正在派发 + Lody 后台「审查中」+ 执行失败（暗色）
         let s3 = makeBaseCoord()
         s3.items = [
             CollaborationItem(
@@ -293,8 +278,8 @@ public enum PreviewSnapshotter {
                 payload: .codeChange(CodeChangePayload(repository: "acme/web", number: 4812, baseRef: "develop", headRef: "perf/formula", headSHA: "aa11", additions: 210, deletions: 45, changedFiles: 7)),
                 status: .running,
                 progressMessage: isZH
-                    ? "Claude Opus 正在只读审查 Diff (已读 5/7 文件)..."
-                    : "Claude Opus reviewing diff read-only (5/7 files read)..."
+                    ? "正在派发 Lody 后台会话（Claude Code · Opus 5.5）..."
+                    : "Dispatching Lody background session (Claude Code · Opus 5.5)..."
             ),
             CollaborationItem(
                 id: "sc-failed",
@@ -345,11 +330,11 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("showcase-03-running-lody-failed-dark.png")
         )
 
-        // 4. 草稿与已派发全状态：草稿就绪（含严重/建议/细节）+ Lody 审查完成 + 已提 Request Changes「待修复」（亮色）
+        // 4. Lody 后台会话全状态：审查中 + 审查完成 + 已提 Request Changes「待修复」（亮色）
         let s4 = makeBaseCoord()
         s4.items = [
             CollaborationItem(
-                id: "sc-draft-cli",
+                id: "sc-lody-active",
                 platform: .github,
                 itemKind: .pullRequest,
                 scope: "acme/sync-engine",
@@ -361,20 +346,15 @@ public enum PreviewSnapshotter {
                 triggerKind: .mention,
                 payload: .codeChange(CodeChangePayload(repository: "acme/sync-engine", number: 305, baseRef: "main", headRef: "perf/batch", headSHA: "c0ffee1", additions: 148, deletions: 39, changedFiles: 5)),
                 status: .draftReady,
-                sessionID: "claude_sess_9",
-                sessionHandle: AgentSessionHandle(engine: .claudeCode, sessionID: "claude_sess_9", workspacePath: "/tmp/wt", launchMode: .managedStructuredRun),
-                localReportPath: "/tmp/report.md",
-                executionOutput: .codeReview(CodeReviewResult(
+                sessionID: "sess-demo-0",
+                sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "sess-demo-0", workspacePath: "/Users/dev/code/sync-engine", launchMode: .nativeBackgroundSession),
+                executionOutput: .structuredReply(StructuredReplyResult(
                     summary: isZH
-                        ? "批处理主链路清晰，发现 1 处并发取消未释放信号量的边界问题及 2 处建议优化。"
-                        : "Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements.",
-                    recommendedVerdict: .requestChanges,
-                    comments: [
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 88, severity: .critical, title: isZH ? "取消分支未释放许可" : "Permit not released on cancel", body: isZH ? "建议移入 defer" : "Move release into defer"),
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 112, severity: .warning, title: isZH ? "缺少最大批大小兜底" : "Missing max batch cap", body: isZH ? "建议限制 500" : "Cap at 500"),
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 140, severity: .nit, title: isZH ? "日志字段命名统一" : "Consistent log field name", body: isZH ? "改为 batchSize" : "Rename to batchSize")
-                    ]
-                ))
+                        ? "Opus 5.5 正在后台审查中 · 已用上下文 112.4K"
+                        : "Opus 5.5 reviewing in background · Context 112.4K",
+                    replyMarkdown: ""
+                )),
+                remoteSessionStatus: .running
             ),
             CollaborationItem(
                 id: "sc-lody-done",
@@ -547,7 +527,7 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("showcase-06-completed-all-reasons-light.png")
         )
 
-        // 7. 点进 PR 的确认卡片（Codex：模型 / 强度 / 模式 / 模板 / 目录）
+        // 7. 点进 PR 的确认卡片（Lody：Lody Agent / 模型 / 强度 / 模板 / 目录）
         let s7 = makeBaseCoord()
         render(
             view: MenuBarContentView(coordinator: s7, initialDetailItemID: "demo-gh-482"),
@@ -557,16 +537,16 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("showcase-07-detail-confirm-dark.png")
         )
 
-        // 8. 点进「第 2 轮复审」确认卡片（上一轮由 Codex 审查，本轮聚焦增量 Diff）
+        // 8. 点进「第 2 轮复审」确认卡片（上一轮由 Lody 审查，本轮续聊原会话聚焦增量改动）
         let s8 = makeBaseCoord()
         if let idx = s8.items.firstIndex(where: { $0.id == "demo-gh-482" }) {
             s8.items[idx].previousReview = PreviousReviewContext(
                 previousItemID: "demo-gh-482-r1",
                 reviewedHeadSHA: "99aabb1",
                 reviewedAt: Date().addingTimeInterval(-3600),
-                engine: .codex,
-                model: "gpt-5.3-codex",
-                sessionID: "0199c3a2-7b1e-7f30-9a4d-5e2f8c61d0b7",
+                engine: .lody,
+                model: "opus",
+                sessionID: "11111111-2222-4333-8444-555555555555",
                 summarySnippet: isZH ? "发现 1 处并发刷新竞态" : "Found 1 concurrent refresh race condition",
                 reviewRound: 1
             )

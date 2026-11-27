@@ -4,7 +4,7 @@ import CollabDockCore
 /// CollabDock 视觉设计体系（CodexBar × Magpie × Linear × macOS Tahoe Liquid Glass）
 enum CDTheme {
     static let popoverWidth: CGFloat = 376
-    static let detailHeight: CGFloat = 590
+    static let detailHeight: CGFloat = 536
     static let cardCornerRadius: CGFloat = 12
     static let innerCornerRadius: CGFloat = 8
 

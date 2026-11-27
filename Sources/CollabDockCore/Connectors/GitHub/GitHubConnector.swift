@@ -46,7 +46,6 @@ public enum GitHubConnectorError: Error, LocalizedError, Equatable {
     case unauthorized
     case rateLimited(retryAfterSeconds: Int)
     case httpError(statusCode: Int, message: String)
-    case pendingReviewAlreadyExists
 
     public var errorDescription: String? {
         switch self {
@@ -60,8 +59,6 @@ public enum GitHubConnectorError: Error, LocalizedError, Equatable {
             return CoreL10n.format("GitHub API rate limit reached; backing off for %lld seconds", retryAfter)
         case .httpError(let code, let msg):
             return CoreL10n.format("GitHub API error (HTTP %lld): %@", code, msg)
-        case .pendingReviewAlreadyExists:
-            return CoreL10n.string("You already have an unsubmitted Pending Review draft on this PR. Submit or discard it on GitHub first (local Markdown report saved).")
         }
     }
 }
@@ -237,10 +234,6 @@ public struct GitHubConnector: CodeReviewConnector {
         )
     }
 
-    public func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode] {
-        ConnectorCatalog.supportedDeliveryModes(for: item)
-    }
-
     /// 解析 `https://github.com/owner/repo/pull/123` 或 `owner/repo#123`
     public static func parsePullRequestReference(_ input: String) -> (repository: String, number: Int)? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -292,156 +285,6 @@ public struct GitHubConnector: CodeReviewConnector {
             actor: pr.user.login,
             commentBody: nil
         ).item
-    }
-
-    public func deliver(
-        output: ExecutionOutput,
-        for item: CollaborationItem,
-        mode: DeliveryMode,
-        context: DeliveryContext
-    ) async throws -> DeliveryReceipt {
-        try await deliver(
-            output: output,
-            for: item,
-            mode: mode,
-            plan: context.plan,
-            unifiedDiff: context.unifiedDiff,
-            reportsDirectory: context.reportsDirectory,
-            language: context.language
-        )
-    }
-
-    public func deliver(
-        output: ExecutionOutput,
-        for item: CollaborationItem,
-        mode: DeliveryMode
-    ) async throws -> DeliveryReceipt {
-        try await deliver(output: output, for: item, mode: mode, context: DeliveryContext())
-    }
-
-    /// 完整交付实现：先保存本地 Markdown 报告，再按交付模式提交 GitHub Pending Review 草稿或 Comment（关联 REQ-009, TASK-013）
-    public func deliver(
-        output: ExecutionOutput,
-        for item: CollaborationItem,
-        mode: DeliveryMode,
-        plan: ExecutionPlan?,
-        unifiedDiff: String?,
-        reportsDirectory: URL? = nil,
-        language: ResolvedLanguage = .zhHans
-    ) async throws -> DeliveryReceipt {
-        let markdown = GitHubReviewFormatter.renderLocalMarkdownReport(
-            item: item,
-            output: output,
-            plan: plan,
-            language: language
-        )
-        let localReportURL = try GitHubReviewFormatter.saveLocalReport(
-            markdown: markdown,
-            itemID: item.id,
-            reportsDirectory: reportsDirectory
-        )
-
-        if mode == .localDraftOnly {
-            return DeliveryReceipt(
-                deliveredMode: .localDraftOnly,
-                destinationURL: item.url,
-                localReportPath: localReportURL
-            )
-        }
-
-        guard let token = await tokenProvider.fetchToken(), !token.isEmpty else {
-            throw GitHubConnectorError.missingToken
-        }
-
-        guard case .codeChange(let code) = item.payload else {
-            return DeliveryReceipt(
-                deliveredMode: .localDraftOnly,
-                destinationURL: item.url,
-                localReportPath: localReportURL
-            )
-        }
-
-        switch output {
-        case .codeReview(let review):
-            let effectiveDiff: String?
-            if let unifiedDiff, !unifiedDiff.isEmpty {
-                effectiveDiff = unifiedDiff
-            } else {
-                effectiveDiff = await fetchPullRequestDiff(repository: code.repository, number: code.number, token: token)
-            }
-
-            let payload = GitHubReviewFormatter.buildReviewPayload(
-                review: review,
-                commitSHA: code.headSHA,
-                unifiedDiff: effectiveDiff,
-                mode: mode,
-                language: language
-            )
-
-            let reviewsURL = baseURL.appendingPathComponent("repos/\(code.repository)/pulls/\(code.number)/reviews")
-            var req = makeRequest(url: reviewsURL, token: token)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try JSONEncoder().encode(payload)
-
-            let (respData, resp) = try await transport.data(for: req)
-            if resp.statusCode == 401 {
-                throw GitHubConnectorError.unauthorized
-            }
-            if resp.statusCode == 422 {
-                let errBody = String(data: respData, encoding: .utf8) ?? ""
-                if errBody.lowercased().contains("pending review") {
-                    throw GitHubConnectorError.pendingReviewAlreadyExists
-                }
-                throw GitHubConnectorError.httpError(statusCode: 422, message: errBody)
-            }
-            guard (200...299).contains(resp.statusCode) else {
-                throw GitHubConnectorError.httpError(
-                    statusCode: resp.statusCode,
-                    message: String(data: respData, encoding: .utf8) ?? ""
-                )
-            }
-
-            let filesURL = URL(string: "\(item.url.absoluteString)/files") ?? item.url
-            return DeliveryReceipt(
-                deliveredMode: mode,
-                destinationURL: filesURL,
-                localReportPath: localReportURL
-            )
-
-        case .structuredReply(let reply):
-            if mode == .directReply {
-                let commentURL = baseURL.appendingPathComponent("repos/\(code.repository)/issues/\(code.number)/comments")
-                var req = makeRequest(url: commentURL, token: token)
-                req.httpMethod = "POST"
-                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                let bodyPayload = ["body": "\(reply.replyMarkdown)\n\n---\n*Assisted by CollabDock (local AI)*"]
-                req.httpBody = try JSONEncoder().encode(bodyPayload)
-
-                let (respData, resp) = try await transport.data(for: req)
-                guard (200...299).contains(resp.statusCode) else {
-                    throw GitHubConnectorError.httpError(
-                        statusCode: resp.statusCode,
-                        message: String(data: respData, encoding: .utf8) ?? ""
-                    )
-                }
-            }
-            return DeliveryReceipt(
-                deliveredMode: mode,
-                destinationURL: item.url,
-                localReportPath: localReportURL
-            )
-        }
-    }
-
-    private func fetchPullRequestDiff(repository: String, number: Int, token: String) async -> String? {
-        let prURL = baseURL.appendingPathComponent("repos/\(repository)/pulls/\(number)")
-        var req = makeRequest(url: prURL, token: token)
-        req.setValue("application/vnd.github.v3.diff", forHTTPHeaderField: "Accept")
-        guard let (data, resp) = try? await transport.data(for: req), resp.statusCode == 200 else {
-            return nil
-        }
-        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - Private Hydration Helpers

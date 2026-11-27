@@ -4,7 +4,7 @@ import ServiceManagement
 import UserNotifications
 import CollabDockCore
 
-/// macOS 系统集成能力协议（通知、开机自启、界面语言覆盖、接管会话与打开本地报告），用于 `AppCoordinator` 依赖注入与单测隔离
+/// macOS 系统集成能力协议（通知、开机自启、界面语言覆盖与打开 Lody 会话），用于 `AppCoordinator` 依赖注入与单测隔离
 @MainActor
 public protocol SystemIntegrating: AnyObject {
     var onNotificationSelectedItem: ((String) -> Void)? { get set }
@@ -15,7 +15,6 @@ public protocol SystemIntegrating: AnyObject {
     func applyInterfaceLanguage(_ appleLanguages: [String]?)
     func relaunchApplication()
     func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?)
-    func openLocalReport(path: String)
 }
 
 public extension SystemIntegrating {
@@ -141,20 +140,16 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
         }
     }
 
-    // MARK: - 一键接管原会话（Lody Deep Link / Terminal --resume）
+    // MARK: - 一键打开 Lody 会话（Lody Deep Link）
 
     public func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {
-        let command: String
-        if handle.engine == .lody {
-            let lodyBackend = LodyBackend(config: LodyConfig(workspace: lodyWorkspace ?? ""))
-            if let deepLink = lodyBackend.sessionDeepLink(for: handle) {
-                NSWorkspace.shared.open(deepLink)
-                return
-            }
-            command = lodyBackend.resumeShellCommand(for: handle)
-        } else {
-            command = DirectCLIBackend().resumeShellCommand(for: handle)
+        guard handle.engine == .lody else { return }
+        let lodyBackend = LodyBackend(config: LodyConfig(workspace: lodyWorkspace ?? ""))
+        if let deepLink = lodyBackend.sessionDeepLink(for: handle) {
+            NSWorkspace.shared.open(deepLink)
+            return
         }
+        let command = lodyBackend.resumeShellCommand(for: handle)
         let escapedForAppleScript = command
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -178,10 +173,5 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
         NSPasteboard.general.setString(command, forType: .string)
         let terminalURL = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
         NSWorkspace.shared.openApplication(at: terminalURL, configuration: NSWorkspace.OpenConfiguration())
-    }
-
-    public func openLocalReport(path: String) {
-        let url = URL(fileURLWithPath: path)
-        NSWorkspace.shared.open(url)
     }
 }
