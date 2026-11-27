@@ -1164,7 +1164,13 @@ public final class AppCoordinator {
             clock: clock
         )
         do {
-            let item = try await syncService.importPullRequest(reference: reference, existingItems: items)
+            let importResult = try await syncService.importPullRequestResult(reference: reference, existingItems: items)
+            let item = importResult.item
+            for superseded in importResult.supersededItems {
+                if let idx = items.firstIndex(where: { $0.id == superseded.id }) {
+                    items[idx] = superseded
+                }
+            }
             if let existingIdx = items.firstIndex(where: { $0.id == item.id }) {
                 items[existingIdx] = item
             } else {

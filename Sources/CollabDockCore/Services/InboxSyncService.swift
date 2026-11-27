@@ -134,6 +134,20 @@ public struct PRReconcileResult: Equatable, Sendable {
     }
 }
 
+/// 手动导入单个 PR 的输出结果（含新导入条目及同 PR 被自动归档的上一轮已处理条目）
+public struct PRImportResult: Equatable, Sendable {
+    public let item: CollaborationItem
+    public let supersededItems: [CollaborationItem]
+
+    public init(
+        item: CollaborationItem,
+        supersededItems: [CollaborationItem] = []
+    ) {
+        self.item = item
+        self.supersededItems = supersededItems
+    }
+}
+
 /// Core 层收件箱同步编排服务（零 SwiftUI/AppKit 依赖）：
 /// 负责条件轮询、限流退避、去重过滤、规则引擎匹配、复审上下文挂载、远端 PR 状态对齐与手动导入。
 /// 约束：所有 `TaskStore` 读写失败必须包装为 `PersistenceError` 向上抛出，严禁 `try?` 静默吞错。
@@ -294,20 +308,8 @@ public struct InboxSyncService: Sendable {
             }
 
             // 新一轮卡片入箱时，将同 PR 仍停留在收件箱中的已处理卡片（草稿就绪 / 失败）自动归档为 .superseded，保留历史审查内容
-            for i in knownItems.indices {
-                guard knownItems[i].id != newItem.id,
-                      Self.targetKey(for: knownItems[i]) == targetKey,
-                      knownItems[i].status == .draftReady || knownItems[i].status == .failed else {
-                    continue
-                }
-                knownItems[i].status = .completed
-                knownItems[i].completionReason = .superseded
-                let archived = knownItems[i]
-                try await persist(.upsertItem) {
-                    try await store.upsertItem(archived)
-                }
-                supersededItems.append(archived)
-            }
+            let archived = try await archiveSupersededRounds(for: newItem, in: &knownItems)
+            supersededItems.append(contentsOf: archived)
 
             try await persist(.upsertItem) {
                 try await store.upsertItem(newItem)
@@ -411,11 +413,19 @@ public struct InboxSyncService: Sendable {
         )
     }
 
-    /// 手动导入单个 PR（自动挂载复审记忆、避免覆盖同 SHA 已完成历史记录、持久化失败抛出 `PersistenceError`）
+    /// 手动导入单个 PR（自动挂载复审记忆、避免覆盖同 SHA 已完成历史记录、自动归档同 PR 上一轮已处理卡片、持久化失败抛出 `PersistenceError`）
     public func importPullRequest(
         reference: String,
         existingItems: [CollaborationItem]
     ) async throws -> CollaborationItem {
+        try await importPullRequestResult(reference: reference, existingItems: existingItems).item
+    }
+
+    /// 手动导入单个 PR 并返回同 PR 被自动归档的上一轮条目（与 `sync` 共用同一套归档规则）
+    public func importPullRequestResult(
+        reference: String,
+        existingItems: [CollaborationItem]
+    ) async throws -> PRImportResult {
         guard let prFetcher else {
             throw GitHubConnectorError.httpError(statusCode: 501, message: "当前连接器不支持手动拉取 PR")
         }
@@ -450,10 +460,37 @@ public struct InboxSyncService: Sendable {
             )
         }
 
+        var workingItems = existingItems
+        let superseded = try await archiveSupersededRounds(for: item, in: &workingItems)
+
         try await persist(.upsertItem) {
             try await store.upsertItem(item)
         }
-        return item
+        return PRImportResult(item: item, supersededItems: superseded)
+    }
+
+    /// 共用归档规则：新一轮卡片出现时，将同 PR 仍留在收件箱中的已处理卡片（草稿就绪 / 失败）自动归档为 `.superseded` 并落盘
+    private func archiveSupersededRounds(
+        for newItem: CollaborationItem,
+        in items: inout [CollaborationItem]
+    ) async throws -> [CollaborationItem] {
+        let targetKey = Self.targetKey(for: newItem)
+        var archived: [CollaborationItem] = []
+        for i in items.indices {
+            guard items[i].id != newItem.id,
+                  Self.targetKey(for: items[i]) == targetKey,
+                  items[i].status == .draftReady || items[i].status == .failed else {
+                continue
+            }
+            items[i].status = .completed
+            items[i].completionReason = .superseded
+            let updated = items[i]
+            try await persist(.upsertItem) {
+                try await store.upsertItem(updated)
+            }
+            archived.append(updated)
+        }
+        return archived
     }
 
     /// 检索同平台、同仓库、同外部编号的最近已完成/草稿就绪审查记录，构造复审上下文
