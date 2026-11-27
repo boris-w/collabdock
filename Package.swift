@@ -46,6 +46,12 @@ let package = Package(
             name: "CollabDockE2ETests",
             dependencies: ["CollabDockCore"],
             path: "Tests/CollabDockE2ETests"
+        ),
+        // App 层：用注入的假依赖测试 AppCoordinator 的状态流转（不启动 UI、不访问网络与本机 CLI）
+        .testTarget(
+            name: "CollabDockAppTests",
+            dependencies: ["CollabDockApp", "CollabDockCore"],
+            path: "Tests/CollabDockAppTests"
         )
     ]
 )
