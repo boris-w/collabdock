@@ -762,24 +762,14 @@ public struct GitHubConnector: CodeReviewConnector {
         }
     }
 
-    /// `PRStatusQuerying` 协议适配入口：复用下方 GraphQL 批量查询能力
+    /// 一次 GraphQL 请求批量查询收件箱中全部活跃 GitHub PR 的合并/关闭状态与本人最新 Review 结论（收件箱为空时零请求）
     public func fetchPRStatusSnapshots(
         targets: [PRStateReconciler.Target]
     ) async throws -> PRStatusBatchResult {
-        let raw = await fetchPRStatusSnapshots(
-            targets: targets.map { (repository: $0.repository, number: $0.number) }
-        )
-        return PRStatusBatchResult(viewerLogin: raw.viewerLogin, snapshots: raw.snapshots)
-    }
-
-    /// 一次 GraphQL 请求批量查询收件箱中全部活跃 GitHub PR 的合并/关闭状态与本人最新 Review 结论（收件箱为空时零请求）
-    public func fetchPRStatusSnapshots(
-        targets: [(repository: String, number: Int)]
-    ) async -> (viewerLogin: String?, snapshots: [String: PRRemoteStatusSnapshot]) {
         guard !targets.isEmpty,
               let token = await tokenProvider.fetchToken(),
               !token.isEmpty else {
-            return (nil, [:])
+            return PRStatusBatchResult()
         }
 
         // 去重并做严格的 owner/name 白名单校验
@@ -800,7 +790,7 @@ public struct GitHubConnector: CodeReviewConnector {
                 uniqueTargets.append((key, parts[0], parts[1], t.number, normalizedRepo))
             }
         }
-        guard !uniqueTargets.isEmpty else { return (nil, [:]) }
+        guard !uniqueTargets.isEmpty else { return PRStatusBatchResult() }
 
         var queryFields: [String] = ["viewer { login }"]
         for (idx, t) in uniqueTargets.prefix(25).enumerated() {
@@ -829,18 +819,19 @@ public struct GitHubConnector: CodeReviewConnector {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         guard let body = try? JSONSerialization.data(withJSONObject: ["query": query]) else {
-            return (nil, [:])
+            return PRStatusBatchResult()
         }
         req.httpBody = body
 
         guard let (data, resp) = try? await transport.data(for: req),
               (200...299).contains(resp.statusCode) else {
-            return (nil, [:])
+            return PRStatusBatchResult()
         }
-        return Self.parseGraphQLPRStatusResponse(
+        let parsed = Self.parseGraphQLPRStatusResponse(
             data: data,
             targets: uniqueTargets.prefix(25).map { (key: $0.key, repository: $0.repository, number: $0.number) }
         )
+        return PRStatusBatchResult(viewerLogin: parsed.viewerLogin, snapshots: parsed.snapshots)
     }
 
     public static func parseGraphQLPRStatusResponse(

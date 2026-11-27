@@ -153,7 +153,7 @@ struct GitHubConnectorFetchTests {
         let transport = RoutedTransport(["POST /graphql": (500, "oops")])
         let connector = GitHubConnector(transport: transport, tokenProvider: Token(value: "gho_placeholder"))
 
-        #expect(try await connector.fetchPRStatusSnapshots(targets: [PRStateReconciler.Target]()).snapshots.isEmpty)
+        #expect(try await connector.fetchPRStatusSnapshots(targets: []).snapshots.isEmpty)
         #expect(try await connector.fetchPRStatusSnapshots(targets: [PRStateReconciler.Target(repository: "bad name", number: 1)]).snapshots.isEmpty)
         let tokenless = GitHubConnector(transport: transport, tokenProvider: Token(value: nil))
         #expect(try await tokenless.fetchPRStatusSnapshots(targets: [PRStateReconciler.Target(repository: "acme/backend", number: 7)]).snapshots.isEmpty)
