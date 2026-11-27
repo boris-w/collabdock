@@ -37,5 +37,8 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Test
-        run: make test
+      - name: Test + coverage gate
+        # 跑全部单测与端到端测试，并要求 CollabDockCore 行覆盖率不低于 MIN_CORE_LINE_COVERAGE
+        env:
+          MIN_CORE_LINE_COVERAGE: "75"
+        run: make coverage

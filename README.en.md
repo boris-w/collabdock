@@ -119,6 +119,7 @@ make build      # swift build (debug)
 make test       # all tests
 make test-unit  # unit tests only
 make test-e2e   # end-to-end pipeline tests: fake GitHub HTTP + fake agent CLI + real temp git repo; no network or AI needed
+make coverage   # all tests + CollabDockCore line-coverage gate (used by CI)
 make run        # package the .app and relaunch
 ```
 

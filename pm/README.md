@@ -13,7 +13,7 @@
 | **产品名称** | **CollabDock（协作 Dock）**（原暂定名 `ReviewDock`，于 `ITER-002` / `ADR-005` 升级泛化） |
 | **产品形态** | macOS 原生 SwiftUI 菜单栏常驻 App（支持 macOS 14.0+，原生适配 Tahoe） |
 | **架构定位** | 多平台可插拔本地 AI 协作调度坞站（V1 完整打通 GitHub Connector，架构原生预留 GitLab / 飞书 / Slack / Linear / Webhook） |
-| **当前阶段** | `M4 · 体验精简、用量统计、品牌视觉与团队分发`（已完成真实 PR 验收 + 增量复审续聊 + 四引擎 Token/成本统计面板 + 邮件式收件箱与自动归档 + 全引擎模式可选 + 猫坞 PeekCat 品牌图标与 6 态菜单栏重塑，46 项单测全绿） -> 后续：`第二协作连接器（飞书/GitLab）/ 三端原生插件` |
+| **当前阶段** | `M4 · 体验精简、用量统计、品牌视觉与团队分发`（已完成真实 PR 验收 + 增量复审续聊 + 四引擎 Token/成本统计面板 + 邮件式收件箱与自动归档 + 全引擎模式可选 + 猫坞 PeekCat 品牌图标与 6 态菜单栏重塑，测试 114 项全绿、CollabDockCore 行覆盖率 77.7%；2026-11-27 开源并改为 PR 迭代） -> 后续：`第二协作连接器（飞书/GitLab）/ 三端原生插件` |
 | **最新迭代** | [ITER-018 · 品牌图标与菜单栏视觉重塑（猫坞 PeekCat）](./05-iterations/ITER-018-peekcat-brand-icon.md) |
 
 ---
@@ -49,6 +49,12 @@ pm/
 ---
 
 ## 3. 统一编号与可追溯协作规范
+
+> **2026-11-27 起迭代流程改为 GitHub PR**（仓库已开源，`main` 受保护：必须 PR + CI 通过、只允许 squash 合并）。
+> - 一个 PR = 一次迭代，PR 描述（按 `.github/PULL_REQUEST_TEMPLATE.md`）取代逐次的 `ITER-XXX.md`；`05-iterations/` 保留历史记录，只在里程碑复盘时新增。
+> - 待办改用 GitHub Issues，里程碑改用 GitHub Milestones；`04-planning/` 下的 BACKLOG / ROADMAP / TRACEABILITY 冻结，不再维护。
+> - `REQ-XXX`、`ADR-XXX` 继续有效，可在 PR 标题或描述中引用。
+> - 详见 [CONTRIBUTING.md](../CONTRIBUTING.md) 与 [AGENTS.md](../AGENTS.md)。
 
 | 编号前缀 | 所在位置 | 维护规则 |
 | :--- | :--- | :--- |

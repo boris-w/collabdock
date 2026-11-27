@@ -2,7 +2,7 @@ APP_NAME := CollabDock
 BUILD_DIR := build
 VERSION := 0.1.0
 
-.PHONY: build test test-unit test-e2e snapshots icon app dmg universal-dmg run clean
+.PHONY: build test test-unit test-e2e coverage snapshots icon app dmg universal-dmg run clean
 
 build:
 	swift build
@@ -17,6 +17,10 @@ test-unit:
 # 端到端：假 GitHub + 假 Agent CLI + 真实临时 git 仓库，无需网络与真实 AI
 test-e2e:
 	swift test --filter CollabDockE2ETests
+
+# 全部测试 + CollabDockCore 行覆盖率门槛（默认 75%，可用 MIN_CORE_LINE_COVERAGE 覆盖）；CI 使用此目标
+coverage:
+	./scripts/coverage.sh
 
 # DEBUG 构建离屏渲染 UI 快照（Light/Dark），用于 README 截图与视觉回归
 snapshots: build

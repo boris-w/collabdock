@@ -1,5 +1,7 @@
 # 04 · 里程碑路线图（Roadmap）
 
+> ⚠️ **已冻结（2026-11-27）**：迭代改为 GitHub PR，里程碑迁移到 GitHub Milestones。本文件仅作历史参考，内容停留在冻结时的状态。
+
 > **关联文档**：[PRD.md](../02-product/PRD.md) | [BACKLOG.md](./BACKLOG.md) | [TRACEABILITY.md](./TRACEABILITY.md)
 
 ---

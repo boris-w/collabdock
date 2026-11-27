@@ -117,6 +117,7 @@ make build      # swift build（Debug）
 make test       # 运行全部测试
 make test-unit  # 只跑单元测试
 make test-e2e   # 端到端管线测试：假 GitHub HTTP + 假 agent CLI + 真实临时 git 仓库，不需要网络和 AI
+make coverage   # 全部测试 + CollabDockCore 行覆盖率门槛（CI 使用）
 make run        # 打包 .app 并重启
 ```
 

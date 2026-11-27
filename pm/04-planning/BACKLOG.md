@@ -1,5 +1,7 @@
 # 04 · 任务待办与进度看板（Backlog）
 
+> ⚠️ **已冻结（2026-11-27）**：迭代改为 GitHub PR，待办迁移到 GitHub Issues。本文件仅作历史参考，内容停留在冻结时的状态。
+
 > 状态图例：`✅ Done` | `🚧 In Progress` | `🔜 Next` | `📋 Todo` | `⏸ Blocked`
 
 ---
