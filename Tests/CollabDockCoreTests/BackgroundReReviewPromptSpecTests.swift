@@ -71,9 +71,8 @@ struct BackgroundReReviewPromptSpecTests {
         #expect(p.contains("1111111"), "previously reviewed commit")
         #expect(p.contains("2222222"), "latest head commit")
         #expect(p.contains("2222222 fix: handle nil token"), "new commit list")
-        #expect(p.contains("git fetch"), "the agent's worktree is still on the previous commit")
-        #expect(p.contains("git diff"))
-        #expect(p.contains("feat/cache"), "head branch to fetch")
+        #expect(p.contains("git fetch origin pull/482/head"), "fetch by PR number — never by the (untrusted) branch name")
+        #expect(p.contains("git diff 1111111..2222222"))
     }
 
     @Test("A fresh background session for the follow-up round also gets references, not the diff")
@@ -93,6 +92,39 @@ struct BackgroundReReviewPromptSpecTests {
         #expect(p.contains("rebase / force-push"))
         #expect(p.contains("git diff"))
         #expect(p.contains("main"), "full review is against the base branch")
+    }
+
+    @Test("SPEC (security): untrusted branch names never reach the suggested shell commands")
+    func hostileRefsStayOutOfCommands() {
+        let prev = previous()
+        var hostile = item(previous: prev)
+        hostile = CollaborationItem(
+            id: hostile.id, platform: hostile.platform, itemKind: hostile.itemKind, scope: hostile.scope,
+            externalRef: hostile.externalRef, title: hostile.title, url: hostile.url, author: hostile.author,
+            triggeredBy: hostile.triggeredBy, triggerKind: hostile.triggerKind,
+            payload: .codeChange(CodeChangePayload(
+                repository: "acme/backend", number: 482,
+                baseRef: "main;touch${IFS}/tmp/pwned-base",
+                headRef: "x$(touch${IFS}/tmp/pwned-head)`id`",
+                headSHA: "2222222bbbbbbb", additions: 10, deletions: 2, changedFiles: 1
+            )),
+            previousReview: prev, reviewRound: 2
+        )
+        for forcePushed in [false, true] {
+            let p = builder.buildSafePrompt(
+                item: hostile, preset: TaskPreset.defaults[0], extraInstructions: "",
+                launchMode: .nativeBackgroundSession, previousReview: prev,
+                continuityMode: .continueSessionIncremental, incrementalDiff: diffBody,
+                incrementalCommitLog: "2222222 fix", wasForcePushed: forcePushed
+            )
+            let commandLines = p.split(separator: "\n").filter { $0.contains("git fetch") || $0.contains("git diff") }
+            #expect(!commandLines.isEmpty)
+            for line in commandLines {
+                #expect(!line.contains("touch"), "forcePushed=\(forcePushed): \(line)")
+                #expect(!line.contains("$("), "forcePushed=\(forcePushed): \(line)")
+            }
+            #expect(p.contains("pull/482/head"))
+        }
     }
 
     @Test("Safety net: one-shot managed runs keep the inlined incremental diff (agy cannot run git in plan mode)")
