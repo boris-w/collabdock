@@ -9,6 +9,7 @@
 - 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
 
 ### Added
+- **Codex 增量复审续聊上一轮会话** (`REQ-010`)：支持将上一轮 Codex 审查会话继续用于第 N 轮复审（`codex exec resume <SESSION_ID> <PROMPT>`），通过 `-c sandbox_mode="..."` 保持只读/所选沙箱策略并由隔离 worktree 作为进程工作目录，补齐 Claude Code / Antigravity / Lody / Codex 全引擎续聊闭环。
 - **猫坞 PeekCat 品牌图标与 6 态原生菜单栏矢量重塑** (`ITER-018`, `REQ-004`, `REQ-011`, `TASK-016`)：
   - 完成两轮交互式可爱系图标评选（归档于 `pm/05-iterations/assets/ITER-018/`），定稿「V2 暖杏小黑猫配色 × 歪头招手猫造型」1024×1024 母版（`Resources/AppIconMaster.png`），并升级 `scripts/generate-icon.swift` 采用 SwiftUI 原厂 `.continuous` 连续曲率 Squircle 生成 `Resources/AppIcon.icns`。
   - 新增 `PeekCatMenuBarIcon.swift` 18×18pt `@2x` 单色 Template 矢量渲染器，全面取代通用 SF Symbols；全状态保留歪头招手猫轮廓锚点，区分 `空闲 / 待确认(+数字) / 执行中(+数字+2.5s 轻眨眼) / 草稿就绪(^ ^ 笑眼+提示点) / 已暂停(45% 半透明打盹) / 同步异常(! 徽章)`。

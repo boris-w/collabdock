@@ -750,8 +750,10 @@ public struct PreviousReviewContext: Codable, Hashable, Sendable {
     }
 
     public var canContinueSameSession: Bool {
-        guard let sid = sessionID, !sid.isEmpty else { return false }
-        return engine == .lody || engine == .claudeCode || engine == .antigravity
+        guard let sid = sessionID?.trimmingCharacters(in: .whitespacesAndNewlines), !sid.isEmpty else {
+            return false
+        }
+        return engine == .lody || engine == .claudeCode || engine == .antigravity || engine == .codex
     }
 }
 

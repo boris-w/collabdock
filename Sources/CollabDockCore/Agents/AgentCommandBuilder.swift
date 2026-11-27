@@ -333,6 +333,29 @@ public struct AgentCommandBuilder: Sendable {
 
         case .codex:
             let codexSandbox = resolvedDirectMode(plan: plan, fallback: "read-only")
+            if let resumeID = resolvableResumeSessionID(for: plan) {
+                // `codex exec resume` (codex-cli 0.159) 不支持 `--sandbox` / `-C`，通过 `-c sandbox_mode="..."` 保留沙箱策略并依赖进程 cwd 定位 worktree
+                var args: [String] = [
+                    "exec",
+                    "resume",
+                    "-m", plan.model,
+                    "-c", "model_reasoning_effort=\"\(plan.effort.rawValue)\"",
+                    "-c", "sandbox_mode=\"\(codexSandbox)\"",
+                    "--json",
+                    "--output-schema", schemaFileURL.path
+                ]
+                if let lastMsg = codexLastMessageURL {
+                    args.append(contentsOf: ["-o", lastMsg.path])
+                }
+                args.append(resumeID)
+                args.append(prompt)
+                return AgentCommandSpec(
+                    executable: executable,
+                    arguments: args,
+                    workingDirectory: workspaceURL,
+                    outputFilePath: codexLastMessageURL
+                )
+            }
             var args: [String] = [
                 "exec",
                 "-m", plan.model,
@@ -428,6 +451,22 @@ public struct AgentCommandBuilder: Sendable {
 
         case .codex:
             let codexSandbox = resolvedDirectMode(plan: plan, fallback: "read-only")
+            if let resumeID = resolvableResumeSessionID(for: plan) {
+                return AgentCommandSpec(
+                    executable: executable,
+                    arguments: [
+                        "exec",
+                        "resume",
+                        "-m", plan.model,
+                        "-c", "model_reasoning_effort=\"\(plan.effort.rawValue)\"",
+                        "-c", "sandbox_mode=\"\(codexSandbox)\"",
+                        "--json",
+                        resumeID,
+                        prompt
+                    ],
+                    workingDirectory: workspaceURL
+                )
+            }
             // 持久化 exec（不传 --ephemeral），结果写入本地会话供 codex resume / Codex App 接管
             return AgentCommandSpec(
                 executable: executable,
