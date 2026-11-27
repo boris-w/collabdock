@@ -11,6 +11,7 @@
   - `mentions:@me` 兜底搜索从仅 403 触发扩展为在 15 分钟 reconcile 周期同样执行（配合 `updated_at` 指纹跳过无变化 PR），解决 `/notifications` 返回 200 空列表（通知仅走邮件）时 `@mention` 从未被检出的问题。
 
 ### Changed
+- **后台会话复审消息不再内嵌 Diff 正文** (`REQ-010`, `REQ-014`)：派发到长生命周期后台会话（Lody / `claude --bg`）的第 N 轮复审（含续聊、新开增量会话与 force-push 回退）改为仅传递上一轮审查提交、最新提交、分支、新增提交列表以及 `git fetch` / `git diff` 指令，避免大段 diff 撑爆会话上下文或被截断；直连 CLI 托管运行（`agy` / `claude` / `codex`）继续保留内嵌 `<untrusted_incremental_diff>`。
 - 测试：补齐环境探测、GitHub PR 导入与批量状态查询（含 GraphQL 注入防护）、回写时拉取 diff、Lody 目录缓存与模型默认值等用例，`CollabDockCore` 行覆盖率 77.7% → 85.9%，CI 门槛提高到 80%。
 - 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
 
