@@ -12,6 +12,7 @@ final class FakeGitHub: HTTPTransport, @unchecked Sendable {
     struct RecordedRequest {
         let method: String
         let path: String
+        let query: String
         let headers: [String: String]
         let body: Data?
 
@@ -65,6 +66,7 @@ final class FakeGitHub: HTTPTransport, @unchecked Sendable {
             RecordedRequest(
                 method: method,
                 path: path,
+                query: request.url?.query.flatMap { $0.removingPercentEncoding } ?? "",
                 headers: request.allHTTPHeaderFields ?? [:],
                 body: request.httpBody
             ),
