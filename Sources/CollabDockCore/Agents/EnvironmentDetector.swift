@@ -648,6 +648,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
         public let contextUsedTokens: Int
         public let modelID: String?
         public let modelName: String?
+        public let lastMessageAt: Date?
         public let durationSeconds: Double?
 
         public var isRunning: Bool {
@@ -665,6 +666,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             contextUsedTokens: Int,
             modelID: String? = nil,
             modelName: String? = nil,
+            lastMessageAt: Date? = nil,
             durationSeconds: Double? = nil
         ) {
             self.sessionID = sessionID
@@ -673,7 +675,15 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             self.contextUsedTokens = contextUsedTokens
             self.modelID = modelID
             self.modelName = modelName
+            self.lastMessageAt = lastMessageAt
             self.durationSeconds = durationSeconds
+        }
+
+        /// 按本轮派发时间计算耗时（最后一条消息时间 − 本轮派发时间，无 1 小时上限；若尚未产出晚于派发时间的新消息则返回 nil）
+        public func roundDurationSeconds(since dispatchedAt: Date) -> Double? {
+            guard let lastMessageAt else { return nil }
+            let diff = lastMessageAt.timeIntervalSince(dispatchedAt)
+            return diff > 0 ? diff : nil
         }
     }
 
@@ -697,18 +707,28 @@ public struct EnvironmentDetector: EnvironmentDetecting {
         let modelID = lastModel?["modelId"] as? String
         let modelName = lastModel?["name"] as? String
 
+        let lastMessageAt: Date? = {
+            if let lastMs = (session["lastMessageAt"] as? NSNumber)?.doubleValue, lastMs > 0 {
+                return Date(timeIntervalSince1970: lastMs / 1000.0)
+            }
+            if let lastStr = session["lastMessageAt"] as? String {
+                let iso = ISO8601DateFormatter()
+                iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let fallbackISO = ISO8601DateFormatter()
+                return iso.date(from: lastStr) ?? fallbackISO.date(from: lastStr)
+            }
+            return nil
+        }()
+
         var durationSec: Double?
-        if let createdStr = session["createdAt"] as? String {
+        if let lastMessageAt, let createdStr = session["createdAt"] as? String {
             let iso = ISO8601DateFormatter()
             iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let fallbackISO = ISO8601DateFormatter()
             if let start = iso.date(from: createdStr) ?? fallbackISO.date(from: createdStr) {
-                if let lastMs = (session["lastMessageAt"] as? NSNumber)?.doubleValue, lastMs > 0 {
-                    let end = Date(timeIntervalSince1970: lastMs / 1000.0)
-                    let diff = end.timeIntervalSince(start)
-                    if diff > 0 && diff < 3600 {
-                        durationSec = diff
-                    }
+                let diff = lastMessageAt.timeIntervalSince(start)
+                if diff > 0 {
+                    durationSec = diff
                 }
             }
         }
@@ -720,6 +740,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             contextUsedTokens: max(0, usedTokens),
             modelID: modelID,
             modelName: modelName,
+            lastMessageAt: lastMessageAt,
             durationSeconds: durationSec
         )
     }

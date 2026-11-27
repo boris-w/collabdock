@@ -330,10 +330,11 @@ public final class AppCoordinator {
                 } else if let modelID = snap.modelID, !modelID.isEmpty {
                     updated.model = modelID
                 }
+                let roundDuration = snap.roundDurationSeconds(since: updated.createdAt)
                 if snap.contextUsedTokens > 0 {
                     updated.usage = AgentUsageMetrics(
                         totalTokens: snap.contextUsedTokens,
-                        durationSeconds: snap.durationSeconds ?? updated.usage.durationSeconds,
+                        durationSeconds: roundDuration ?? updated.usage.durationSeconds,
                         metricKind: .contextWindow
                     )
                     updated.estimatedCostUSD = UsageCostEstimator.estimateUSD(
@@ -1517,8 +1518,12 @@ public final class AppCoordinator {
 
                 if snap.isSettledIdle {
                     self.items[idx].remoteSessionStatus = .completed
+                    let dispatchedAt = self.matchingLodyUsageRunIndex(itemID: itemID, sessionID: sessionID)
+                        .map { self.usageRuns[$0].createdAt }
+                    let roundDuration = dispatchedAt.flatMap { snap.roundDurationSeconds(since: $0) }
+                        ?? (dispatchedAt == nil ? snap.durationSeconds : nil)
                     var parts: [String] = ["\(modelLabel) 已完成审查"]
-                    if let dur = snap.durationSeconds, dur > 0 {
+                    if let dur = roundDuration, dur > 0 {
                         parts.append("耗时 \(UsageAggregator.formatDuration(dur))")
                     }
                     if snap.contextUsedTokens > 0 {
@@ -1530,7 +1535,7 @@ public final class AppCoordinator {
                     )
                     let updated = self.items[idx]
                     await self.persistItem(updated)
-                    await self.applyLodySnapshotToUsageLedger(sessionID: sessionID, snapshot: snap)
+                    await self.applyLodySnapshotToUsageLedger(itemID: itemID, sessionID: sessionID, snapshot: snap)
                     self.systemIntegration.postCompletionNotification(
                         for: updated,
                         summary: summary,
@@ -1555,11 +1560,23 @@ public final class AppCoordinator {
         lodyMonitorTasks[itemID] = task
     }
 
+    private func matchingLodyUsageRunIndex(itemID: String, sessionID: String) -> Int? {
+        if let exact = usageRuns.firstIndex(where: {
+            $0.itemID == itemID && $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-")
+        }) {
+            return exact
+        }
+        return usageRuns.firstIndex(where: {
+            $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-")
+        })
+    }
+
     private func applyLodySnapshotToUsageLedger(
+        itemID: String,
         sessionID: String,
         snapshot snap: EnvironmentDetector.LodySessionUsageSnapshot
     ) async {
-        guard let runIdx = usageRuns.firstIndex(where: { $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-") }) else {
+        guard let runIdx = matchingLodyUsageRunIndex(itemID: itemID, sessionID: sessionID) else {
             return
         }
         var updated = usageRuns[runIdx]
@@ -1568,10 +1585,11 @@ public final class AppCoordinator {
         } else if let modelID = snap.modelID, !modelID.isEmpty {
             updated.model = modelID
         }
+        let roundDuration = snap.roundDurationSeconds(since: updated.createdAt)
         if snap.contextUsedTokens > 0 {
             updated.usage = AgentUsageMetrics(
                 totalTokens: snap.contextUsedTokens,
-                durationSeconds: snap.durationSeconds ?? updated.usage.durationSeconds,
+                durationSeconds: roundDuration ?? updated.usage.durationSeconds,
                 metricKind: .contextWindow
             )
             updated.estimatedCostUSD = UsageCostEstimator.estimateUSD(

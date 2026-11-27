@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Fixed
+- **修复 Lody 续聊复审及超 1 小时审查卡片不显示耗时的问题** (`REQ-014`)：`LodySessionUsageSnapshot` 暴露 `lastMessageAt` 并新增 `roundDurationSeconds(since:)`（按最后一条消息时间减去本轮派发时间计算，移除 1 小时静默上限）；`AppCoordinator` 的卡片摘要与用量账本同步改用对应用量记录的 `createdAt` 作为本轮派发起点。
 - **修复同提交 Re-request review 漏报与通知仅走邮件时漏检 `@mention`** (`REQ-002`, `REQ-010`)：
   - `PollRequest` 新增 `viewerLogin`（由 `InboxSyncService` 从 `currentHandle` 透传）；`GitHubConnector` 在 Notifications 与 Search 两条通道拉取 `review_requested` PR 时查询 `/issues/{number}/timeline`，当本人最近一次提交 review 之后存在发给本人的新 `review_requested` 事件时，将请求时间追加到 revisionKey（其余情况及拉取失败保持原有 `head.sha` 键，升级零重报）。
   - `GitHubConnector.evaluatePRAutoCompletion` 识别同提交第 N 轮复审卡片，避免把上一轮在同 SHA 上留下的 `CHANGES_REQUESTED` / `APPROVED` 旧结论套用到新卡片上。
