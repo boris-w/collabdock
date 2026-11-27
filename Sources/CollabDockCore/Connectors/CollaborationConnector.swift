@@ -143,20 +143,23 @@ public struct PRStatusBatchResult: Equatable, Sendable {
     }
 }
 
-/// 单次轮询请求（携带游标、慢通道对齐标志与已知 PR `updated_at` 指纹，确保跨轮次零配额优化可随协议传递）
+/// 单次轮询请求（携带游标、慢通道对齐标志、已知 PR `updated_at` 指纹与当前登录用户名，确保跨轮次零配额优化与同提交复审识别可随协议传递）
 public struct PollRequest: Equatable, Sendable {
     public var cursor: SyncCursor?
     public var reconcileNow: Bool
     public var knownFingerprints: [String: String]
+    public var viewerLogin: String?
 
     public init(
         cursor: SyncCursor? = nil,
         reconcileNow: Bool = true,
-        knownFingerprints: [String: String] = [:]
+        knownFingerprints: [String: String] = [:],
+        viewerLogin: String? = nil
     ) {
         self.cursor = cursor
         self.reconcileNow = reconcileNow
         self.knownFingerprints = knownFingerprints
+        self.viewerLogin = viewerLogin
     }
 }
 

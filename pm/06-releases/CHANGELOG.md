@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复同提交 Re-request review 漏报与通知仅走邮件时漏检 `@mention`** (`REQ-002`, `REQ-010`)：
+  - `PollRequest` 新增 `viewerLogin`（由 `InboxSyncService` 从 `currentHandle` 透传）；`GitHubConnector` 在 Notifications 与 Search 两条通道拉取 `review_requested` PR 时查询 `/issues/{number}/timeline`，当本人最近一次提交 review 之后存在发给本人的新 `review_requested` 事件时，将请求时间追加到 revisionKey（其余情况及拉取失败保持原有 `head.sha` 键，升级零重报）。
+  - `GitHubConnector.evaluatePRAutoCompletion` 识别同提交第 N 轮复审卡片，避免把上一轮在同 SHA 上留下的 `CHANGES_REQUESTED` / `APPROVED` 旧结论套用到新卡片上。
+  - `mentions:@me` 兜底搜索从仅 403 触发扩展为在 15 分钟 reconcile 周期同样执行（配合 `updated_at` 指纹跳过无变化 PR），解决 `/notifications` 返回 200 空列表（通知仅走邮件）时 `@mention` 从未被检出的问题。
+
 ### Changed
 - 测试：补齐环境探测、GitHub PR 导入与批量状态查询（含 GraphQL 注入防护）、回写时拉取 diff、Lody 目录缓存与模型默认值等用例，`CollabDockCore` 行覆盖率 77.7% → 85.9%，CI 门槛提高到 80%。
 - 开源并改为 GitHub PR 迭代：`main` 受保护（PR + CI 必须通过、仅 squash 合并）；CI 新增 `make coverage`，要求 `CollabDockCore` 行覆盖率 ≥ 75% 并在 Job Summary 输出逐文件覆盖率；新增 `AGENTS.md` 约定 AI 开发会话的 PR / TDD / 隐私规则；`pm/04-planning` 冻结，待办迁移至 GitHub Issues。
