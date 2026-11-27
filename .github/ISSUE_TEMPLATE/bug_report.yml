@@ -1,0 +1,82 @@
+name: Bug report / 问题反馈
+description: Report something that doesn't work as expected. 报告不符合预期的行为。
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. English or Chinese are both fine. 中英文均可。
+
+        **Security issues must not be reported here.** See [SECURITY.md](https://github.com/boris-w/collabdock/blob/main/SECURITY.md).
+        **安全问题请不要在这里提交**，参见 SECURITY.md。
+
+        Please remove tokens, private repository names and other sensitive data from logs and screenshots.
+        请先从日志和截图中去掉 token、私有仓库名等敏感信息。
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? / 问题描述
+      description: What did you expect, and what happened instead? 期望的结果与实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version / macOS 版本
+      placeholder: e.g. macOS 15.5 (Apple Silicon)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CollabDock version or commit / 版本或 commit
+      description: Settings shows the version; if built from source, paste `git rev-parse --short HEAD`. 从源码构建请提供 commit。
+      placeholder: e.g. 0.1.0 / a1b2c3d
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: AI engine / AI 引擎
+      options:
+        - Claude Code (claude)
+        - Codex CLI (codex)
+        - Antigravity (agy)
+        - Lody (lody / npx lody)
+        - Not engine-related / 与引擎无关
+    validations:
+      required: true
+  - type: input
+    id: engine-version
+    attributes:
+      label: Engine version / 引擎版本
+      description: Output of e.g. `claude --version`, `codex --version`, `agy --version`, `lody --version`.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / 日志
+      description: Error messages shown in the app, terminal output, or relevant lines from Console.app. 应用内错误信息、终端输出或 Console.app 中的相关日志。
+      render: shell
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or additional context / 截图或其他信息
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues. / 已搜索过现有 issue。
+          required: true
+        - label: I removed tokens and other sensitive data from this report. / 已去除 token 等敏感信息。
+          required: true
