@@ -292,7 +292,10 @@ public struct LodyBackend: ExecutionBackend {
     }
 
     public func resumeShellCommand(for handle: AgentSessionHandle) -> String {
-        AgentDriverCatalog.resumeShellCommand(for: handle, lodyWorkspace: effectiveWorkspaceID)
+        if let deepLink = sessionDeepLink(for: handle)?.absoluteString {
+            return "open \(Self.shellEscape(deepLink))"
+        }
+        return "npx lody session list --json"
     }
 
     // MARK: - Lody 专属能力（绝不泄漏至 DirectCLIBackend 或通用 AgentRunRequest）
@@ -365,9 +368,21 @@ public struct LodyBackend: ExecutionBackend {
         )
     }
 
+    /// 构造官方 Lody Deep Link（支持从 CollabDock 一键在 Lody Desktop 打开对应会话，关联 ADR-007）
+    public static func sessionDeepLink(sessionID: String, workspace: String? = nil) -> URL? {
+        var comps = URLComponents()
+        comps.scheme = "lody"
+        comps.host = "session"
+        comps.path = "/\(sessionID)"
+        if let workspace, !workspace.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            comps.queryItems = [URLQueryItem(name: "workspace", value: workspace)]
+        }
+        return comps.url
+    }
+
     /// 构造在 Lody Desktop 中打开指定会话的 Deep Link
     public func sessionDeepLink(for handle: AgentSessionHandle) -> URL? {
-        AgentDriverCatalog.lodySessionDeepLink(
+        Self.sessionDeepLink(
             sessionID: handle.sessionID,
             workspace: effectiveWorkspaceID
         )

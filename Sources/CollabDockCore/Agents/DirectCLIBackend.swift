@@ -264,7 +264,21 @@ public struct DirectCLIBackend: ExecutionBackend {
     }
 
     public func resumeShellCommand(for handle: AgentSessionHandle) -> String {
-        AgentDriverCatalog.resumeShellCommand(for: handle, lodyWorkspace: nil)
+        let escapedDir = Self.shellEscape(handle.workspacePath)
+        let escapedID = Self.shellEscape(handle.sessionID)
+        switch handle.engine {
+        case .claudeCode:
+            if handle.launchMode == .nativeBackgroundSession {
+                return "cd \(escapedDir) && claude attach \(escapedID)"
+            }
+            return "cd \(escapedDir) && claude --resume \(escapedID)"
+        case .codex:
+            return "cd \(escapedDir) && codex resume \(escapedID)"
+        case .antigravity:
+            return "cd \(escapedDir) && agy --resume \(escapedID)"
+        case .lody:
+            return LodyBackend().resumeShellCommand(for: handle)
+        }
     }
 
     private static func isBackgroundDispatch(for plan: ExecutionPlan) -> Bool {

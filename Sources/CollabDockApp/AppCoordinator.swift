@@ -971,6 +971,7 @@ final class AppCoordinator {
             presetID = candidates.first?.id ?? settings.presets.first?.id ?? "code-review-general"
         }
 
+        let backend: any ExecutionBackend = (engine == .lody) ? LodyBackend() : DirectCLIBackend()
         return ExecutionPlan(
             engine: engine,
             model: model,
@@ -979,7 +980,7 @@ final class AppCoordinator {
             mode: preferredMode(for: engine, lodyAgentConfig: lodyAgent),
             presetID: presetID,
             deliveryMode: ConnectorCatalog.defaultDeliveryMode(for: item),
-            launchMode: AgentDriverCatalog.defaultLaunchMode(for: engine, fallback: settings.defaultLaunchMode),
+            launchMode: backend.defaultLaunchMode(fallback: settings.defaultLaunchMode),
             sandboxPolicy: .readOnly,
             targetDirectoryOverride: nil,
             useIsolatedWorktree: settings.lodyConfig.useLodyWorktree,

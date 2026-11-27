@@ -103,13 +103,17 @@ final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate
     // MARK: - 一键接管原会话（Lody Deep Link / Terminal --resume）
 
     func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {
-        if handle.engine == .lody,
-           let deepLink = AgentDriverCatalog.lodySessionDeepLink(sessionID: handle.sessionID, workspace: lodyWorkspace) {
-            NSWorkspace.shared.open(deepLink)
-            return
+        let command: String
+        if handle.engine == .lody {
+            let lodyBackend = LodyBackend(config: LodyConfig(workspace: lodyWorkspace ?? ""))
+            if let deepLink = lodyBackend.sessionDeepLink(for: handle) {
+                NSWorkspace.shared.open(deepLink)
+                return
+            }
+            command = lodyBackend.resumeShellCommand(for: handle)
+        } else {
+            command = DirectCLIBackend().resumeShellCommand(for: handle)
         }
-
-        let command = AgentDriverCatalog.resumeShellCommand(for: handle, lodyWorkspace: lodyWorkspace)
         let escapedForAppleScript = command
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")

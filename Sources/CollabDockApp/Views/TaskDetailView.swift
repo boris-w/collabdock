@@ -330,8 +330,8 @@ struct TaskDetailView: View {
                                     plan.continuityMode = .freshSessionIncremental
                                 }
                             }
-                            plan.launchMode = AgentDriverCatalog.defaultLaunchMode(
-                                for: engine,
+                            let backend: any ExecutionBackend = (engine == .lody) ? LodyBackend() : DirectCLIBackend()
+                            plan.launchMode = backend.defaultLaunchMode(
                                 fallback: coordinator.settings.defaultLaunchMode
                             )
                         }

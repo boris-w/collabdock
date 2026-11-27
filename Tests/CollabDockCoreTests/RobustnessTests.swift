@@ -106,7 +106,7 @@ struct RobustnessTests {
             workspacePath: workspace.path,
             launchMode: .managedStructuredRun
         )
-        let command = AgentDriverCatalog.resumeShellCommand(for: handle)
+        let command = DirectCLIBackend().resumeShellCommand(for: handle)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")

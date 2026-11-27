@@ -184,10 +184,10 @@ enum E2EAcceptanceRunner {
         print("[E2E]   wasBackgroundDispatched=\(result.wasBackgroundDispatched)")
         print("[E2E]   sessionID=\(result.sessionHandle?.sessionID ?? "nil")")
         if let handle = result.sessionHandle {
-            let resumeCmd = AgentDriverCatalog.resumeShellCommand(
-                for: handle,
-                lodyWorkspace: lodyCatalog?.workspaceID
-            )
+            let backend: any ExecutionBackend = (handle.engine == .lody)
+                ? LodyBackend(config: LodyConfig(workspace: lodyCatalog?.workspaceID ?? ""))
+                : DirectCLIBackend()
+            let resumeCmd = backend.resumeShellCommand(for: handle)
             print("[E2E]   handoff=\(resumeCmd)")
         }
 
