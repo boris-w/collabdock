@@ -61,6 +61,7 @@ public struct InboxSyncRequest: Sendable {
     public let currentHandle: String
     public let autoCompleteApprovedOrClosedPRs: Bool
     public let previousState: InboxSyncState
+    public let reconcileIntervalSeconds: TimeInterval
 
     public init(
         manual: Bool = false,
@@ -68,7 +69,8 @@ public struct InboxSyncRequest: Sendable {
         rules: TriggerRules = TriggerRules(),
         currentHandle: String = "",
         autoCompleteApprovedOrClosedPRs: Bool = true,
-        previousState: InboxSyncState = InboxSyncState()
+        previousState: InboxSyncState = InboxSyncState(),
+        reconcileIntervalSeconds: TimeInterval = 180
     ) {
         self.manual = manual
         self.existingItems = existingItems
@@ -76,6 +78,7 @@ public struct InboxSyncRequest: Sendable {
         self.currentHandle = currentHandle
         self.autoCompleteApprovedOrClosedPRs = autoCompleteApprovedOrClosedPRs
         self.previousState = previousState
+        self.reconcileIntervalSeconds = reconcileIntervalSeconds
     }
 }
 
@@ -180,10 +183,10 @@ public struct InboxSyncService: Sendable {
             )
         }
 
-        // 仅在首次启动、手动刷新或距上次对齐满 15 分钟时走慢通道 review-requested Search 对齐
+        // 首次启动、手动刷新或距上次对齐满指定间隔（默认 3 分钟）时走 Search 兜底对齐
         let shouldReconcile = request.manual
             || state.lastReconcileAt == nil
-            || now.timeIntervalSince(state.lastReconcileAt!) >= 900
+            || now.timeIntervalSince(state.lastReconcileAt!) >= request.reconcileIntervalSeconds
 
         let previousCursor = try await persist(.loadCursor) {
             try await store.loadCursor(for: source.platform)
