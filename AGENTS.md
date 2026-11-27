@@ -37,7 +37,6 @@
 
 - `npx` 回退钉住 `lody@latest`，且 Lody 子进程固定在中性临时目录启动（防止目标仓库里同名 `package.json` 劫持 `npx`）。
 - 子进程环境变量剥离 `GITHUB_TOKEN` / `GH_TOKEN` / `GH_ENTERPRISE_TOKEN`，以及 `ELECTRON_RUN_AS_NODE`、`LODY_*` 会话变量。
-- `agy` 模型 ID 已带强度后缀（`-high` 等）时不再传 `--effort`。
 - CLI 非零退出时优先从 stdout 的 JSON `error` 提取错误（`lody --json` 把错误写在 stdout）。
 - `review_requested` 通知按 PR head SHA 去重（作者推新提交后能再次触发复审）。
 - PR 自动归档：`APPROVED` / `MERGED` / `CLOSED` 归档，`CHANGES_REQUESTED` 留在收件箱。
@@ -46,9 +45,9 @@
 ## 5. 代码地图
 
 - `Sources/CollabDockCore`：纯 Swift 业务逻辑（零 SwiftUI 依赖）。
-  - `Services/`：`InboxSyncService`（轮询、去重、规则、退避、PR 状态对齐、导入）、`ReviewExecutionService`（准备 → 执行 / 会诊 / 后台派发 → 回写 → 持久化）。
-  - `Agents/`：`ExecutionBackend` 协议与 `DirectCLIBackend`、`LodyBackend`；命令构造、流解析、会诊合并、运行票据 `ExecutionRunRegistry`。
-  - `Connectors/`：`CollaborationSource` / `CollaborationSink` 协议与 GitHub 实现、`PRStateReconciler`。
+  - `Services/`：`InboxSyncService`（轮询、去重、规则、退避、PR 状态对齐、导入）、`ReviewExecutionService`（准备 Lody 工作区 → 派发 Lody 后台会话 → 记账 → 持久化）。
+  - `Agents/`：`ExecutionBackend` 协议与 `LodyBackend`；Lody 命令构造、JSON 输出解析、运行票据 `ExecutionRunRegistry`。
+  - `Connectors/`：`CollaborationSource` / `PullRequestFetching` / `PRStatusQuerying` 协议与只读 GitHub 实现、`PRStateReconciler`。
   - `Storage/`：`TaskStore` 协议与 SQLite 实现；存储失败以 `PersistenceError` 上抛，不要 `try?` 吞掉。
 - `Sources/CollabDockApp`：SwiftUI 菜单栏应用，`AppCoordinator` 只负责 UI 状态与调用 Core 服务。`Debug/` 下是仅 DEBUG 可用的截图与真实 PR 验收工具。
 - 设计文档在 `pm/`（中文）；架构决策新增 ADR，不改写旧 ADR。

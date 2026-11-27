@@ -36,23 +36,6 @@
         }
       }
     },
-    "%1$@ with %2$@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ with %2$@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "用 %2$@ %1$@"
-          }
-        }
-      }
-    },
     "%1$@ · Lody (%2$@)": {
       "extractionState": "manual",
       "localizations": {
@@ -291,23 +274,6 @@
         }
       }
     },
-    "%lld models": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld models"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld 个模型"
-          }
-        }
-      }
-    },
     "%lld pending": {
       "extractionState": "manual",
       "localizations": {
@@ -393,23 +359,6 @@
         }
       }
     },
-    "Stored locally in SQLite" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Stored locally in SQLite"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地 SQLite 存储"
-          }
-        }
-      }
-    },
     "@dev please check if webhook callback timeouts are looping on retries": {
       "extractionState": "manual",
       "localizations": {
@@ -491,23 +440,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "评论 / 消息中 @我 (mention)"
-          }
-        }
-      }
-    },
-    "AI Engines": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI Engines"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI 引擎"
           }
         }
       }
@@ -648,23 +580,6 @@
         }
       }
     },
-    "Analyzing and generating review draft...": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Analyzing and generating review draft..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在分析并生成审查草稿..."
-          }
-        }
-      }
-    },
     "Archived": {
       "extractionState": "manual",
       "localizations": {
@@ -801,23 +716,6 @@
         }
       }
     },
-    "Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "批处理主链路清晰，发现 1 处并发取消时未释放信号量的边界问题及 2 处建议优化。"
-          }
-        }
-      }
-    },
     "Bind Folder...": {
       "extractionState": "manual",
       "localizations": {
@@ -869,23 +767,6 @@
         }
       }
     },
-    "CLI exact + Lody context": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "CLI exact + Lody context"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "含 CLI 精确 + Lody 上下文"
-          }
-        }
-      }
-    },
     "Cache %.0f%%": {
       "extractionState": "manual",
       "localizations": {
@@ -933,23 +814,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "预览模式下无法联网拉取 PR"
-          }
-        }
-      }
-    },
-    "Cap the backoff at 30s.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cap the backoff at 30s."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "建议封顶 30s。"
           }
         }
       }
@@ -1192,23 +1056,6 @@
         }
       }
     },
-    "Concurrent cache expiration can trigger a thundering herd; coalesce in-flight refresh requests.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Concurrent cache expiration can trigger a thundering herd; coalesce in-flight refresh requests."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "高并发缓存失效时可能触发缓存击穿，建议合并在途刷新请求。"
-          }
-        }
-      }
-    },
     "Context %@": {
       "extractionState": "manual",
       "localizations": {
@@ -1226,36 +1073,19 @@
         }
       }
     },
-    "Continue %@ Session": {
+    "Continue Lody Session": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continue %@ Session"
+            "value": "Continue Lody Session"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "续聊原 %@ 会话复审"
-          }
-        }
-      }
-    },
-    "Continued existing %@ session for follow-up review": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continued existing %@ session for follow-up review"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已续聊原 %@ 会话复审"
+            "value": "续聊 Lody 会话"
           }
         }
       }
@@ -1341,57 +1171,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "复制升级命令"
-          }
-        }
-      }
-    },
-    "Council": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Council"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "双模型会诊"
-          }
-        }
-      }
-    },
-    "Council (%1$@ × %2$@)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Council (%1$@ × %2$@)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "双模型会诊 (%1$@×%2$@)"
-          }
-        }
-      }
-    },
-    "Council On": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Council On"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已开启双模型会诊"
           }
         }
       }
@@ -1549,23 +1328,6 @@
         }
       }
     },
-    "Default AI Engine": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default AI Engine"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认 AI 引擎"
-          }
-        }
-      }
-    },
     "Default Execution Preferences": {
       "extractionState": "manual",
       "localizations": {
@@ -1583,23 +1345,6 @@
         }
       }
     },
-    "Default Launch Mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default Launch Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认唤起方式"
-          }
-        }
-      }
-    },
     "Default Lody Agent": {
       "extractionState": "manual",
       "localizations": {
@@ -1613,23 +1358,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "默认 Lody Agent"
-          }
-        }
-      }
-    },
-    "Default Mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Default Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "默认模式"
           }
         }
       }
@@ -1719,23 +1447,6 @@
         }
       }
     },
-    "Delivery": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delivery"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "交付方式"
-          }
-        }
-      }
-    },
     "Detecting...": {
       "extractionState": "manual",
       "localizations": {
@@ -1817,23 +1528,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "开发者模式已开启（点击前往设置管理）"
-          }
-        }
-      }
-    },
-    "Direct CLI exact measurement": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Direct CLI exact measurement"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直连 CLI 精确采集"
           }
         }
       }
@@ -1923,19 +1617,36 @@
         }
       }
     },
-    "Dispatched to native %@ background session": {
+    "Dispatched & Reviewed": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dispatched to native %@ background session"
+            "value": "Dispatched & Reviewed"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已派发至 %@ 原生后台会话"
+            "value": "已派发与已审查"
+          }
+        }
+      }
+    },
+    "Dispatching Lody review session...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispatching Lody review session..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在派发 Lody 审查会话..."
           }
         }
       }
@@ -1970,23 +1681,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "草稿就绪"
-          }
-        }
-      }
-    },
-    "Drafts & Dispatched": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Drafts & Dispatched"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "草稿与已派发"
           }
         }
       }
@@ -2076,19 +1770,19 @@
         }
       }
     },
-    "Enabled: injects only the single selected preset plus read-only guardrails. Lody / background sessions output Markdown; managed drafts include a JSON Schema. Click \"Prompt\" on the confirmation card to inspect the full text.": {
+    "Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Enabled: injects only the single selected preset plus read-only guardrails. Lody / background sessions output Markdown; managed drafts include a JSON Schema. Click \"Prompt\" on the confirmation card to inspect the full text."
+            "value": "Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已开启：每次唤起仅注入当前选中的 1 条模板（不会全量注入）+ 只读安全边界；Lody / 后台会话输出人类可读 Markdown，托管草稿模式附加 JSON Schema。确认卡片点「预览提示词」可实时查看完整原文。"
+            "value": "已开启：每次唤起仅注入当前选中的 1 条模板（不会全量注入）+ 只读安全边界；Lody 会话输出人类可读 Markdown。确认卡片点「预览提示词」可实时查看完整原文。"
           }
         }
       }
@@ -2310,23 +2004,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地数据库打开失败（本次运行数据不会持久化）：%@"
-          }
-        }
-      }
-    },
-    "Follow Agent Default": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Follow Agent Default"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟随 Agent 默认"
           }
         }
       }
@@ -2586,23 +2263,6 @@
         }
       }
     },
-    "Include batchID for production tracing.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Include batchID for production tracing."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "便于线上追踪。"
-          }
-        }
-      }
-    },
     "Includes Developer Mode sample stats (click to clear; real SQLite data is untouched)": {
       "extractionState": "manual",
       "localizations": {
@@ -2620,19 +2280,19 @@
         }
       }
     },
-    "Inject 5-day / 4-engine sample usage stats to preview charts (never written to SQLite).": {
+    "Inject 5-day sample usage stats to preview charts (never written to SQLite).": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inject 5-day / 4-engine sample usage stats to preview charts (never written to SQLite)."
+            "value": "Inject 5-day sample usage stats to preview charts (never written to SQLite)."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向统计页注入跨 5 天 / 四引擎示例数据预览图表，绝不写入本地 SQLite 账本。"
+            "value": "注入 5 天示例用量数据以预览图表（不会写入 SQLite）。"
           }
         }
       }
@@ -2807,40 +2467,6 @@
         }
       }
     },
-    "Language used by CollabDock for GitHub review headings, severity labels, local reports, and multi-model consensus text.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Language used by CollabDock for GitHub review headings, severity labels, local reports, and multi-model consensus text."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "控制 CollabDock 写入 GitHub 的审查标题、严重度标签、本地报告与双模型会诊合并文案。"
-          }
-        }
-      }
-    },
-    "Launch Mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Launch Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "唤起方式"
-          }
-        }
-      }
-    },
     "Launch at login": {
       "extractionState": "manual",
       "localizations": {
@@ -2909,6 +2535,40 @@
         }
       }
     },
+    "Legacy CLI + Lody context": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legacy CLI + Lody context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "含历史 CLI + Lody 上下文"
+          }
+        }
+      }
+    },
+    "Legacy CLI exact measurement": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legacy CLI exact measurement"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史 CLI 精确统计"
+          }
+        }
+      }
+    },
     "Load Sample": {
       "extractionState": "manual",
       "localizations": {
@@ -2956,23 +2616,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "加载演示任务"
-          }
-        }
-      }
-    },
-    "Local AI Engine / Orchestrator": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Local AI Engine / Orchestrator"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "选择本地 AI 引擎 / 编排端"
           }
         }
       }
@@ -3062,36 +2705,36 @@
         }
       }
     },
-    "Lody Workspace Session · Markdown": {
+    "Lody": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lody Workspace Session · Markdown"
+            "value": "Lody"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lody 工作区持久化会话 · Markdown"
+            "value": "Lody"
           }
         }
       }
     },
-    "Lody Workspace · Markdown": {
+    "Lody Agent": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lody Workspace · Markdown"
+            "value": "Lody Agent"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lody 工作区会话 · Markdown"
+            "value": "Lody Agent"
           }
         }
       }
@@ -3143,6 +2786,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lody 上下文"
+          }
+        }
+      }
+    },
+    "Lody review complete · 54s · 142K ctx": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody review complete · 54s · 142K ctx"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody 审查完成 · 54秒 · 142K 上下文"
           }
         }
       }
@@ -3249,23 +2909,6 @@
         }
       }
     },
-    "Maximum retry backoff is uncapped": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Maximum retry backoff is uncapped"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最大重试退避未设上限"
-          }
-        }
-      }
-    },
     "Measured": {
       "extractionState": "manual",
       "localizations": {
@@ -3300,57 +2943,6 @@
         }
       }
     },
-    "Missing batchID in logs": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Missing batchID in logs"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "日志缺少 batchID"
-          }
-        }
-      }
-    },
-    "Missing singleflight guard on JWKS refresh": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Missing singleflight guard on JWKS refresh"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "JWKS 刷新缺少并发去重保护"
-          }
-        }
-      }
-    },
-    "Mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "模式"
-          }
-        }
-      }
-    },
     "Model": {
       "extractionState": "manual",
       "localizations": {
@@ -3364,23 +2956,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "模型"
-          }
-        }
-      }
-    },
-    "Move the release call into a defer block.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Move the release call into a defer block."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "建议将 release 移入 defer 块。"
           }
         }
       }
@@ -3432,23 +3007,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "还没有已完成事项"
-          }
-        }
-      }
-    },
-    "No delivery connector found for %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No delivery connector found for %@"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未找到 %@ 的交付连接器"
           }
         }
       }
@@ -3657,40 +3215,6 @@
         }
       }
     },
-    "Open local Markdown report": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open local Markdown report"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开本地 Markdown 报告"
-          }
-        }
-      }
-    },
-    "Open local report": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open local report"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开本地报告"
-          }
-        }
-      }
-    },
     "Output": {
       "extractionState": "manual",
       "localizations": {
@@ -3755,23 +3279,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "解析触发正文中的 --model / --focus 建议（仅预填，不绕过人工确认）"
-          }
-        }
-      }
-    },
-    "Partner": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Partner"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会诊搭档"
           }
         }
       }
@@ -4133,19 +3640,19 @@
         }
       }
     },
-    "Repository → Local Directory Mapping (shared across all engines)": {
+    "Repository → Local Directory Mapping": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Repository → Local Directory Mapping (shared across all engines)"
+            "value": "Repository → Local Directory Mapping"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "仓库 → 本地目录映射（全引擎共用，支持自动发现与手动指定）"
+            "value": "仓库 → 本地目录映射"
           }
         }
       }
@@ -4252,23 +3759,6 @@
         }
       }
     },
-    "Resume": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resume"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接管会话"
-          }
-        }
-      }
-    },
     "Resume Target": {
       "extractionState": "manual",
       "localizations": {
@@ -4282,23 +3772,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "续聊目标"
-          }
-        }
-      }
-    },
-    "Resume local session": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resume local session"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "接管本地会话"
           }
         }
       }
@@ -4337,23 +3810,6 @@
         }
       }
     },
-    "Review Language": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Review Language"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "审查语言"
-          }
-        }
-      }
-    },
     "Review Usage": {
       "extractionState": "manual",
       "localizations": {
@@ -4384,23 +3840,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "默认审查方式与代码搜索目录"
-          }
-        }
-      }
-    },
-    "Review completed": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Review completed"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "审查已完成"
           }
         }
       }
@@ -4524,19 +3963,19 @@
         }
       }
     },
-    "Run PR reviews via Lody or local CLIs (Claude / Codex / Antigravity) to track tokens, models, and estimated API cost.": {
+    "Run PR reviews via Lody to track context usage, models, and estimated API cost.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Run PR reviews via Lody or local CLIs (Claude / Codex / Antigravity) to track tokens, models, and estimated API cost."
+            "value": "Run PR reviews via Lody to track context usage, models, and estimated API cost."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "通过 CollabDock 派发到 Lody 或本地 CLI（Claude / Codex / Antigravity）审查 PR 后，将自动采集并汇总 Token、模型与参考 API 价值。"
+            "value": "通过 CollabDock 派发到 Lody 审查 PR 后，将自动采集并汇总上下文用量、模型与参考 API 价值。"
           }
         }
       }
@@ -4694,23 +4133,6 @@
         }
       }
     },
-    "Session Mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Session Mode"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会话模式"
-          }
-        }
-      }
-    },
     "Settings (⌘,)": {
       "extractionState": "manual",
       "localizations": {
@@ -4775,6 +4197,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "中止本次执行"
+          }
+        }
+      }
+    },
+    "Stored locally in SQLite": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stored locally in SQLite"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地 SQLite 存储"
           }
         }
       }
@@ -5047,23 +4486,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "任务 / 工单指派给我 (assigned)"
-          }
-        }
-      }
-    },
-    "Task cancellation path does not release concurrency permit": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Task cancellation path does not release concurrency permit"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Task 取消分支未释放并发许可"
           }
         }
       }
@@ -5459,6 +4881,23 @@
         }
       }
     },
+    "Workspace Default": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作区默认"
+          }
+        }
+      }
+    },
     "Workspace Default Agent": {
       "extractionState": "manual",
       "localizations": {
@@ -5527,36 +4966,36 @@
         }
       }
     },
-    "[Demo] Real GitHub PRs will automatically create an isolated worktree, run %@, and save a Pending Review draft.": {
+    "[Demo] Dispatching to Lody (%@)...": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "[Demo] Real GitHub PRs will automatically create an isolated worktree, run %@, and save a Pending Review draft."
+            "value": "[Demo] Dispatching to Lody (%@)..."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "[演示] 真实 GitHub PR 确认后将自动创建隔离 Worktree、运行 %@ 并写入 Pending Review 草稿。"
+            "value": "[演示] 正在派发到 Lody（%@）..."
           }
         }
       }
     },
-    "[Demo] Simulating %@ (%@) in read-only sandbox...": {
+    "[Demo] Real GitHub PRs will dispatch a Lody background session (%@) and track its progress and usage.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "[Demo] Simulating %@ (%@) in read-only sandbox..."
+            "value": "[Demo] Real GitHub PRs will dispatch a Lody background session (%@) and track its progress and usage."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "[演示] 模拟 %@ (%@) 在只读沙箱中分析..."
+            "value": "[演示] 真实 GitHub PR 将派发 Lody 后台会话（%@），并持续追踪执行进度与上下文用量。"
           }
         }
       }

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import CollabDockCore
 
-/// 二级钻取页面：跨平台通用的本地人工确认与 AI 模型调度画布
+/// 二级钻取页面：跨平台通用的本地人工确认与 Lody Agent 调度画布
 struct TaskDetailView: View {
     let item: CollaborationItem
     @Bindable var coordinator: AppCoordinator
@@ -26,26 +26,17 @@ struct TaskDetailView: View {
         plan.lodyAgentConfig ?? coordinator.settings.lodyConfig.defaultAgentConfig
     }
 
-    private var modelsForEngine: [ModelOption] {
-        if plan.engine == .lody {
-            return coordinator.modelsForLody(agentConfig: effectiveLodyAgentConfig)
-        }
-        return coordinator.availableModelsByEngine[plan.engine] ?? plan.engine.defaultModels
+    private var lodyAgents: [LodyAgentConfigOption] {
+        coordinator.lodyAgentConfigOptions
+    }
+
+    private var modelsForLody: [ModelOption] {
+        coordinator.modelsForLody(agentConfig: effectiveLodyAgentConfig)
     }
 
     private var selectedModelOption: ModelOption {
-        modelsForEngine.first(where: { $0.id == plan.model })
+        modelsForLody.first(where: { $0.id == plan.model })
             ?? ModelOption(id: plan.model, displayName: plan.model)
-    }
-
-    private var modesForEngine: [AgentModeOption] {
-        coordinator.modes(for: plan.engine, lodyAgentConfig: effectiveLodyAgentConfig)
-    }
-
-    private var selectedModeOption: AgentModeOption {
-        let current = plan.mode ?? coordinator.preferredMode(for: plan.engine, lodyAgentConfig: effectiveLodyAgentConfig)
-        return modesForEngine.first(where: { $0.id == current })
-            ?? AgentModeOption(id: current, displayName: current == "__agent_default__" ? L("Follow Agent Default") : current)
     }
 
     private var availablePresets: [TaskPreset] {
@@ -58,14 +49,11 @@ struct TaskDetailView: View {
             ?? TaskPreset.defaults[0]
     }
 
-    private var supportedDeliveryModes: [DeliveryMode] {
-        ConnectorCatalog.supportedDeliveryModes(for: item)
-    }
-
     private var compactModelLabel: String {
         selectedModelOption.displayName
             .replacingOccurrences(of: " (Latest)", with: "")
             .replacingOccurrences(of: " (Fast)", with: "")
+            .replacingOccurrences(of: " (recommended)", with: "")
     }
 
     private var resolvedDirectory: (path: String?, displayName: String, lodyProjectID: String?) {
@@ -92,6 +80,35 @@ struct TaskDetailView: View {
         }
     }
 
+    private var isContinuingExistingLodySession: Bool {
+        plan.continuityMode == .continueSessionIncremental
+            && item.previousReview?.engine == .lody
+            && item.previousReview?.canContinueSameSession == true
+    }
+
+    private var useAgentTiles: Bool {
+        !lodyAgents.isEmpty && lodyAgents.count <= 4
+    }
+
+    private func matchesAgent(_ agent: LodyAgentConfigOption) -> Bool {
+        let raw = effectiveLodyAgentConfig.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty, raw != "default" else { return false }
+        let lowered = raw.lowercased()
+        return agent.id == raw
+            || agent.name.lowercased() == lowered
+            || agent.agentType?.lowercased() == lowered
+    }
+
+    private func selectLodyAgent(_ selector: String) {
+        withAnimation(.snappy(duration: 0.16)) {
+            plan.engine = .lody
+            plan.launchMode = .nativeBackgroundSession
+            plan.lodyAgentConfig = selector
+            plan.model = coordinator.preferredLodyModel(forAgentConfig: selector)
+            plan.mode = coordinator.preferredLodyMode(forAgentConfig: selector)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             detailNavBar
@@ -100,7 +117,9 @@ struct TaskDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     contextBlock
-                    engineTileRow
+                    if !isContinuingExistingLodySession && useAgentTiles {
+                        lodyAgentTileRow
+                    }
                     parametersCard
                     extraInstructionsSection
                 }
@@ -275,78 +294,66 @@ struct TaskDetailView: View {
     }
 
     private var ctaButtonTitle: String {
-        if let partner = plan.councilPartner {
-            return L("Council (%1$@ × %2$@)", plan.engine.shortName, partner.engine.shortName)
-        }
-        if plan.continuityMode == .continueSessionIncremental,
-           let prev = item.previousReview,
-           prev.engine == plan.engine,
-           prev.canContinueSameSession {
-            return L("Continue %@ Session", plan.engine.shortName)
+        if isContinuingExistingLodySession {
+            return L("Continue Lody Session")
         }
         let verb = (item.previousReview != nil) ? L("Re-review") : actionVerb
-        if plan.engine == .lody {
-            if !plan.model.isEmpty && plan.model != "default" {
-                return L("%1$@ · Lody (%2$@)", verb, compactModelLabel)
-            }
-            if !effectiveLodyAgentConfig.isEmpty && effectiveLodyAgentConfig != "default" {
-                return L("%1$@ · Lody (%2$@)", verb, coordinator.lodyAgentConfigDisplayName(for: effectiveLodyAgentConfig))
-            }
-            return L("%@ with Lody", verb)
+        if !plan.model.isEmpty && plan.model != "default" {
+            return L("%1$@ · Lody (%2$@)", verb, compactModelLabel)
         }
-        return L("%1$@ with %2$@", verb, compactModelLabel)
+        if !effectiveLodyAgentConfig.isEmpty && effectiveLodyAgentConfig != "default" {
+            return L("%1$@ · Lody (%2$@)", verb, coordinator.lodyAgentConfigDisplayName(for: effectiveLodyAgentConfig))
+        }
+        return L("%@ with Lody", verb)
     }
 
-    // MARK: - 本地 AI 引擎四宫格选择瓷砖
+    // MARK: - Lody Agent 主选择瓷砖
 
-    private var engineTileRow: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(L("Local AI Engine / Orchestrator"))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
+    private var lodyAgentTileRow: some View {
+        let isDefaultSelected = effectiveLodyAgentConfig.isEmpty || effectiveLodyAgentConfig == "default"
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(L("Lody Agent"))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    selectLodyAgent("default")
+                } label: {
+                    Text(L("Workspace Default"))
+                        .font(.system(size: 10, weight: isDefaultSelected ? .semibold : .medium))
+                        .foregroundStyle(isDefaultSelected ? Color.accentColor : .secondary)
+                        .padding(.horizontal, 6.5)
+                        .padding(.vertical, 2)
+                        .background(
+                            isDefaultSelected
+                                ? Color.accentColor.opacity(0.12)
+                                : CDTheme.subtleSurface(for: scheme),
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+            }
 
             HStack(spacing: 6) {
-                ForEach(AgentEngine.allCases) { engine in
-                    let isSelected = plan.engine == engine
+                ForEach(lodyAgents) { agent in
+                    let isSelected = matchesAgent(agent)
+                    let accent = agent.inferredUnderlyingEngine?.brandAccent ?? AgentEngine.lody.brandAccent
+                    let symbol = agent.inferredUnderlyingEngine?.symbolName ?? "cube.transparent"
                     Button {
-                        withAnimation(.snappy(duration: 0.16)) {
-                            plan.engine = engine
-                            if engine == .lody {
-                                let lodyAgent = plan.lodyAgentConfig ?? coordinator.settings.lodyConfig.defaultAgentConfig
-                                plan.lodyAgentConfig = lodyAgent
-                                plan.model = coordinator.preferredLodyModel(forAgentConfig: lodyAgent)
-                                plan.mode = coordinator.preferredLodyMode(forAgentConfig: lodyAgent)
-                                plan.councilPartner = nil
-                            } else {
-                                plan.lodyAgentConfig = nil
-                                let options = coordinator.availableModelsByEngine[engine] ?? engine.defaultModels
-                                plan.model = coordinator.settings.defaultModels[engine] ?? options.first?.id ?? ""
-                                plan.mode = coordinator.preferredMode(for: engine)
-                            }
-                            if let prev = item.previousReview {
-                                if prev.canContinueSameSession && prev.engine == engine {
-                                    plan.continuityMode = .continueSessionIncremental
-                                } else if plan.continuityMode == .continueSessionIncremental {
-                                    plan.continuityMode = .freshSessionIncremental
-                                }
-                            }
-                            let backend: any ExecutionBackend = (engine == .lody) ? LodyBackend() : DirectCLIBackend()
-                            plan.launchMode = backend.defaultLaunchMode(
-                                fallback: coordinator.settings.defaultLaunchMode
-                            )
-                        }
+                        selectLodyAgent(agent.id)
                     } label: {
                         VStack(spacing: 5) {
-                            Image(systemName: engine.symbolName)
+                            Image(systemName: symbol)
                                 .font(.system(size: 12.5, weight: .semibold))
-                                .foregroundStyle(isSelected ? engine.brandAccent : .secondary)
+                                .foregroundStyle(isSelected ? accent : .secondary)
                                 .frame(width: 24, height: 24)
                                 .background(
-                                    (isSelected ? engine.brandAccent.opacity(0.14) : CDTheme.subtleSurface(for: scheme)),
+                                    (isSelected ? accent.opacity(0.14) : CDTheme.subtleSurface(for: scheme)),
                                     in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 )
 
-                            Text(engine.shortName)
+                            Text(agent.name)
                                 .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
                                 .foregroundStyle(isSelected ? .primary : .secondary)
                                 .lineLimit(1)
@@ -377,18 +384,11 @@ struct TaskDetailView: View {
 
     // MARK: - 单张 Grouped Inset 参数卡
 
-    private var isContinuingExistingLodySession: Bool {
-        plan.engine == .lody
-            && plan.continuityMode == .continueSessionIncremental
-            && item.previousReview?.engine == .lody
-            && item.previousReview?.canContinueSameSession == true
-    }
-
     private var parametersCard: some View {
         CDInsetCard {
             VStack(spacing: 0) {
                 if let prev = item.previousReview {
-                    let canContinue = prev.canContinueSameSession && prev.engine == plan.engine
+                    let canContinue = prev.canContinueSameSession && prev.engine == .lody
                     let allowedModes: [ReviewContinuityMode] = canContinue
                         ? [.continueSessionIncremental, .freshSessionIncremental, .freshSessionFull]
                         : [.freshSessionIncremental, .freshSessionFull]
@@ -409,15 +409,13 @@ struct TaskDetailView: View {
                     CDHairlineDivider()
                 }
 
-                if plan.engine == .lody && !isContinuingExistingLodySession {
+                if !isContinuingExistingLodySession && !useAgentTiles {
                     inlineMenuRow(
-                        label: "Lody Agent",
+                        label: L("Lody Agent"),
                         value: coordinator.lodyAgentConfigDisplayName(for: effectiveLodyAgentConfig)
                     ) {
                         Button {
-                            plan.lodyAgentConfig = "default"
-                            plan.model = coordinator.preferredLodyModel(forAgentConfig: "default")
-                            plan.mode = coordinator.preferredLodyMode(forAgentConfig: "default")
+                            selectLodyAgent("default")
                         } label: {
                             if effectiveLodyAgentConfig == "default" || effectiveLodyAgentConfig.isEmpty {
                                 Label(L("Workspace Default Agent"), systemImage: "checkmark")
@@ -426,16 +424,12 @@ struct TaskDetailView: View {
                             }
                         }
                         Divider()
-                        ForEach(coordinator.lodyAgentConfigOptions) { agent in
+                        ForEach(lodyAgents) { agent in
                             Button {
-                                plan.lodyAgentConfig = agent.id
-                                plan.model = coordinator.preferredLodyModel(forAgentConfig: agent.id)
-                                plan.mode = coordinator.preferredLodyMode(forAgentConfig: agent.id)
+                                selectLodyAgent(agent.id)
                             } label: {
                                 let labelText = agent.models.isEmpty ? agent.name : L("%@ (%lld models)", agent.name, agent.models.count)
-                                if effectiveLodyAgentConfig == agent.id
-                                    || effectiveLodyAgentConfig.lowercased() == agent.name.lowercased()
-                                    || effectiveLodyAgentConfig.lowercased() == agent.agentType?.lowercased() {
+                                if matchesAgent(agent) {
                                     Label(labelText, systemImage: "checkmark")
                                 } else {
                                     Text(labelText)
@@ -451,7 +445,7 @@ struct TaskDetailView: View {
                     label: L("Model"),
                     value: selectedModelOption.displayName
                 ) {
-                    ForEach(modelsForEngine) { option in
+                    ForEach(modelsForLody) { option in
                         Button {
                             plan.model = option.id
                         } label: {
@@ -502,25 +496,6 @@ struct TaskDetailView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
-                CDHairlineDivider()
-
-                inlineMenuRow(
-                    label: L("Mode"),
-                    value: selectedModeOption.displayName
-                ) {
-                    ForEach(modesForEngine) { modeOpt in
-                        Button {
-                            plan.mode = modeOpt.id
-                        } label: {
-                            if modeOpt.id == selectedModeOption.id {
-                                Label(modeOpt.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(modeOpt.displayName)
-                            }
-                        }
-                    }
-                }
-
                 if isContinuingExistingLodySession, let sid = item.previousReview?.sessionID {
                     CDHairlineDivider()
                     HStack {
@@ -565,9 +540,9 @@ struct TaskDetailView: View {
                         }
                     }
 
-                    CDHairlineDivider()
-
                     if item.payload.linkedRepository != nil {
+                        CDHairlineDivider()
+
                         inlineMenuRow(label: L("Directory"), value: directorySummaryLabel) {
                             Button {
                                 plan.useIsolatedWorktree = true
@@ -617,63 +592,6 @@ struct TaskDetailView: View {
                                 }
                                 if panel.runModal() == .OK, let url = panel.url {
                                     plan.targetDirectoryOverride = url.path
-                                }
-                            }
-                        }
-
-                        CDHairlineDivider()
-                    }
-
-                    if plan.engine == .lody {
-                        HStack {
-                            Text(L("Session Mode"))
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Image(systemName: "cube.transparent")
-                                    .font(.system(size: 9.5, weight: .semibold))
-                                    .foregroundStyle(AgentEngine.lody.brandAccent)
-                                Text(L("Lody Workspace · Markdown"))
-                                    .font(.system(size: 11.5, weight: .medium))
-                                    .foregroundStyle(.primary)
-                            }
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                CDTheme.subtleSurface(for: scheme),
-                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            )
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8.5)
-                    } else {
-                        inlineMenuRow(label: L("Delivery"), value: plan.deliveryMode.shortLabel(for: item.platform)) {
-                            ForEach(supportedDeliveryModes) { mode in
-                                Button {
-                                    plan.deliveryMode = mode
-                                } label: {
-                                    if mode == plan.deliveryMode {
-                                        Label(mode.displayName(for: item.platform), systemImage: "checkmark")
-                                    } else {
-                                        Text(mode.displayName(for: item.platform))
-                                    }
-                                }
-                            }
-                        }
-
-                        CDHairlineDivider()
-
-                        inlineMenuRow(label: L("Launch Mode"), value: plan.launchMode.shortLabel) {
-                            ForEach(ExecutionLaunchMode.allCases) { mode in
-                                Button {
-                                    plan.launchMode = mode
-                                } label: {
-                                    if mode == plan.launchMode {
-                                        Label(mode.displayName, systemImage: "checkmark")
-                                    } else {
-                                        Text(mode.displayName)
-                                    }
                                 }
                             }
                         }
@@ -739,30 +657,6 @@ struct TaskDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                if plan.engine != .lody {
-                    Button {
-                        withAnimation(.snappy(duration: 0.16)) {
-                            if plan.councilPartner == nil {
-                                let partnerEngine: AgentEngine = (plan.engine == .claudeCode) ? .codex : .claudeCode
-                                let partnerModels = coordinator.availableModelsByEngine[partnerEngine] ?? partnerEngine.defaultModels
-                                let partnerModel = coordinator.settings.defaultModels[partnerEngine] ?? partnerModels.first?.id ?? ""
-                                plan.councilPartner = CouncilPartner(engine: partnerEngine, model: partnerModel, effort: plan.effort)
-                            } else {
-                                plan.councilPartner = nil
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: plan.councilPartner == nil ? "person.2" : "person.2.fill")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(plan.councilPartner == nil ? L("Council") : L("Council On"))
-                                .font(.system(size: 11.5, weight: .medium))
-                        }
-                        .foregroundStyle(plan.councilPartner == nil ? Color.secondary : Color.accentColor)
-                    }
-                    .buttonStyle(.plain)
-                }
-
                 Spacer()
 
                 Button {
@@ -779,71 +673,6 @@ struct TaskDetailView: View {
                     .foregroundStyle(showPromptPreview ? Color.accentColor : Color.secondary)
                 }
                 .buttonStyle(.plain)
-            }
-
-            if let partner = plan.councilPartner {
-                let eligibleEngines: [AgentEngine] = [.claudeCode, .codex, .antigravity].filter { $0 != plan.engine }
-                let partnerModels = coordinator.availableModelsByEngine[partner.engine] ?? partner.engine.defaultModels
-                let partnerModelDisplay = partnerModels.first(where: { $0.id == partner.model })?.displayName ?? partner.model
-
-                CDInsetCard {
-                    HStack(spacing: 8) {
-                        Text(L("Partner"))
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Menu {
-                            ForEach(eligibleEngines) { eng in
-                                Button(eng.shortName) {
-                                    let opts = coordinator.availableModelsByEngine[eng] ?? eng.defaultModels
-                                    let modelID = coordinator.settings.defaultModels[eng] ?? opts.first?.id ?? ""
-                                    plan.councilPartner = CouncilPartner(engine: eng, model: modelID, effort: partner.effort)
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 3) {
-                                Text(partner.engine.shortName)
-                                    .font(.system(size: 11.5, weight: .medium))
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 8.5, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(CDTheme.subtleSurface(for: scheme), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .menuStyle(.button)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-
-                        Menu {
-                            ForEach(partnerModels) { opt in
-                                Button(opt.displayName) {
-                                    plan.councilPartner?.model = opt.id
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 3) {
-                                Text(partnerModelDisplay)
-                                    .font(.system(size: 11.5, weight: .medium))
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 8.5, weight: .semibold))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(CDTheme.subtleSurface(for: scheme), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        .menuStyle(.button)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7.5)
-                }
             }
 
             if showExtraInstructions {
@@ -863,12 +692,11 @@ struct TaskDetailView: View {
             }
 
             if showPromptPreview {
-                let isBgMode = (plan.engine == .lody) || (plan.launchMode == .nativeBackgroundSession && plan.engine == .claudeCode)
                 let previewText = AgentCommandBuilder().buildSafePrompt(
                     item: item,
                     preset: selectedPreset,
                     extraInstructions: plan.extraInstructions,
-                    launchMode: isBgMode ? .nativeBackgroundSession : .managedStructuredRun,
+                    launchMode: .nativeBackgroundSession,
                     injectPresetPrompt: coordinator.settings.injectPresetPrompt,
                     previousReview: plan.previousReview,
                     continuityMode: plan.continuityMode

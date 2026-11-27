@@ -224,11 +224,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var connectors: [ConnectorConfig]
     public var globalTriggerRules: TriggerRules
     public var defaultEngine: AgentEngine
-    public var defaultModels: [AgentEngine: String]
-    /// 各直连 AI 引擎偏好的默认执行模式（如 claude/agy 的 `plan` / `default` / `auto`，codex 的 `read-only` / `workspace-write`，关联 ITER-016）
-    public var defaultModes: [AgentEngine: String]
     public var defaultEffort: ReasoningEffort
-    public var defaultLaunchMode: ExecutionLaunchMode
     /// 唤起 AI 时是否注入内置任务模板与安全约束提示词（默认开启；关闭后仅发原始触发上下文与补充指令）
     public var injectPresetPrompt: Bool
     public var lodyConfig: LodyConfig
@@ -244,8 +240,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var autoCompleteApprovedOrClosedPRs: Bool
     /// 界面语言（跟随系统 / 简体中文 / English，重启后生效，关联 issue #4）
     public var appLanguage: AppLanguage
-    /// 审查语言（写回 GitHub 的正文、行内评论、本地报告与会诊合并文案，默认跟随界面语言，关联 issue #4）
-    public var reviewLanguage: ReviewLanguage
     public var presets: [TaskPreset]
 
     public init(
@@ -254,21 +248,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         notificationsEnabled: Bool = true,
         connectors: [ConnectorConfig] = ConnectorConfig.defaults,
         globalTriggerRules: TriggerRules = TriggerRules(),
-        defaultEngine: AgentEngine = .claudeCode,
-        defaultModels: [AgentEngine: String] = [
-            .claudeCode: "opus",
-            .codex: "gpt-5.3-codex",
-            .antigravity: "gemini-4-neon-xhigh",
-            .lody: "default"
-        ],
-        defaultModes: [AgentEngine: String] = [
-            .claudeCode: "plan",
-            .codex: "read-only",
-            .antigravity: "plan",
-            .lody: "__agent_default__"
-        ],
+        defaultEngine: AgentEngine = .lody,
         defaultEffort: ReasoningEffort = .high,
-        defaultLaunchMode: ExecutionLaunchMode = .managedStructuredRun,
         injectPresetPrompt: Bool = true,
         lodyConfig: LodyConfig = LodyConfig(),
         customExecutablePaths: [String: String] = [:],
@@ -278,7 +259,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
         developerModeEnabled: Bool = false,
         autoCompleteApprovedOrClosedPRs: Bool = true,
         appLanguage: AppLanguage = .system,
-        reviewLanguage: ReviewLanguage = .followUI,
         presets: [TaskPreset] = TaskPreset.defaults
     ) {
         self.pollIntervalSeconds = max(60, pollIntervalSeconds)
@@ -286,11 +266,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.notificationsEnabled = notificationsEnabled
         self.connectors = connectors
         self.globalTriggerRules = globalTriggerRules
-        self.defaultEngine = defaultEngine
-        self.defaultModels = defaultModels
-        self.defaultModes = defaultModes
+        self.defaultEngine = .lody
         self.defaultEffort = defaultEffort
-        self.defaultLaunchMode = defaultLaunchMode
         self.injectPresetPrompt = injectPresetPrompt
         self.lodyConfig = lodyConfig
         self.customExecutablePaths = customExecutablePaths
@@ -300,68 +277,54 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.developerModeEnabled = developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = autoCompleteApprovedOrClosedPRs
         self.appLanguage = appLanguage
-        self.reviewLanguage = reviewLanguage
         self.presets = presets
     }
 
     enum CodingKeys: String, CodingKey {
         case pollIntervalSeconds, launchAtLogin, notificationsEnabled, connectors
-        case globalTriggerRules, defaultEngine, defaultModels, defaultModes, defaultEffort
-        case defaultLaunchMode, injectPresetPrompt, lodyConfig
+        case globalTriggerRules, defaultEngine, defaultEffort
+        case injectPresetPrompt, lodyConfig
         case customExecutablePaths, workspaceSearchRoots, repositoryDirectoryOverrides
         case usageCurrency, developerModeEnabled, autoCompleteApprovedOrClosedPRs
-        case appLanguage, reviewLanguage, presets
+        case appLanguage, presets
     }
 
-    /// 向后兼容解码：版本升级新增字段时绝不丢弃用户原有配置
+    private enum LegacyCodingKeys: String, CodingKey {
+        case defaultModels
+    }
+
+    /// 向后兼容解码：旧直连引擎键与 reviewLanguage 静默忽略，legacy defaultEngine 归一为 .lody
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
         let fallback = AppSettings()
         self.pollIntervalSeconds = max(60, (try? c.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds)) ?? fallback.pollIntervalSeconds)
         self.launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? fallback.launchAtLogin
         self.notificationsEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .notificationsEnabled)) ?? fallback.notificationsEnabled
         self.connectors = (try? c.decodeIfPresent([ConnectorConfig].self, forKey: .connectors)) ?? fallback.connectors
         self.globalTriggerRules = (try? c.decodeIfPresent(TriggerRules.self, forKey: .globalTriggerRules)) ?? fallback.globalTriggerRules
-        self.defaultEngine = (try? c.decodeIfPresent(AgentEngine.self, forKey: .defaultEngine)) ?? fallback.defaultEngine
-        var decodedModels: [AgentEngine: String]
-        if let nativeDict = try? c.decodeIfPresent([AgentEngine: String].self, forKey: .defaultModels) {
-            decodedModels = nativeDict
-        } else if let stringDict = try? c.decodeIfPresent([String: String].self, forKey: .defaultModels) {
-            decodedModels = fallback.defaultModels
-            for (k, v) in stringDict {
-                if let eng = AgentEngine(rawValue: k) {
-                    decodedModels[eng] = v
-                }
-            }
-        } else {
-            decodedModels = fallback.defaultModels
-        }
+        self.defaultEngine = .lody
+
         var decodedLody = (try? c.decodeIfPresent(LodyConfig.self, forKey: .lodyConfig)) ?? fallback.lodyConfig
-        // 平滑迁移旧版把 Lody Agent Config 存在 defaultModels[.lody] 的配置
+        // 平滑迁移旧版把 Lody Agent Config 存在 defaultModels["lody"] 的配置
+        let legacyLodyModel: String? = {
+            if let nativeDict = try? legacy.decodeIfPresent([AgentEngine: String].self, forKey: .defaultModels) {
+                return nativeDict[.lody]
+            }
+            if let stringDict = try? legacy.decodeIfPresent([String: String].self, forKey: .defaultModels) {
+                return stringDict["lody"]
+            }
+            return nil
+        }()
         let legacyAgentPlaceholders: Set<String> = ["claude", "codex", "antigravity"]
-        if let legacyLodyVal = decodedModels[.lody]?.lowercased(), legacyAgentPlaceholders.contains(legacyLodyVal) {
+        if let legacyLodyVal = legacyLodyModel?.lowercased(), legacyAgentPlaceholders.contains(legacyLodyVal) {
             if decodedLody.defaultAgentConfig.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || decodedLody.defaultAgentConfig == "default" {
                 decodedLody.defaultAgentConfig = legacyLodyVal
             }
-            decodedModels[.lody] = "default"
         }
-        self.defaultModels = decodedModels
-        if let nativeModes = try? c.decodeIfPresent([AgentEngine: String].self, forKey: .defaultModes) {
-            self.defaultModes = nativeModes
-        } else if let stringModes = try? c.decodeIfPresent([String: String].self, forKey: .defaultModes) {
-            var mapped = fallback.defaultModes
-            for (k, v) in stringModes {
-                if let eng = AgentEngine(rawValue: k) {
-                    mapped[eng] = v
-                }
-            }
-            self.defaultModes = mapped
-        } else {
-            self.defaultModes = fallback.defaultModes
-        }
+
         self.defaultEffort = (try? c.decodeIfPresent(ReasoningEffort.self, forKey: .defaultEffort)) ?? fallback.defaultEffort
-        self.defaultLaunchMode = (try? c.decodeIfPresent(ExecutionLaunchMode.self, forKey: .defaultLaunchMode)) ?? fallback.defaultLaunchMode
         self.injectPresetPrompt = (try? c.decodeIfPresent(Bool.self, forKey: .injectPresetPrompt)) ?? fallback.injectPresetPrompt
         self.lodyConfig = decodedLody
         self.customExecutablePaths = (try? c.decodeIfPresent([String: String].self, forKey: .customExecutablePaths)) ?? fallback.customExecutablePaths
@@ -371,7 +334,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.developerModeEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .developerModeEnabled)) ?? fallback.developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = (try? c.decodeIfPresent(Bool.self, forKey: .autoCompleteApprovedOrClosedPRs)) ?? fallback.autoCompleteApprovedOrClosedPRs
         self.appLanguage = (try? c.decodeIfPresent(AppLanguage.self, forKey: .appLanguage)) ?? fallback.appLanguage
-        self.reviewLanguage = (try? c.decodeIfPresent(ReviewLanguage.self, forKey: .reviewLanguage)) ?? fallback.reviewLanguage
         var decodedPresets = (try? c.decodeIfPresent([TaskPreset].self, forKey: .presets)) ?? fallback.presets
         // 若用户从未改过旧版 6 条出厂预制，平滑精简为新版极简默认；若用户自定义过任何模板则 100% 保留
         if decodedPresets == TaskPreset.legacyFactoryDefaults {

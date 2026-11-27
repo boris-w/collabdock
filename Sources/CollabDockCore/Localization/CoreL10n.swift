@@ -1,6 +1,6 @@
 import Foundation
 
-/// Resolved effective language used for UI rendering and GitHub review output (issue #4).
+/// Resolved effective language used for UI rendering (issue #4).
 public enum ResolvedLanguage: String, Codable, Hashable, Sendable {
     case zhHans = "zh-Hans"
     case en = "en"
@@ -58,39 +58,11 @@ public enum AppLanguage: String, CaseIterable, Codable, Hashable, Sendable, Iden
     }
 }
 
-/// Language used for text CollabDock writes to GitHub (pending reviews, inline comments, local reports, council synthesis).
-public enum ReviewLanguage: String, CaseIterable, Codable, Hashable, Sendable, Identifiable {
-    case followUI = "followUI"
-    case zhHans = "zh-Hans"
-    case en = "en"
-
-    public var id: String { rawValue }
-
-    public func resolved(uiLanguage: ResolvedLanguage) -> ResolvedLanguage {
-        switch self {
-        case .followUI: return uiLanguage
-        case .zhHans: return .zhHans
-        case .en: return .en
-        }
-    }
-
-    public var displayName: String {
-        switch self {
-        case .followUI:
-            return CoreL10n.string("Follow UI")
-        case .zhHans:
-            return CoreL10n.string("Simplified Chinese")
-        case .en:
-            return "English"
-        }
-    }
-}
-
 /// Safe localization helper for `CollabDockCore`.
 ///
 /// Avoids SwiftPM's generated `Bundle.module` (which crashes when `.bundle` lives under
 /// `CollabDock.app/Contents/Resources/` rather than the `.app` root) and supports explicit
-/// per-call language selection for review output and offscreen snapshot rendering.
+/// per-call language selection for offscreen snapshot rendering.
 public enum CoreL10n {
     private final class BundleToken {}
     private static let bundleName = "CollabDock_CollabDockCore"

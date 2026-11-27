@@ -245,29 +245,17 @@ public struct EnvironmentDetector: EnvironmentDetecting {
 
         async let gitProbe = probeBinary(name: "git", versionArgs: ["--version"], override: customPaths["git"], path: resolvedPATH, env: baseEnv)
         async let ghProbe = probeBinary(name: "gh", versionArgs: ["--version"], override: customPaths["gh"], path: resolvedPATH, env: baseEnv)
-        async let claudeProbe = probeBinary(name: "claude", versionArgs: ["--version"], override: customPaths["claude"], path: resolvedPATH, env: baseEnv)
-        async let codexProbe = probeBinary(name: "codex", versionArgs: ["--version"], override: customPaths["codex"], path: resolvedPATH, env: baseEnv)
-        async let agyProbe = probeBinary(name: "agy", versionArgs: ["--version"], override: customPaths["agy"], path: resolvedPATH, env: baseEnv)
         async let lodyProbe = probeLody(override: customPaths["lody"], path: resolvedPATH, env: baseEnv)
 
-        let (git, gh, claude, codex, agy, lody) = await (gitProbe, ghProbe, claudeProbe, codexProbe, agyProbe, lodyProbe)
+        let (git, gh, lody) = await (gitProbe, ghProbe, lodyProbe)
 
         let engines: [AgentEngine: CLIProbeStatus] = [
-            .claudeCode: claude,
-            .codex: codex,
-            .antigravity: agy,
             .lody: lody
         ]
 
-        async let ghAuthTask = detectGitHubAuth(ghProbe: gh, env: baseEnv, manualPAT: manualGitHubPAT)
-        async let agyModelsTask = fetchAgyModels(agyProbe: agy, env: baseEnv)
-
-        let (ghAuth, agyModels) = await (ghAuthTask, agyModelsTask)
+        let ghAuth = await detectGitHubAuth(ghProbe: gh, env: baseEnv, manualPAT: manualGitHubPAT)
 
         let discoveredModels: [AgentEngine: [ModelOption]] = [
-            .claudeCode: AgentEngine.claudeCode.defaultModels,
-            .codex: AgentEngine.codex.defaultModels,
-            .antigravity: agyModels.isEmpty ? AgentEngine.antigravity.defaultModels : agyModels,
             .lody: AgentEngine.lody.defaultModels
         ]
 
@@ -352,24 +340,6 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             unique.append(cleaned)
         }
         return unique.joined(separator: ":")
-    }
-
-    public static func parseAgyModelsOutput(_ output: String) -> [ModelOption] {
-        var options: [ModelOption] = []
-        for rawLine in output.split(whereSeparator: \.isNewline) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            guard !line.isEmpty else { continue }
-            if line.lowercased().hasPrefix("fetching ") || line.lowercased().hasPrefix("available ") {
-                continue
-            }
-            let parts = line.split(separator: "\t", maxSplits: 1).map {
-                $0.trimmingCharacters(in: .whitespaces)
-            }
-            if parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty {
-                options.append(ModelOption(id: parts[0], displayName: parts[1]))
-            }
-        }
-        return options
     }
 
     public static func parseGHAuthStatus(_ combinedOutput: String) -> (username: String?, scopes: [String]) {
@@ -967,23 +937,6 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             displayName: (rawName?.isEmpty == false) ? rawName : nil,
             avatarURL: (avatar?.isEmpty == false) ? avatar : nil
         )
-    }
-
-    private func fetchAgyModels(
-        agyProbe: CLIProbeStatus,
-        env: [String: String]
-    ) async -> [ModelOption] {
-        guard agyProbe.isInstalled, let agyPath = agyProbe.executablePath else {
-            return []
-        }
-        let res = await runner.run(
-            executablePath: agyPath,
-            arguments: ["models"],
-            environment: env,
-            timeoutSeconds: 6.0
-        )
-        guard res.succeeded else { return [] }
-        return Self.parseAgyModelsOutput(res.stdout)
     }
 
     private func findExecutable(named name: String, in path: String) -> String? {

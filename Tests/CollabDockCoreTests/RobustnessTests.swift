@@ -81,32 +81,31 @@ struct RobustnessTests {
         #expect(try await reopened.loadAllItems().map(\.id) == [good.id])
     }
 
-    @Test("Security: resume shell command quotes hostile session IDs and paths so nothing is injected")
+    @Test("Security: the Lody resume command quotes hostile session / workspace IDs so nothing is injected")
     func resumeShellCommandIsInjectionSafe() throws {
         let sandbox = FileManager.default.temporaryDirectory
             .appendingPathComponent("collabdock-shell-\(UUID().uuidString)", isDirectory: true)
-        let workspace = sandbox.appendingPathComponent(#"it's a "repo" $(touch pwned-dir)"#, isDirectory: true)
         let bin = sandbox.appendingPathComponent("bin", isDirectory: true)
-        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: sandbox) }
 
-        // 假 claude：把收到的参数逐行写到文件
+        // 假 open：把收到的参数逐行写到文件
         let argsFile = sandbox.appendingPathComponent("args.txt")
-        let fakeClaude = bin.appendingPathComponent("claude")
+        let fakeOpen = bin.appendingPathComponent("open")
         try "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\"; done > \"\(argsFile.path)\"\n"
-            .write(to: fakeClaude, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeClaude.path)
+            .write(to: fakeOpen, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakeOpen.path)
 
         let pwnedMarker = sandbox.appendingPathComponent("pwned")
         let hostileID = "abc'; touch '\(pwnedMarker.path)'; echo '"
+        let hostileWorkspace = "ws'$(touch '\(pwnedMarker.path)')'"
         let handle = AgentSessionHandle(
-            engine: .claudeCode,
+            engine: .lody,
             sessionID: hostileID,
-            workspacePath: workspace.path,
-            launchMode: .managedStructuredRun
+            workspacePath: sandbox.path,
+            launchMode: .nativeBackgroundSession
         )
-        let command = DirectCLIBackend().resumeShellCommand(for: handle)
+        let command = LodyBackend(config: LodyConfig(workspace: hostileWorkspace)).resumeShellCommand(for: handle)
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
@@ -118,8 +117,9 @@ struct RobustnessTests {
 
         #expect(process.terminationStatus == 0)
         let recorded = try String(contentsOf: argsFile, encoding: .utf8)
-        #expect(recorded == "--resume\n\(hostileID)\n")
+        let args = recorded.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(args.count == 1, "the deep link must reach `open` as a single argument, got \(args)")
+        #expect(args.first?.hasPrefix("lody://session/") == true)
         #expect(!FileManager.default.fileExists(atPath: pwnedMarker.path))
-        #expect(!FileManager.default.fileExists(atPath: sandbox.appendingPathComponent("pwned-dir").path))
     }
 }

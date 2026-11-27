@@ -505,15 +505,6 @@ public final class AppCoordinator {
         let snapshot = await detector.detectAll(customPaths: settings.customExecutablePaths)
         self.environment = snapshot
 
-        for (engine, models) in snapshot.discoveredModels where engine != .lody && !models.isEmpty {
-            availableModelsByEngine[engine] = models
-            if let currentDefault = settings.defaultModels[engine],
-               !models.contains(where: { $0.id == currentDefault }),
-               let first = models.first {
-                settings.defaultModels[engine] = first.id
-            }
-        }
-
         if let detectedUser = snapshot.githubAuth.username,
            let idx = settings.connectors.firstIndex(where: { $0.platform == .github }),
            settings.connectors[idx].accountHandle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -726,17 +717,12 @@ public final class AppCoordinator {
            options.contains(where: { $0.id == saved }) {
             return saved
         }
-        if let fallbackGlobal = settings.defaultModels[.lody],
-           options.contains(where: { $0.id == fallbackGlobal }) {
-            return fallbackGlobal
-        }
         return options.first?.id ?? "default"
     }
 
     func setPreferredLodyModel(_ modelID: String, forAgentConfig selector: String) {
         let normalizedKey = lodyCatalog?.matchAgentConfig(selector: selector)?.id ?? selector
         settings.lodyConfig.defaultModelByAgentConfig[normalizedKey] = modelID
-        settings.defaultModels[.lody] = modelID
     }
 
     func modesForLody(agentConfig selector: String) -> [AgentModeOption] {
@@ -767,25 +753,6 @@ public final class AppCoordinator {
     func setPreferredLodyMode(_ modeID: String, forAgentConfig selector: String) {
         let normalizedKey = lodyCatalog?.matchAgentConfig(selector: selector)?.id ?? selector
         settings.lodyConfig.defaultModeByAgentConfig[normalizedKey] = modeID
-        settings.defaultModes[.lody] = modeID
-    }
-
-    func modes(for engine: AgentEngine, lodyAgentConfig: String? = nil) -> [AgentModeOption] {
-        if engine == .lody {
-            return modesForLody(agentConfig: lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig)
-        }
-        return engine.defaultModes
-    }
-
-    func preferredMode(for engine: AgentEngine, lodyAgentConfig: String? = nil) -> String {
-        if engine == .lody {
-            return preferredLodyMode(forAgentConfig: lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig)
-        }
-        let options = engine.defaultModes
-        if let saved = settings.defaultModes[engine], options.contains(where: { $0.id == saved }) {
-            return saved
-        }
-        return engine.defaultSafeModeID
     }
 
     var resolvedLodyWorkspaceForDeepLink: String {
@@ -1001,41 +968,21 @@ public final class AppCoordinator {
 
     public func defaultPlan(for item: CollaborationItem) -> ExecutionPlan {
         let prev = item.previousReview
-        let engine: AgentEngine
         let continuityMode: ReviewContinuityMode
-
-        if let suggested = item.suggestedEngine {
-            engine = suggested
-            if let prev, prev.canContinueSameSession && prev.engine == suggested {
-                continuityMode = .continueSessionIncremental
-            } else if prev != nil {
-                continuityMode = .freshSessionIncremental
-            } else {
-                continuityMode = .freshSessionFull
-            }
-        } else if let prev, prev.canContinueSameSession {
-            // 复审默认优先续接上次的同引擎会话（如原 Lody 会话），保留完整记忆
-            engine = prev.engine
-            continuityMode = .continueSessionIncremental
-        } else if prev != nil {
-            engine = settings.defaultEngine
-            continuityMode = .freshSessionIncremental
+        if let prev {
+            continuityMode = (prev.engine == .lody && prev.canContinueSameSession)
+                ? .continueSessionIncremental
+                : .freshSessionIncremental
         } else {
-            engine = settings.defaultEngine
             continuityMode = .freshSessionFull
         }
 
-        let lodyAgent: String? = (engine == .lody) ? settings.lodyConfig.defaultAgentConfig : nil
-        let models = (engine == .lody)
-            ? modelsForLody(agentConfig: lodyAgent ?? "default")
-            : (availableModelsByEngine[engine] ?? engine.defaultModels)
+        let lodyAgent = settings.lodyConfig.defaultAgentConfig
         let model: String
         if let suggested = item.suggestedModel, !suggested.isEmpty {
             model = suggested
-        } else if engine == .lody {
-            model = preferredLodyModel(forAgentConfig: lodyAgent ?? "default")
         } else {
-            model = settings.defaultModels[engine] ?? models.first?.id ?? ""
+            model = preferredLodyModel(forAgentConfig: lodyAgent)
         }
 
         let candidates = presets(for: item)
@@ -1047,16 +994,14 @@ public final class AppCoordinator {
             presetID = candidates.first?.id ?? settings.presets.first?.id ?? "code-review-general"
         }
 
-        let backend: any ExecutionBackend = (engine == .lody) ? LodyBackend() : DirectCLIBackend()
         return ExecutionPlan(
-            engine: engine,
+            engine: .lody,
             model: model,
             lodyAgentConfig: lodyAgent,
             effort: settings.defaultEffort,
-            mode: preferredMode(for: engine, lodyAgentConfig: lodyAgent),
+            mode: preferredLodyMode(forAgentConfig: lodyAgent),
             presetID: presetID,
-            deliveryMode: ConnectorCatalog.defaultDeliveryMode(for: item),
-            launchMode: backend.defaultLaunchMode(fallback: settings.defaultLaunchMode),
+            launchMode: .nativeBackgroundSession,
             sandboxPolicy: .readOnly,
             targetDirectoryOverride: nil,
             useIsolatedWorktree: settings.lodyConfig.useLodyWorktree,
@@ -1145,16 +1090,11 @@ public final class AppCoordinator {
     }
 
     public func openHandoff(for item: CollaborationItem) {
-        guard let handle = item.sessionHandle else { return }
+        guard let handle = item.sessionHandle, handle.engine == .lody else { return }
         systemIntegration.openSessionHandoff(
             handle: handle,
             lodyWorkspace: resolvedLodyWorkspaceForDeepLink
         )
-    }
-
-    public func openLocalReport(for item: CollaborationItem) {
-        guard let path = item.localReportPath else { return }
-        systemIntegration.openLocalReport(path: path)
     }
 
     public func importPullRequest(reference: String) async -> Result<CollaborationItem, Error> {
@@ -1259,26 +1199,31 @@ public final class AppCoordinator {
         }
     }
 
-    /// 真实端到端执行管线：隔离 Worktree -> 单/双引擎只读沙箱并行执行 -> 会诊汇总 -> Diff 行号校验 -> GitHub Pending Review 草稿 + 本地 Markdown 报告
+    /// Lody 审查执行管线：工作区路由 → 派发 Lody 后台会话 → 记账 → 实时追踪状态与上下文用量
     @discardableResult
     public func confirmAndRun(itemID: String, plan: ExecutionPlan) -> Task<Void, Never>? {
         guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return nil }
-        settings.defaultEngine = plan.engine
-        if plan.engine == .lody {
-            let activeLodyCfg = plan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig
-            settings.lodyConfig.defaultAgentConfig = activeLodyCfg
-            setPreferredLodyModel(plan.model, forAgentConfig: activeLodyCfg)
-            if let chosenMode = plan.mode, !chosenMode.isEmpty {
+
+        var effectivePlan = plan
+        let wasDirectEnginePlan = effectivePlan.engine != .lody
+        if wasDirectEnginePlan {
+            effectivePlan.engine = .lody
+            effectivePlan.model = "default"
+        }
+        effectivePlan.launchMode = .nativeBackgroundSession
+
+        let activeLodyCfg = effectivePlan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig
+        effectivePlan.lodyAgentConfig = activeLodyCfg
+
+        settings.defaultEngine = .lody
+        settings.lodyConfig.defaultAgentConfig = activeLodyCfg
+        if !wasDirectEnginePlan {
+            setPreferredLodyModel(effectivePlan.model, forAgentConfig: activeLodyCfg)
+            if let chosenMode = effectivePlan.mode, !chosenMode.isEmpty {
                 setPreferredLodyMode(chosenMode, forAgentConfig: activeLodyCfg)
             }
-        } else {
-            settings.defaultModels[plan.engine] = plan.model
-            if let chosenMode = plan.mode, !chosenMode.isEmpty {
-                settings.defaultModes[plan.engine] = chosenMode
-            }
-            settings.defaultLaunchMode = plan.launchMode
         }
-        settings.defaultEffort = plan.effort
+        settings.defaultEffort = effectivePlan.effort
 
         let targetItem = items[idx]
         items[idx].status = .preparing
@@ -1287,30 +1232,27 @@ public final class AppCoordinator {
 
         let ticket = runRegistry.begin(itemID: itemID)
 
-        // 演示条目仍走安全模拟，防止向虚构仓库 `acme/backend` 发起真实 git clone / GitHub POST
+        // 演示条目仍走安全模拟，防止向虚构仓库 `acme/backend` 发起真实 git clone / Lody 派发
         if isPreviewMode || targetItem.id.hasPrefix("demo-") {
-            return runDemoSimulation(ticket: ticket, targetItem: targetItem, plan: plan)
+            return runDemoSimulation(ticket: ticket, targetItem: targetItem, plan: effectivePlan)
         }
 
-        let preset = settings.presets.first(where: { $0.id == plan.presetID })
+        let preset = settings.presets.first(where: { $0.id == effectivePlan.presetID })
             ?? TaskPreset.defaults[0]
         let searchRoots = settings.workspaceSearchRoots
         let lodyConfig = settings.lodyConfig
         let lodyCatalogSnapshot = lodyCatalog
         let injectPreset = settings.injectPresetPrompt
         let notifyEnabled = settings.notificationsEnabled
-        let resolvedReviewLanguage = settings.reviewLanguage.resolved(uiLanguage: settings.appLanguage.resolved())
-        let lodyAgentDisplayName: String? = (plan.engine == .lody)
-            ? lodyAgentConfigDisplayName(for: plan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig)
-            : nil
+        let lodyAgentDisplayName = lodyAgentConfigDisplayName(for: activeLodyCfg)
 
         let repoNameForResolve = targetItem.payload.linkedRepository
-        if let repoNameForResolve, let explicitDir = plan.targetDirectoryOverride, !explicitDir.isEmpty {
+        if let repoNameForResolve, let explicitDir = effectivePlan.targetDirectoryOverride, !explicitDir.isEmpty {
             setRepositoryDirectoryOverride(repository: repoNameForResolve, path: explicitDir)
         }
         let resolvedDirInfo = resolvedDirectoryInfo(
             forRepository: repoNameForResolve,
-            override: plan.targetDirectoryOverride
+            override: effectivePlan.targetDirectoryOverride
         )
 
         guard let store = taskStore else {
@@ -1323,6 +1265,7 @@ public final class AppCoordinator {
             return nil
         }
 
+        let runPlan = effectivePlan
         return Task {
             defer {
                 self.runRegistry.finish(ticket)
@@ -1341,41 +1284,25 @@ public final class AppCoordinator {
                 }
                 let envSnapshot = self.environment
 
-                let directBackend = self.backendFactory.makeDirectBackend()
                 let lodyBackend = self.backendFactory.makeLodyBackend(
                     config: lodyConfig,
                     catalog: lodyCatalogSnapshot
                 )
-                let sinkContext = ConnectorBuildContext(
-                    platform: targetItem.platform,
-                    rules: self.settings.effectiveRules(for: targetItem.platform),
-                    environment: envSnapshot
-                )
-                guard let sink = self.connectorFactory.makeSink(context: sinkContext) else {
-                    throw NSError(
-                        domain: "CollabDock",
-                        code: 3,
-                        userInfo: [NSLocalizedDescriptionKey: L("No delivery connector found for %@", targetItem.platform.displayName)]
-                    )
-                }
                 let executionService = ReviewExecutionService(
-                    directBackend: directBackend,
-                    lodyBackend: lodyBackend,
-                    sink: sink,
+                    backend: lodyBackend,
                     store: store,
                     clock: self.clock
                 )
                 let executionRequest = ReviewExecutionRequest(
                     item: targetItem,
-                    plan: plan,
+                    plan: runPlan,
                     preset: preset,
                     ticket: ticket,
                     searchRoots: searchRoots,
                     preferredLocalPath: resolvedDirInfo.path,
                     environment: envSnapshot,
                     injectPresetPrompt: injectPreset,
-                    lodyAgentDisplayName: lodyAgentDisplayName,
-                    reviewLanguage: resolvedReviewLanguage
+                    lodyAgentDisplayName: lodyAgentDisplayName
                 )
 
                 let outcome = try await executionService.execute(executionRequest) { [weak self] progress in
@@ -1392,7 +1319,7 @@ public final class AppCoordinator {
                 case .cancelled:
                     restorePendingOnCancel(itemID: itemID)
 
-                case .backgroundDispatched(let dispatched, let handle, let continued, let recordedRuns):
+                case .backgroundDispatched(let dispatched, let handle, _, let recordedRuns):
                     for run in recordedRuns.reversed() {
                         usageRuns.insert(run, at: 0)
                     }
@@ -1401,31 +1328,9 @@ public final class AppCoordinator {
                     }
                     selectedTab = .inbox
 
-                    if plan.engine == .lody, let sid = handle?.sessionID, !sid.isEmpty {
+                    if let sid = handle?.sessionID, !sid.isEmpty {
                         startMonitoringLodySession(itemID: itemID, sessionID: sid, notifyEnabled: notifyEnabled)
-                    } else {
-                        systemIntegration.postCompletionNotification(
-                            for: dispatched,
-                            summary: continued
-                                ? L("Continued existing %@ session for follow-up review", plan.engine.displayName)
-                                : L("Dispatched to native %@ background session", plan.engine.displayName),
-                            enabled: notifyEnabled
-                        )
                     }
-
-                case .delivered(let delivered, _, let recordedRuns):
-                    for run in recordedRuns.reversed() {
-                        usageRuns.insert(run, at: 0)
-                    }
-                    if let updatedIdx = items.firstIndex(where: { $0.id == itemID }) {
-                        items[updatedIdx] = delivered
-                    }
-                    selectedTab = delivered.status.isInboxActive ? .inbox : .completed
-                    systemIntegration.postCompletionNotification(
-                        for: delivered,
-                        summary: delivered.executionOutput?.summaryText ?? L("Review completed"),
-                        enabled: notifyEnabled
-                    )
                 }
             } catch {
                 guard self.runRegistry.isCurrent(ticket) else {
@@ -1673,7 +1578,8 @@ public final class AppCoordinator {
 
     private func runDemoSimulation(ticket: ExecutionRunTicket, targetItem: CollaborationItem, plan: ExecutionPlan) -> Task<Void, Never> {
         let itemID = ticket.itemID
-        updateProgress(for: ticket, status: .running, message: L("[Demo] Simulating %@ (%@) in read-only sandbox...", plan.engine.displayName, plan.model))
+        let agentName = lodyAgentConfigDisplayName(for: plan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig)
+        updateProgress(for: ticket, status: .running, message: L("[Demo] Dispatching to Lody (%@)...", agentName))
         return Task {
             defer {
                 self.runRegistry.finish(ticket)
@@ -1684,26 +1590,17 @@ public final class AppCoordinator {
                   items[idx].status == .running else { return }
             items[idx].status = .draftReady
             items[idx].progressMessage = nil
+            items[idx].remoteSessionStatus = .completed
             items[idx].sessionHandle = AgentSessionHandle(
-                engine: plan.engine,
+                engine: .lody,
                 sessionID: "demo-session-001",
                 workspacePath: FileManager.default.homeDirectoryForCurrentUser.path,
-                launchMode: plan.launchMode
+                launchMode: .nativeBackgroundSession
             )
-            items[idx].executionOutput = .codeReview(
-                CodeReviewResult(
-                    summary: L("[Demo] Real GitHub PRs will automatically create an isolated worktree, run %@, and save a Pending Review draft.", plan.engine.displayName),
-                    recommendedVerdict: .comment,
-                    comments: [
-                        CodeInlineComment(
-                            path: "Sources/Auth/JWTVerifier.swift",
-                            line: 42,
-                            side: .right,
-                            severity: .warning,
-                            title: L("Missing singleflight guard on JWKS refresh"),
-                            body: L("Concurrent cache expiration can trigger a thundering herd; coalesce in-flight refresh requests.")
-                        )
-                    ]
+            items[idx].executionOutput = .structuredReply(
+                StructuredReplyResult(
+                    summary: L("[Demo] Real GitHub PRs will dispatch a Lody background session (%@) and track its progress and usage.", agentName),
+                    replyMarkdown: ""
                 )
             )
             selectedTab = .inbox
@@ -1817,19 +1714,12 @@ public final class AppCoordinator {
                 externalRef: "#2735",
                 title: "fix(workspace): organize shared projects under their team",
                 reviewRound: 1,
-                engine: .claudeCode,
-                model: "opus",
+                engine: .lody,
+                lodyAgentName: "Claude Code",
+                model: "Opus 5.5",
                 effort: .high,
-                sessionID: "claude_demo_1",
-                usage: AgentUsageMetrics(
-                    inputTokens: 42_000,
-                    outputTokens: 3_400,
-                    cacheReadTokens: 88_000,
-                    thinkingTokens: 4_100,
-                    reportedCostUSD: 0.96,
-                    durationSeconds: 31,
-                    metricKind: .exact
-                ),
+                sessionID: "ses_demo_2",
+                usage: AgentUsageMetrics(totalTokens: 133_400, durationSeconds: 31, metricKind: .contextWindow),
                 createdAt: daysAgo(1, hours: 3),
                 syncedAt: now
             ),
@@ -1858,18 +1748,12 @@ public final class AppCoordinator {
                 externalRef: "#990",
                 title: "feat(envoy-gateway): staging admin domain restriction",
                 reviewRound: 1,
-                engine: .antigravity,
-                model: "gemini-3.8-flash-low",
+                engine: .lody,
+                lodyAgentName: "Antigravity",
+                model: "Gemini 3.8 Flash",
                 effort: .low,
-                sessionID: "agy_demo_2",
-                usage: AgentUsageMetrics(
-                    inputTokens: 19_200,
-                    outputTokens: 1_850,
-                    cacheReadTokens: 12_400,
-                    thinkingTokens: 1_240,
-                    durationSeconds: 14,
-                    metricKind: .exact
-                ),
+                sessionID: "ses_demo_4",
+                usage: AgentUsageMetrics(totalTokens: 33_450, durationSeconds: 14, metricKind: .contextWindow),
                 createdAt: daysAgo(2, hours: 2),
                 syncedAt: now
             ),
@@ -1881,17 +1765,12 @@ public final class AppCoordinator {
                 externalRef: "#4729",
                 title: "feat(app): cap app preview sandboxes per space",
                 reviewRound: 1,
-                engine: .codex,
-                model: "gpt-6.2-sol",
+                engine: .lody,
+                lodyAgentName: "Codex",
+                model: "6.2 Sol",
                 effort: .high,
-                sessionID: "codex_demo_3",
-                usage: AgentUsageMetrics(
-                    inputTokens: 54_000,
-                    outputTokens: 4_200,
-                    cacheReadTokens: 61_000,
-                    durationSeconds: 29,
-                    metricKind: .exact
-                ),
+                sessionID: "ses_demo_5",
+                usage: AgentUsageMetrics(totalTokens: 119_200, durationSeconds: 29, metricKind: .contextWindow),
                 createdAt: daysAgo(4, hours: 4),
                 syncedAt: now
             )
@@ -2001,35 +1880,15 @@ public final class AppCoordinator {
                     )
                 ),
                 status: .draftReady,
-                executionOutput: .codeReview(
-                    CodeReviewResult(
-                        summary: L("Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements."),
-                        recommendedVerdict: .requestChanges,
-                        comments: [
-                            CodeInlineComment(
-                                path: "Sources/Queue/BatchFlusher.swift",
-                                line: 88,
-                                severity: .critical,
-                                title: L("Task cancellation path does not release concurrency permit"),
-                                body: L("Move the release call into a defer block.")
-                            ),
-                            CodeInlineComment(
-                                path: "Sources/Queue/BatchFlusher.swift",
-                                line: 112,
-                                severity: .warning,
-                                title: L("Maximum retry backoff is uncapped"),
-                                body: L("Cap the backoff at 30s.")
-                            ),
-                            CodeInlineComment(
-                                path: "Sources/Queue/BatchFlusher.swift",
-                                line: 134,
-                                severity: .warning,
-                                title: L("Missing batchID in logs"),
-                                body: L("Include batchID for production tracing.")
-                            )
-                        ]
-                    )
-                )
+                progressMessage: L("Lody review complete · 54s · 142K ctx"),
+                sessionID: "ses_demo_305",
+                sessionHandle: AgentSessionHandle(
+                    engine: .lody,
+                    sessionID: "ses_demo_305",
+                    workspacePath: "/Users/dev/code/sync-engine",
+                    launchMode: .nativeBackgroundSession
+                ),
+                remoteSessionStatus: .completed
             )
         ]
     }

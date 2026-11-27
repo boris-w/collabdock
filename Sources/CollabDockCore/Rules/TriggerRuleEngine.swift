@@ -138,24 +138,14 @@ public struct TriggerRuleEngine: Sendable {
             in: body
         ) {
             model = extractedModel
-            engine = inferEngine(fromModel: extractedModel)
         }
 
         if let extractedEngine = firstCapture(
-            pattern: #"(?:--engine|--cli)\s+([A-Za-z0-9\-]+)"#,
+            pattern: #"(?:--engine|--cli)\s+([A-Za-z0-9.\-]+)"#,
             in: body
         )?.lowercased() {
-            switch extractedEngine {
-            case "claude", "claude-code":
-                engine = .claudeCode
-            case "codex":
-                engine = .codex
-            case "agy", "antigravity":
-                engine = .antigravity
-            case "lody", "lody.ai":
+            if extractedEngine == "lody" || extractedEngine == "lody.ai" {
                 engine = .lody
-            default:
-                break
             }
         }
 
@@ -210,20 +200,6 @@ public struct TriggerRuleEngine: Sendable {
             }
         }
         return false
-    }
-
-    private func inferEngine(fromModel model: String) -> AgentEngine? {
-        let lower = model.lowercased()
-        if lower.contains("gemini") || lower.contains("neon") || lower.contains("carbon") || lower.contains("argon") {
-            return .antigravity
-        }
-        if lower.contains("codex") || lower.hasPrefix("gpt-") || lower == "o3" || lower == "o4-mini" {
-            return .codex
-        }
-        if lower.contains("opus") || lower.contains("sonnet") || lower.contains("haiku") || lower.contains("claude") {
-            return .claudeCode
-        }
-        return nil
     }
 
     private func firstCapture(pattern: String, in text: String) -> String? {

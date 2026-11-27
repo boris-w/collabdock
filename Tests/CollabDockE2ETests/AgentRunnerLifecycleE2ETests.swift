@@ -33,24 +33,31 @@ struct AgentRunnerLifecycleE2ETests {
         )
     }
 
-    @Test("A failing CLI surfaces the JSON error message instead of a bare exit code")
+    private func lodyPlan() -> ExecutionPlan {
+        ExecutionPlan(engine: .lody, model: "default", launchMode: .nativeBackgroundSession)
+    }
+
+    @Test("An expired Lody login is reported with the raw reason and a login hint instead of a bare exit code")
     func cliFailureIsReported() async throws {
         let workspace = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: workspace) }
         let fake = try FakeAgentCLI(
             in: workspace,
-            stdoutLines: [#"{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Invalid API key · Please run /login"}"#],
-            exitCode: 1
+            name: "lody",
+            stdoutLines: [],
+            exitCode: 1,
+            stderr: "Error: token expired, please run lody login"
         )
 
         do {
             _ = try await AgentSessionRunner().run(
                 item: item(),
-                plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"),
+                plan: lodyPlan(),
                 preset: TaskPreset.defaults[0],
                 workspaceURL: workspace,
-                environmentSnapshot: fake.environmentSnapshot(engine: .claudeCode),
+                environmentSnapshot: fake.environmentSnapshot(engine: .lody),
                 lodyConfig: LodyConfig(),
+                lodyWorkspaceTarget: .preparedLocalPath(workspace.path),
                 cancellationToken: ProcessCancellationToken(),
                 onProgress: { _ in }
             )
@@ -60,16 +67,17 @@ struct AgentRunnerLifecycleE2ETests {
                 Issue.record("expected processFailed, got \(error)"); return
             }
             #expect(code == 1)
-            #expect(detail.contains("Invalid API key"))
+            #expect(detail.contains("token expired"))
+            #expect(detail.contains("lody@latest login"))
         }
     }
 
-    @Test("Missing CLI binary fails fast with an actionable error")
+    @Test("Neither lody nor npx on PATH: the dispatch fails fast with an actionable error")
     func missingBinary() async throws {
         let workspace = try makeWorkspace()
         defer { try? FileManager.default.removeItem(at: workspace) }
         let env = EnvironmentSnapshot(
-            resolvedPATH: workspace.path, // 空目录：找不到 codex
+            resolvedPATH: workspace.path, // 空目录：找不到 lody 也找不到 npx
             git: CLIProbeStatus(name: "git", isInstalled: true, executablePath: "/usr/bin/git"),
             gh: CLIProbeStatus(name: "gh", isInstalled: false),
             engines: [:],
@@ -80,18 +88,19 @@ struct AgentRunnerLifecycleE2ETests {
         await #expect(throws: AgentRunnerError.self) {
             _ = try await AgentSessionRunner().run(
                 item: item(),
-                plan: ExecutionPlan(engine: .codex, model: "gpt-5"),
+                plan: lodyPlan(),
                 preset: TaskPreset.defaults[0],
                 workspaceURL: workspace,
                 environmentSnapshot: env,
                 lodyConfig: LodyConfig(),
+                lodyWorkspaceTarget: .preparedLocalPath(workspace.path),
                 cancellationToken: ProcessCancellationToken(),
                 onProgress: { _ in }
             )
         }
     }
 
-    /// 真实 CLI（node / codex）会派生子进程并继承 stdout。用户点「中止」后，整个进程树都必须结束，
+    /// 真实 CLI（lody 走 node / npx）会派生子进程并继承 stdout。用户点「中止」后，整个进程树都必须结束，
     /// 且 run 要在几秒内以 `.cancelled` 返回，而不是等到子进程自己退出、管道关闭才返回。
     @Test(
         "Cancelling kills the whole agent process tree and returns promptly",
@@ -102,21 +111,25 @@ struct AgentRunnerLifecycleE2ETests {
         defer { try? FileManager.default.removeItem(at: workspace) }
         let fake = try FakeAgentCLI(
             in: workspace,
-            stdoutLines: [ClaudeStream.initEvent(sessionID: "sess-cancel")],
+            name: "lody",
+            stdoutLines: [#"{"ok":true,"sessionId":"lody-cancel","status":"running"}"#],
             hangSeconds: 20
         )
         let token = ProcessCancellationToken()
         let runItem = item()
-        let snapshot = fake.environmentSnapshot(engine: .claudeCode)
+        let snapshot = fake.environmentSnapshot(engine: .lody)
+        let target = LodyWorkspaceTarget.preparedLocalPath(workspace.path)
+        let plan = lodyPlan()
 
         let task = Task {
             try await AgentSessionRunner().run(
                 item: runItem,
-                plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"),
+                plan: plan,
                 preset: TaskPreset.defaults[0],
                 workspaceURL: workspace,
                 environmentSnapshot: snapshot,
                 lodyConfig: LodyConfig(),
+                lodyWorkspaceTarget: target,
                 cancellationToken: token,
                 onProgress: { _ in }
             )

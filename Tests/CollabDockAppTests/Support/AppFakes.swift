@@ -29,8 +29,7 @@ struct StaticEnvironment: EnvironmentDetecting {
         git: CLIProbeStatus(name: "git", isInstalled: true, executablePath: "/usr/bin/git"),
         gh: CLIProbeStatus(name: "gh", isInstalled: true, executablePath: "/usr/local/bin/gh"),
         engines: [
-            .claudeCode: CLIProbeStatus(name: "claude", isInstalled: true, executablePath: "/usr/local/bin/claude"),
-            .codex: CLIProbeStatus(name: "codex", isInstalled: true, executablePath: "/usr/local/bin/codex")
+            .lody: CLIProbeStatus(name: "lody", isInstalled: true, executablePath: "/usr/local/bin/lody")
         ],
         githubAuth: GitHubAuthSnapshot(isAuthenticated: true, username: "me", tokenSource: .ghCLI, hasNotificationsScope: true),
         discoveredModels: [:]
@@ -136,59 +135,40 @@ struct ScriptedFetcher: PullRequestFetching {
     }
 }
 
-final class RecordingSink: CollaborationSink, @unchecked Sendable {
-    let platform: PlatformKind = .github
-    private let lock = NSLock()
-    private var delivered: [String] = []
-    private var recordedContexts: [DeliveryContext] = []
-    var deliveries: [String] { lock.withLock { delivered } }
-    var contexts: [DeliveryContext] { lock.withLock { recordedContexts } }
-
-    func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode] { ConnectorCatalog.supportedDeliveryModes(for: item) }
-    func deliver(output: ExecutionOutput, for item: CollaborationItem, mode: DeliveryMode, context: DeliveryContext) async throws -> DeliveryReceipt {
-        lock.withLock {
-            delivered.append(item.id)
-            recordedContexts.append(context)
-        }
-        return DeliveryReceipt(deliveredMode: mode, destinationURL: item.url, localReportPath: URL(fileURLWithPath: "/tmp/collabdock-app-test-report.md"))
-    }
-}
-
 struct FakeConnectorFactory: ConnectorFactory {
     var source: ScriptedSource = ScriptedSource()
     var status = ScriptedStatusQuery()
     var fetcher = ScriptedFetcher()
-    var sink = RecordingSink()
 
     func makeSource(context: ConnectorBuildContext) -> (any CollaborationSource)? { source }
     func makePRStatusQuery(context: ConnectorBuildContext) -> (any PRStatusQuerying)? { status }
     func makePRFetcher(context: ConnectorBuildContext) -> (any PullRequestFetching)? { fetcher }
-    func makeSink(context: ConnectorBuildContext) -> (any CollaborationSink)? { sink }
 }
 
 // MARK: - Execution backend
 
-/// 可脚本化的执行后端：`blockUntilCancelled` 时模拟一个一直在跑、直到用户中止的 AI 进程
+/// 可脚本化的 Lody 执行后端：`blockUntilCancelled` 时模拟一个一直在跑、直到用户中止的派发进程
 final class ScriptedBackend: ExecutionBackend, @unchecked Sendable {
-    let kind: ExecutionBackendKind
-    let supportedEngines: [AgentEngine]
+    let kind: ExecutionBackendKind = .lody
     private let lock = NSLock()
+    private var _requests: [AgentRunRequest] = []
     private var _blockUntilCancelled = false
     private var _lingerAfterCancelSeconds: Double = 0
     private var _result: Result<AgentRunResult, Error> = .success(
         AgentRunResult(
-            output: .codeReview(CodeReviewResult(summary: "Looks good.", recommendedVerdict: .comment, comments: [])),
-            sessionHandle: nil,
+            output: nil,
+            sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "lody-sess-1", workspacePath: "/tmp/collabdock-app-test-wt", launchMode: .nativeBackgroundSession),
             rawOutputText: "",
+            wasBackgroundDispatched: true,
             usage: AgentUsageMetrics(inputTokens: 100, outputTokens: 20)
         )
     )
     private(set) var executeCount = 0
 
-    init(kind: ExecutionBackendKind = .directCLI, engines: [AgentEngine] = [.claudeCode, .codex, .antigravity]) {
-        self.kind = kind
-        self.supportedEngines = engines
-    }
+    init() {}
+
+    /// 实际交给后端执行的请求（用来断言计划被规整成 Lody）
+    var requests: [AgentRunRequest] { lock.withLock { _requests } }
 
     var blockUntilCancelled: Bool {
         get { lock.withLock { _blockUntilCancelled } }
@@ -205,16 +185,17 @@ final class ScriptedBackend: ExecutionBackend, @unchecked Sendable {
     }
 
     func prepareWorkspace(for request: WorkspacePreparationRequest, onProgress: @escaping @Sendable (String) -> Void) async throws -> PreparedWorkspaceContext {
-        PreparedWorkspaceContext(workspaceURL: URL(fileURLWithPath: "/tmp/collabdock-app-test-wt", isDirectory: true), unifiedDiff: "diff")
+        PreparedWorkspaceContext(workspaceURL: URL(fileURLWithPath: "/tmp/collabdock-app-test-wt", isDirectory: true))
     }
 
-    func buildCommand(for request: AgentRunRequest, prompt: String, schemaFileURL: URL, outputFileURL: URL?) throws -> AgentCommandSpec {
+    func buildCommand(for request: AgentRunRequest, prompt: String) throws -> AgentCommandSpec {
         AgentCommandSpec(executable: "/usr/bin/true", arguments: [], workingDirectory: request.workspace.workspaceURL)
     }
 
     func execute(_ request: AgentRunRequest, onProgress: @escaping @Sendable (String) -> Void) async throws -> AgentRunResult {
         let (block, scripted) = lock.withLock { () -> (Bool, Result<AgentRunResult, Error>) in
             executeCount += 1
+            _requests.append(request)
             return (_blockUntilCancelled, _result)
         }
         onProgress("running")
@@ -236,7 +217,7 @@ final class ScriptedBackend: ExecutionBackend, @unchecked Sendable {
     func resumeShellCommand(for handle: AgentSessionHandle) -> String { "" }
 }
 
-/// 每次 makeDirectBackend 依次返回队列中的后端（用于「取消后立刻重跑」这类需要两个不同后端行为的场景）
+/// 每次 makeLodyBackend 依次返回队列中的后端（用于「取消后立刻重跑」这类需要两个不同后端行为的场景）
 final class QueueBackendFactory: ExecutionBackendFactory, @unchecked Sendable {
     private let lock = NSLock()
     private var queue: [ScriptedBackend]
@@ -247,12 +228,8 @@ final class QueueBackendFactory: ExecutionBackendFactory, @unchecked Sendable {
         fallback = backends.last ?? ScriptedBackend()
     }
 
-    func makeDirectBackend() -> any ExecutionBackend {
-        lock.withLock { queue.isEmpty ? fallback : queue.removeFirst() }
-    }
-
     func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend {
-        ScriptedBackend(kind: .lody, engines: [.lody])
+        lock.withLock { queue.isEmpty ? fallback : queue.removeFirst() }
     }
 }
 

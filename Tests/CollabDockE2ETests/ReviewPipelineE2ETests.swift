@@ -2,14 +2,29 @@ import Foundation
 import Testing
 @testable import CollabDockCore
 
-/// 安全网（Characterization）：在现有代码上必须为绿。重构 AppCoordinator / 执行后端时，这些断言描述的外部行为不能变。
+/// 安全网：只剩 Lody 之后的完整链路。GitHub 通知 → 规则 → Lody 工作区（用户仓库就地 + Lody 原生 worktree）→ 假 lody CLI 派发 → 被跟踪的会话。
+/// CollabDock 自己不再往 GitHub 写任何东西（评论由 Lody 里的 agent 按用户指示发出）。
 @Suite(
-    "E2E — PR review pipeline: GitHub → rules → isolated worktree → agent CLI → pending review",
+    "E2E — PR review pipeline: GitHub → rules → Lody workspace → lody CLI → tracked session",
     .serialized,
     .enabled(if: GitSandbox.isGitAvailable)
 )
 struct ReviewPipelineE2ETests {
-    @Test("First review: a review request becomes a pending GitHub review draft without touching the user's checkout")
+    private static let lodyOK = #"{"ok":true,"sessionId":"lody-sess-1","status":"running"}"#
+
+    private func neutralDirectory(in scenario: PRScenario) throws -> URL {
+        let dir = scenario.sandbox.root.appendingPathComponent("neutral-cwd", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// CollabDock 只读 GitHub：除 GraphQL 查询外不能有任何写请求
+    private func expectNoGitHubWrites(_ github: FakeGitHub) {
+        let writes = github.requests.filter { $0.method != "GET" && $0.path != "/graphql" }
+        #expect(writes.isEmpty, "CollabDock must not write to GitHub: \(writes.map { "\($0.method) \($0.path)" })")
+    }
+
+    @Test("First review: a review request is dispatched to a Lody session on the user's repo (Lody's own worktree), checkout untouched, nothing written to GitHub")
     func firstReviewEndToEnd() async throws {
         let scenario = try await PRScenario.make()
         defer { scenario.sandbox.cleanup() }
@@ -35,15 +50,23 @@ struct ReviewPipelineE2ETests {
             Issue.record("default rules should accept a review request, got \(evaluation)"); return
         }
 
-        // 3. 隔离上下文：detached worktree 指向 PR 头，用户仓库原封不动
-        let context = try await scenario.prepare(item)
-        #expect(context.isTemporaryWorktree)
-        #expect(context.workspaceURL.path.hasPrefix(scenario.sandbox.cacheRoot.path))
-        let worktreeHead = try await scenario.sandbox.git(["-C", context.workspaceURL.path, "rev-parse", "HEAD"])
-        #expect(worktreeHead == scenario.headSHA)
-        let diff = try #require(context.unifiedDiff)
-        #expect(diff.contains("+    static let ttl = 60"))
-        #expect(diff.contains("+    func purge() { }"))
+        // 3. Lody 工作区：用户仓库就地使用（Lody 自己开 worktree），只刷新 PR 分支引用
+        let fake = try FakeAgentCLI(in: scenario.sandbox.root, name: "lody", stdoutLines: [Self.lodyOK])
+        let environment = fake.environmentSnapshot(engine: .lody)
+        let backend = LodyBackend(
+            catalog: LodyCatalogSnapshot(),
+            worktreeManager: scenario.worktreeManager,
+            temporaryWorkingDirectory: try neutralDirectory(in: scenario)
+        )
+        let plan = ExecutionPlan(engine: .lody, model: "default", launchMode: .nativeBackgroundSession, useIsolatedWorktree: true)
+        let context = try await backend.prepareWorkspace(
+            for: WorkspacePreparationRequest(
+                item: item, plan: plan, preferredLocalPath: scenario.sandbox.userRepo.path, environment: environment
+            ),
+            onProgress: { _ in }
+        )
+        #expect(realPath(context.workspaceURL.path) == realPath(scenario.sandbox.userRepo.path))
+        #expect(context.isTemporaryWorktree == false)
 
         #expect(try await scenario.sandbox.currentBranch() == "main")
         let status = try await scenario.sandbox.git(["-C", scenario.sandbox.userRepo.path, "status", "--porcelain"])
@@ -51,95 +74,31 @@ struct ReviewPipelineE2ETests {
         let wip = try String(contentsOf: scenario.sandbox.userRepo.appendingPathComponent("WIP.txt"), encoding: .utf8)
         #expect(wip == "my uncommitted work\n")
 
-        // 4. 执行：假 claude 回放 stream-json
-        let fake = try FakeAgentCLI(
-            in: scenario.sandbox.root,
-            stdoutLines: [
-                ClaudeStream.initEvent(sessionID: "sess-e2e-1"),
-                ClaudeStream.toolUse("Read", path: PRScenario.filePath),
-                ClaudeStream.result(sessionID: "sess-e2e-1", structuredOutput: SampleReview.json)
-            ]
-        )
-        let plan = ExecutionPlan(engine: .claudeCode, model: "sonnet", effort: .medium)
-        let progress = ProgressLog()
+        // 4. 派发：假 lody 记录收到的参数 / 环境 / 工作目录
         let run = try await withHostGitHubTokens {
-            try await AgentSessionRunner().run(
-                item: item,
-                plan: plan,
-                preset: TaskPreset.defaults[0],
-                workspaceURL: context.workspaceURL,
-                environmentSnapshot: fake.environmentSnapshot(engine: .claudeCode),
-                lodyConfig: LodyConfig(),
-                unifiedDiff: context.unifiedDiff,
-                cancellationToken: ProcessCancellationToken(),
-                onProgress: { progress.append($0) }
+            try await backend.execute(
+                AgentRunRequest(item: item, plan: plan, preset: TaskPreset.defaults[0], workspace: context, environment: environment),
+                onProgress: { _ in }
             )
         }
 
-        #expect(run.wasBackgroundDispatched == false)
-        #expect(run.sessionHandle?.sessionID == "sess-e2e-1")
-        #expect(run.sessionHandle?.engine == .claudeCode)
-        guard case .codeReview(let review)? = run.output else {
-            Issue.record("expected a structured code review, got \(String(describing: run.output))"); return
-        }
-        #expect(review.comments.count == 2)
-        #expect(progress.all.contains { $0.contains("Read") || $0.contains("Cache.swift") })
-
-        // 4b. 宿主真正交给 CLI 的东西：只读模式、结构化输出、在隔离 worktree 内运行、拿不到 GitHub Token
-        #expect(fake.workingDirectory == realPath(context.workspaceURL.path))
-        #expect(fake.value(after: "--permission-mode") == "plan")
-        #expect(fake.value(after: "--output-format") == "stream-json")
-        #expect(fake.value(after: "--json-schema") != nil)
-        let allowedTools = try #require(fake.value(after: "--allowedTools"))
-        #expect(allowedTools.contains("Read"))
-        #expect(!allowedTools.contains("Write") && !allowedTools.contains("Edit"))
+        #expect(run.wasBackgroundDispatched)
+        #expect(run.output == nil)
+        #expect(run.sessionHandle?.engine == .lody)
+        #expect(run.sessionHandle?.sessionID == "lody-sess-1")
+        #expect(Array(fake.argv.prefix(3)) == ["session", "create", "--json"])
+        #expect(fake.value(after: "--local-project") == scenario.sandbox.userRepo.path)
+        #expect(fake.argv.contains("--worktree"))
+        #expect(fake.value(after: "--branch") == PRScenario.headRef)
+        let prompt = try #require(fake.argv.last)
+        #expect(prompt.contains("https://github.com/\(PRScenario.repository)/pull/\(PRScenario.number)") || prompt.contains("#\(PRScenario.number)"))
+        #expect(!prompt.contains(PRScenario.token))
+        #expect(fake.workingDirectory != realPath(scenario.sandbox.userRepo.path), "lody must not start inside the target repository")
         let leakedKeys = fake.environmentKeys.intersection(["GITHUB_TOKEN", "GH_TOKEN", "GH_ENTERPRISE_TOKEN"])
         #expect(leakedKeys.isEmpty)
-        let prompt = try #require(fake.value(after: "-p"))
-        #expect(prompt.contains("<untrusted_external_data>"))
-        #expect(prompt.contains("<untrusted_pr_diff>"))
-        #expect(prompt.contains("+    static let ttl = 60"))
-        #expect(!prompt.contains(PRScenario.token))
 
-        // 5. 回写：Pending Review 草稿（不带 event），越界评论降级进总结，本地报告落盘
-        let reports = scenario.sandbox.root.appendingPathComponent("reports", isDirectory: true)
-        let receipt = try await scenario.connector.deliver(
-            output: .codeReview(review),
-            for: item,
-            mode: .platformDraft,
-            plan: plan,
-            unifiedDiff: context.unifiedDiff,
-            reportsDirectory: reports
-        )
-        #expect(receipt.deliveredMode == .platformDraft)
-
-        let posts = scenario.github.requests("POST", "/repos/\(PRScenario.repository)/pulls/\(PRScenario.number)/reviews")
-        #expect(posts.count == 1)
-        let body = try #require(posts.first?.jsonBody)
-        #expect(body["event"] == nil, "a pending draft must not carry an event")
-        #expect(body["commit_id"] as? String == scenario.headSHA)
-        let comments = try #require(body["comments"] as? [[String: Any]])
-        #expect(comments.count == 1)
-        #expect(comments.first?["path"] as? String == PRScenario.filePath)
-        #expect(comments.first?["line"] as? Int == SampleReview.inDiffLine)
-        #expect((comments.first?["body"] as? String)?.contains("```suggestion") == true)
-        #expect((body["body"] as? String)?.contains("Out-of-diff note") == true)
-        #expect(posts.first?.headers["Authorization"]?.contains(PRScenario.token) == true)
-
-        let reportPath = try #require(receipt.localReportPath)
-        let report = try String(contentsOf: reportPath, encoding: .utf8)
-        #expect(report.contains("Adds a TTL constant"))
-
-        // 6. 清理 worktree 后不留痕迹
-        await scenario.worktreeManager.removeWorktree(
-            baseRepositoryURL: scenario.sandbox.userRepo,
-            worktreeURL: context.workspaceURL,
-            gitExecutablePath: scenario.sandbox.gitPath,
-            environment: scenario.sandbox.env
-        )
-        #expect(!FileManager.default.fileExists(atPath: context.workspaceURL.path))
-        let worktrees = try await scenario.sandbox.git(["-C", scenario.sandbox.userRepo.path, "worktree", "list", "--porcelain"])
-        #expect(!worktrees.contains(context.workspaceURL.lastPathComponent))
+        // 5. CollabDock 没有往 GitHub 写任何东西
+        expectNoGitHubWrites(scenario.github)
     }
 
     @Test("The same review request seen again after a restart is deduplicated by its stable key")
@@ -163,8 +122,8 @@ struct ReviewPipelineE2ETests {
         #expect(try await reopened.loadAllItems().map(\.id) == [first.item.id])
     }
 
-    @Test("Re-review after a fix push: incremental diff + resume of the previous agent session")
-    func incrementalReReviewResumesSession() async throws {
+    @Test("Re-review after a fix push: the incremental range is computed in the repo and the previous Lody session is continued")
+    func incrementalReReviewContinuesLodySession() async throws {
         let scenario = try await PRScenario.make()
         defer { scenario.sandbox.cleanup() }
         let firstHead = scenario.headSHA
@@ -179,56 +138,85 @@ struct ReviewPipelineE2ETests {
             previousItemID: scenario.item(headSHA: firstHead).id,
             reviewedHeadSHA: firstHead,
             reviewedAt: Date(),
-            engine: .claudeCode,
-            model: "sonnet",
-            sessionID: "sess-e2e-1",
+            engine: .lody,
+            sessionID: "lody-sess-1",
             summarySnippet: "purge() is a no-op",
             reviewRound: 1
         )
         let item = scenario.item(headSHA: newHead, previousReview: previous)
+        let plan = ExecutionPlan(
+            engine: .lody, model: "default", launchMode: .nativeBackgroundSession,
+            continuityMode: .continueSessionIncremental, previousReview: previous
+        )
+        let fake = try FakeAgentCLI(in: scenario.sandbox.root, name: "lody", stdoutLines: [Self.lodyOK])
+        let environment = fake.environmentSnapshot(engine: .lody)
+        let backend = LodyBackend(
+            catalog: LodyCatalogSnapshot(),
+            worktreeManager: scenario.worktreeManager,
+            temporaryWorkingDirectory: try neutralDirectory(in: scenario)
+        )
 
-        let context = try await scenario.prepare(item, previousReviewedSHA: firstHead)
+        let context = try await backend.prepareWorkspace(
+            for: WorkspacePreparationRequest(
+                item: item, plan: plan, preferredLocalPath: scenario.sandbox.userRepo.path, environment: environment
+            ),
+            onProgress: { _ in }
+        )
         #expect(context.wasForcePushed == false)
         let incremental = try #require(context.incrementalDiff)
         #expect(incremental.contains("+    mutating func purge() { storage.removeAll() }"))
         #expect(!incremental.contains("+    static let ttl = 60"), "round-1 changes must not be re-reviewed")
         #expect(context.incrementalCommitLog?.contains("fix: purge clears storage") == true)
-        #expect(context.unifiedDiff?.contains("+    static let ttl = 60") == true)
 
-        let fake = try FakeAgentCLI(
-            in: scenario.sandbox.root,
-            stdoutLines: [ClaudeStream.result(sessionID: "sess-e2e-1", structuredOutput: #"{"summary":"Fix looks good.","recommendedVerdict":"APPROVE","comments":[]}"#)]
-        )
-        let plan = ExecutionPlan(
-            engine: .claudeCode,
-            model: "sonnet",
-            continuityMode: .continueSessionIncremental,
-            previousReview: previous
-        )
-        let run = try await AgentSessionRunner().run(
-            item: item,
-            plan: plan,
-            preset: TaskPreset.defaults[0],
-            workspaceURL: context.workspaceURL,
-            environmentSnapshot: fake.environmentSnapshot(engine: .claudeCode),
-            lodyConfig: LodyConfig(),
-            unifiedDiff: context.unifiedDiff,
-            incrementalDiff: context.incrementalDiff,
-            incrementalCommitLog: context.incrementalCommitLog,
-            wasForcePushed: context.wasForcePushed,
-            cancellationToken: ProcessCancellationToken(),
+        let run = try await backend.execute(
+            AgentRunRequest(item: item, plan: plan, preset: TaskPreset.defaults[0], workspace: context, environment: environment),
             onProgress: { _ in }
         )
 
-        #expect(fake.value(after: "--resume") == "sess-e2e-1")
-        let prompt = try #require(fake.value(after: "-p"))
-        #expect(prompt.contains("<untrusted_incremental_diff>"))
-        #expect(prompt.contains("+    mutating func purge() { storage.removeAll() }"))
-        #expect(run.sessionHandle?.sessionID == "sess-e2e-1")
-        guard case .codeReview(let review)? = run.output else {
-            Issue.record("expected a structured code review"); return
-        }
-        #expect(review.recommendedVerdict == .approve)
+        #expect(Array(fake.argv.prefix(3)) == ["session", "chat", "--json"])
+        #expect(fake.argv.contains("lody-sess-1"))
+        let prompt = try #require(fake.argv.last)
+        #expect(prompt.contains("pull/\(PRScenario.number)/head"), "the Lody agent fetches the new commits itself")
+        #expect(!prompt.contains("<untrusted_incremental_diff>"), "the diff is not inlined into the chat message")
+        #expect(run.sessionHandle?.sessionID == "lody-sess-1")
+        expectNoGitHubWrites(scenario.github)
+    }
+
+    @Test("Re-review whose previous round ran on a removed direct engine opens a new Lody session")
+    func reReviewAfterDirectEngineStartsNewLodySession() async throws {
+        let scenario = try await PRScenario.make()
+        defer { scenario.sandbox.cleanup() }
+        let previous = PreviousReviewContext(
+            previousItemID: scenario.item(headSHA: scenario.headSHA).id,
+            reviewedHeadSHA: scenario.headSHA,
+            reviewedAt: Date(),
+            engine: .claudeCode,
+            sessionID: "claude-sess-1",
+            reviewRound: 1
+        )
+        let item = scenario.item(headSHA: scenario.headSHA, previousReview: previous)
+        let plan = ExecutionPlan(
+            engine: .lody, model: "default", launchMode: .nativeBackgroundSession,
+            continuityMode: .continueSessionIncremental, previousReview: previous
+        )
+        let fake = try FakeAgentCLI(in: scenario.sandbox.root, name: "lody", stdoutLines: [Self.lodyOK])
+        let backend = LodyBackend(
+            catalog: LodyCatalogSnapshot(),
+            worktreeManager: scenario.worktreeManager,
+            temporaryWorkingDirectory: try neutralDirectory(in: scenario)
+        )
+
+        _ = try await backend.execute(
+            AgentRunRequest(
+                item: item, plan: plan, preset: TaskPreset.defaults[0],
+                workspace: PreparedWorkspaceContext(workspaceURL: scenario.sandbox.userRepo),
+                environment: fake.environmentSnapshot(engine: .lody)
+            ),
+            onProgress: { _ in }
+        )
+
+        #expect(Array(fake.argv.prefix(3)) == ["session", "create", "--json"])
+        #expect(!fake.argv.contains("claude-sess-1"))
     }
 
     @Test("Re-review after a force-push falls back to the full PR diff")

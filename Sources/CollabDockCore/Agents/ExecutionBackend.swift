@@ -23,9 +23,8 @@ public struct AgentSessionHandle: Codable, Hashable, Sendable {
     }
 }
 
-/// 执行后端类型：将「Agent 引擎」与「执行后端（本机直连 CLI vs Lody 编排层）」解耦
+/// 执行后端类型（当前仅保留 Lody 编排层）
 public enum ExecutionBackendKind: String, Codable, CaseIterable, Hashable, Sendable {
-    case directCLI
     case lody
 }
 
@@ -84,23 +83,20 @@ public struct RawExecutionOutput: Equatable, Sendable {
     }
 }
 
-/// 统一执行后端协议：每个后端自治负责工作区定位、命令构造、启动执行、结果解析、会话句柄与续聊命令
+/// 统一执行后端协议：负责工作区定位、命令构造、启动执行、结果解析、会话句柄与续聊命令
 public protocol ExecutionBackend: Sendable {
     var kind: ExecutionBackendKind { get }
-    var supportedEngines: [AgentEngine] { get }
 
-    /// 1. 定位并准备本次运行所需的只读上下文/工作区
+    /// 1. 定位并准备本次运行所需的上下文/工作区
     func prepareWorkspace(
         for request: WorkspacePreparationRequest,
         onProgress: @escaping @Sendable (String) -> Void
     ) async throws -> PreparedWorkspaceContext
 
-    /// 2. 根据已构造的安全 Prompt 与临时文件路径生成最终 CLI 命令规格（含工作目录）
+    /// 2. 根据已构造的安全 Prompt 生成最终 CLI 命令规格（含工作目录）
     func buildCommand(
         for request: AgentRunRequest,
-        prompt: String,
-        schemaFileURL: URL,
-        outputFileURL: URL?
+        prompt: String
     ) throws -> AgentCommandSpec
 
     /// 3. 启动子进程并流式消费输出、剥离敏感环境变量、完成解析与句柄构建
@@ -109,7 +105,7 @@ public protocol ExecutionBackend: Sendable {
         onProgress: @escaping @Sendable (String) -> Void
     ) async throws -> AgentRunResult
 
-    /// 4. 解析原始子进程输出（处理错误码提取、结构化输出/降级、背景派发与用量补全）
+    /// 4. 解析原始子进程输出（处理错误码提取、后台派发与用量补全）
     func parseResult(
         _ raw: RawExecutionOutput,
         for request: AgentRunRequest
@@ -126,23 +122,6 @@ public protocol ExecutionBackend: Sendable {
 }
 
 public extension ExecutionBackend {
-    func supports(engine: AgentEngine) -> Bool {
-        supportedEngines.contains(engine)
-    }
-
-    var supportedLaunchModes: [ExecutionLaunchMode] {
-        switch kind {
-        case .directCLI:
-            return [.managedStructuredRun, .nativeBackgroundSession]
-        case .lody:
-            return [.nativeBackgroundSession, .managedStructuredRun]
-        }
-    }
-
-    func defaultLaunchMode(fallback: ExecutionLaunchMode) -> ExecutionLaunchMode {
-        kind == .lody ? .nativeBackgroundSession : fallback
-    }
-
     static func shellEscape(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }

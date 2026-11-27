@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CollabDockCore
 
-/// 环境探测的编排逻辑（此前只测了各个解析函数）：二进制定位、版本探测、gh 登录态、token 优先级、agy 模型、Lody 目录与会话用量。
+/// 环境探测的编排逻辑（此前只测了各个解析函数）：二进制定位、版本探测、gh 登录态、token 优先级、Lody 目录与会话用量。
 /// 全部通过 FakeProcessRunner + 临时目录里的假二进制完成，不依赖本机安装了什么。
 @Suite("EnvironmentDetector — detection orchestration with a fake process runner")
 struct EnvironmentDetectionTests {
@@ -12,12 +12,6 @@ struct EnvironmentDetectionTests {
       - Active account: true
       - Token scopes: 'gist', 'notifications', 'read:org', 'repo'
     """
-    static let agyModels = """
-    Fetching available models...
-    gemini-4-neon-xhigh\tGemini 4 Neon (XHigh)
-    claude-opus-5-5-high\tClaude Opus 5.5 (High)
-    """
-
     private func scriptedRunner() -> FakeProcessRunner {
         let r = FakeProcessRunner()
         r.on("git", ["--version"], stdout: "git version 2.48.0\n")
@@ -28,7 +22,7 @@ struct EnvironmentDetectionTests {
         r.on("lody", ["--version"], stdout: "0.9.3\n")
         r.on("gh", ["auth", "status"], stderr: Self.ghAuthLoggedIn)
         r.on("gh", ["api", "user"], stdout: #"{"login":"alice","name":"Alice A.","avatar_url":"https://avatars.githubusercontent.com/u/1?v=4"}"#)
-        r.on("agy", ["models"], stdout: Self.agyModels)
+        r.on("agy", ["models"], stdout: "gemini-4-neon-xhigh\tGemini 4 Neon (XHigh)\n")
         return r
     }
 
@@ -36,7 +30,7 @@ struct EnvironmentDetectionTests {
         Dictionary(uniqueKeysWithValues: names.map { ($0, bins.path($0)) })
     }
 
-    @Test("detectAll probes every CLI, reads versions, GitHub login + scopes and the live agy model list")
+    @Test("detectAll probes git, gh and lody only (never the removed direct CLIs), and reads the GitHub login + scopes")
     func detectAllHappyPath() async throws {
         let names = ["git", "gh", "claude", "codex", "agy", "lody"]
         let bins = try FakeBinaries(names)
@@ -48,11 +42,12 @@ struct EnvironmentDetectionTests {
         #expect(snap.git.isInstalled && snap.git.version == "git version 2.48.0")
         #expect(snap.gh.executablePath == bins.path("gh"))
         #expect(snap.gh.version == "gh version 2.65.0 (2026-01-10)")
-        #expect(snap.engines[.claudeCode]?.version == "2.1.0 (Claude Code)")
-        #expect(snap.engines[.codex]?.version == "codex-cli 0.159.2")
-        #expect(snap.engines[.antigravity]?.version == "agy 1.4.0", "first non-empty line, trimmed")
         #expect(snap.engines[.lody]?.executablePath == bins.path("lody"))
-        #expect(AgentEngine.allCases.allSatisfy { snap.isEngineReady($0) })
+        #expect(snap.isEngineReady(.lody))
+        #expect(Set(snap.engines.keys) == [.lody], "only Lody is probed as an engine")
+        for removed in ["claude", "codex", "agy"] {
+            #expect(runner.calls(to: removed).isEmpty, "\(removed) must not be executed")
+        }
 
         #expect(snap.githubAuth.isAuthenticated)
         #expect(snap.githubAuth.tokenSource == .ghCLI)
@@ -60,34 +55,24 @@ struct EnvironmentDetectionTests {
         #expect(snap.githubAuth.displayName == "Alice A.")
         #expect(snap.githubAuth.avatarURL == "https://avatars.githubusercontent.com/u/1?v=4")
         #expect(snap.githubAuth.hasNotificationsScope)
-
-        #expect(snap.discoveredModels[.antigravity]?.map(\.id) == ["gemini-4-neon-xhigh", "claude-opus-5-5-high"])
-        #expect(snap.discoveredModels[.claudeCode] == AgentEngine.claudeCode.defaultModels)
-        #expect(snap.discoveredModels[.codex] == AgentEngine.codex.defaultModels)
     }
 
-    @Test("Missing CLIs are reported as not installed; no gh → not authenticated, no agy → built-in model list")
+    @Test("Missing tools are reported as not installed; no gh → not authenticated and gh is never called")
     func detectAllWithMissingTools() async throws {
-        let bins = try FakeBinaries(["git", "claude"])
+        let bins = try FakeBinaries(["git"])
         defer { bins.cleanup() }
         let runner = scriptedRunner()
         let missing = bins.dir.appendingPathComponent("does-not-exist").path
 
         let snap = await EnvironmentDetector(runner: runner).detectAll(customPaths: [
-            "git": bins.path("git"), "claude": bins.path("claude"),
-            "gh": missing, "codex": missing, "agy": missing
+            "git": bins.path("git"), "gh": missing
         ])
 
         #expect(snap.gh.isInstalled == false)
         #expect(snap.gh.errorMessage?.contains("gh") == true)
-        #expect(snap.engines[.codex]?.isInstalled == false)
-        #expect(snap.engines[.antigravity]?.isInstalled == false)
-        #expect(snap.engines[.claudeCode]?.isInstalled == true)
         #expect(snap.githubAuth.isAuthenticated == false)
         #expect(snap.githubAuth.tokenSource == GitHubTokenSource.none)
-        #expect(snap.discoveredModels[.antigravity] == AgentEngine.antigravity.defaultModels)
         #expect(runner.calls(to: "gh").isEmpty)
-        #expect(runner.calls(to: "agy").isEmpty)
     }
 
     @Test("gh installed but logged out: not authenticated with a login hint, profile is not fetched")

@@ -197,41 +197,48 @@ struct AppCoordinatorTests {
 
     // MARK: execution
 
-    @Test("Confirm & run: the review becomes a draft, is delivered once, recorded in usage, notified, and the choice is remembered")
+    private func lodyPlan(model: String = "opus", agent: String = "Claude Code") -> ExecutionPlan {
+        ExecutionPlan(engine: .lody, model: model, lodyAgentConfig: agent, launchMode: .nativeBackgroundSession)
+    }
+
+    @Test("Confirm & run: the review is dispatched to a tracked Lody session, recorded in usage, and the agent/model choice is remembered")
     func confirmAndRunSucceeds() async throws {
         let pr = AppFixtures.prItem()
-        let h = Harness()
+        let backend = ScriptedBackend()
+        let h = Harness(backends: [backend])
         h.coordinator.items = [pr]
 
-        let task = h.coordinator.confirmAndRun(itemID: pr.id, plan: ExecutionPlan(engine: .codex, model: "gpt-5.3-codex"))
+        let task = h.coordinator.confirmAndRun(itemID: pr.id, plan: lodyPlan())
         await task?.value
 
         let done = try #require(item(h, pr.id))
         #expect(done.status == .draftReady)
-        guard case .codeReview(let review)? = done.executionOutput else { Issue.record("expected a code review"); return }
-        #expect(review.summary == "Looks good.")
-        #expect(h.connectors.sink.deliveries == [pr.id])
-        #expect(h.system.completions == [pr.id])
+        #expect(done.remoteSessionStatus == .running)
+        #expect(done.sessionID == "lody-sess-1")
+        #expect(backend.executeCount == 1)
+        #expect(backend.requests.first?.plan.engine == .lody)
         #expect(h.coordinator.usageRuns.count == 1)
-        #expect(h.coordinator.settings.defaultEngine == .codex)
-        #expect(h.coordinator.settings.defaultModels[.codex] == "gpt-5.3-codex")
-        #expect(h.settingsStore.savedSettings.last?.defaultEngine == .codex)
+        #expect(h.coordinator.usageRuns.first?.engine == .lody)
+        #expect(h.coordinator.settings.defaultEngine == .lody)
+        #expect(h.coordinator.settings.lodyConfig.defaultAgentConfig == "Claude Code")
+        #expect(h.coordinator.settings.lodyConfig.defaultModelByAgentConfig["Claude Code"] == "opus")
+        #expect(h.settingsStore.savedSettings.last?.defaultEngine == .lody)
         #expect(await eventually { await h.store.items[pr.id]?.status == .draftReady })
     }
 
-    @Test("Confirm & run: an agent failure marks the item failed with the error and delivers nothing")
+    @Test("Confirm & run: a Lody failure marks the item failed with the error")
     func confirmAndRunFails() async throws {
         let backend = ScriptedBackend()
-        backend.result = .failure(AgentRunnerError.processFailed(exitCode: 1, stderr: "Invalid API key"))
+        backend.result = .failure(AgentRunnerError.processFailed(exitCode: 1, stderr: "Workspace quota exceeded"))
         let pr = AppFixtures.prItem()
         let h = Harness(backends: [backend])
         h.coordinator.items = [pr]
 
-        await h.coordinator.confirmAndRun(itemID: pr.id, plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"))?.value
+        await h.coordinator.confirmAndRun(itemID: pr.id, plan: lodyPlan())?.value
 
         #expect(item(h, pr.id)?.status == .failed)
-        #expect(item(h, pr.id)?.errorMessage?.contains("Invalid API key") == true)
-        #expect(h.connectors.sink.deliveries.isEmpty)
+        #expect(item(h, pr.id)?.errorMessage?.contains("Workspace quota exceeded") == true)
+        #expect(item(h, pr.id)?.sessionID == nil)
         #expect(h.coordinator.selectedTab == .inbox)
     }
 
@@ -243,14 +250,14 @@ struct AppCoordinatorTests {
         let h = Harness(backends: [blocking])
         h.coordinator.items = [pr]
 
-        let task = h.coordinator.confirmAndRun(itemID: pr.id, plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"))
+        let task = h.coordinator.confirmAndRun(itemID: pr.id, plan: lodyPlan())
         #expect(await eventually { blocking.executeCount == 1 })
         h.coordinator.cancelRunningItem(id: pr.id)
         #expect(item(h, pr.id)?.status == .pendingConfirmation)
 
         await task?.value
         #expect(item(h, pr.id)?.status == .pendingConfirmation)
-        #expect(h.connectors.sink.deliveries.isEmpty)
+        #expect(item(h, pr.id)?.sessionID == nil)
         #expect(h.system.completions.isEmpty)
     }
 
@@ -264,34 +271,34 @@ struct AppCoordinatorTests {
         let h = Harness(backends: [blocking, normal])
         h.coordinator.items = [pr]
 
-        let first = h.coordinator.confirmAndRun(itemID: pr.id, plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"))
+        let first = h.coordinator.confirmAndRun(itemID: pr.id, plan: lodyPlan())
         #expect(await eventually { blocking.executeCount == 1 })
         h.coordinator.cancelRunningItem(id: pr.id)
-        let second = h.coordinator.confirmAndRun(itemID: pr.id, plan: ExecutionPlan(engine: .claudeCode, model: "sonnet"))
+        let second = h.coordinator.confirmAndRun(itemID: pr.id, plan: lodyPlan())
 
         await second?.value
         #expect(item(h, pr.id)?.status == .draftReady)
         await first?.value
 
         #expect(item(h, pr.id)?.status == .draftReady, "the stale run's cleanup must not reset the finished new run")
-        #expect(h.connectors.sink.deliveries == [pr.id])
+        #expect(item(h, pr.id)?.sessionID == "lody-sess-1")
         #expect(normal.executeCount == 1)
     }
 
-    @Test("Re-review defaults to continuing the previous session when the previous engine supports it")
+    @Test("Re-review defaults to continuing the previous Lody session")
     func defaultPlanForReReview() {
         var pr = AppFixtures.prItem(sha: "def5678")
         pr.previousReview = PreviousReviewContext(
-            previousItemID: "r1", reviewedHeadSHA: "abc1234", reviewedAt: Date(), engine: .claudeCode, sessionID: "sess-1"
+            previousItemID: "r1", reviewedHeadSHA: "abc1234", reviewedAt: Date(), engine: .lody, sessionID: "lody-1"
         )
         pr.reviewRound = 2
         let h = Harness()
 
         let plan = h.coordinator.defaultPlan(for: pr)
 
-        #expect(plan.engine == .claudeCode)
+        #expect(plan.engine == .lody)
         #expect(plan.continuityMode == .continueSessionIncremental)
-        #expect(plan.previousReview?.sessionID == "sess-1")
+        #expect(plan.previousReview?.sessionID == "lody-1")
     }
 
     // MARK: inbox management

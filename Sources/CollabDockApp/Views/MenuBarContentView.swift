@@ -403,13 +403,12 @@ public struct MenuBarContentView: View {
 
             if !draftItems.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionHeader(L("Drafts & Dispatched"), count: draftItems.count)
+                    sectionHeader(L("Dispatched & Reviewed"), count: draftItems.count)
                     ForEach(draftItems) { item in
                         DraftResultCardView(
                             item: item,
                             onOpenSource: { openURL(item.deliveryURL ?? item.url) },
-                            onOpenReport: item.localReportPath != nil ? { coordinator.openLocalReport(for: item) } : nil,
-                            onHandoff: item.sessionHandle != nil ? { coordinator.openHandoff(for: item) } : nil,
+                            onHandoff: item.sessionHandle?.engine == .lody ? { coordinator.openHandoff(for: item) } : nil,
                             onMarkCompleted: {
                                 withAnimation(.snappy(duration: 0.18)) {
                                     coordinator.markItemCompleted(id: item.id)
@@ -467,8 +466,7 @@ public struct MenuBarContentView: View {
                             CompletedItemRowView(
                                 item: item,
                                 onOpenSource: { openURL(item.deliveryURL ?? item.url) },
-                                onOpenReport: item.localReportPath != nil ? { coordinator.openLocalReport(for: item) } : nil,
-                                onHandoff: item.sessionHandle != nil ? { coordinator.openHandoff(for: item) } : nil,
+                                onHandoff: item.sessionHandle?.engine == .lody ? { coordinator.openHandoff(for: item) } : nil,
                                 onDelete: {
                                     withAnimation(.snappy(duration: 0.16)) {
                                         coordinator.deleteItem(id: item.id)
@@ -835,7 +833,7 @@ private struct RunningTaskBannerView: View {
                     Spacer()
                     CDHoverIconButton(systemImage: "stop.fill", helpText: L("Stop run"), action: onCancel)
                 }
-                Text(item.progressMessage ?? L("Analyzing and generating review draft..."))
+                Text(item.progressMessage ?? L("Dispatching Lody review session..."))
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -847,7 +845,6 @@ private struct RunningTaskBannerView: View {
 private struct DraftResultCardView: View {
     let item: CollaborationItem
     let onOpenSource: () -> Void
-    let onOpenReport: (() -> Void)?
     let onHandoff: (() -> Void)?
     let onMarkCompleted: () -> Void
     let onDelete: () -> Void
@@ -928,13 +925,10 @@ private struct DraftResultCardView: View {
 
                     HStack(spacing: 6) {
                         Spacer()
-                        if let onOpenReport {
-                            CDHoverIconButton(systemImage: "doc.text", helpText: L("Open local Markdown report"), action: onOpenReport)
-                        }
                         if let onHandoff {
                             CDPillButton(
-                                title: item.sessionHandle?.engine == .lody ? L("Open Lody") : L("Resume"),
-                                systemImage: item.sessionHandle?.engine == .lody ? "cube.transparent" : "terminal",
+                                title: L("Open Lody"),
+                                systemImage: "cube.transparent",
                                 action: onHandoff
                             )
                         }
@@ -962,7 +956,6 @@ private struct DraftResultCardView: View {
 private struct CompletedItemRowView: View {
     let item: CollaborationItem
     let onOpenSource: () -> Void
-    let onOpenReport: (() -> Void)?
     let onHandoff: (() -> Void)?
     let onDelete: () -> Void
 
@@ -1022,13 +1015,10 @@ private struct CompletedItemRowView: View {
 
             HStack(spacing: 2) {
                 if isHovering {
-                    if let onOpenReport {
-                        CDHoverIconButton(systemImage: "doc.text", helpText: L("Open local report"), action: onOpenReport)
-                    }
                     if let onHandoff {
                         CDHoverIconButton(
-                            systemImage: item.sessionHandle?.engine == .lody ? "cube.transparent" : "terminal",
-                            helpText: item.sessionHandle?.engine == .lody ? L("Open Lody session") : L("Resume local session"),
+                            systemImage: "cube.transparent",
+                            helpText: L("Open Lody session"),
                             action: onHandoff
                         )
                     }

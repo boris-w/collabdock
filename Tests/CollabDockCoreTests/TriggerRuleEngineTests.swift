@@ -5,7 +5,7 @@ import Testing
 struct TriggerRuleEngineTests {
     let engine = TriggerRuleEngine()
 
-    @Test("Accepts GitHub PR @mention with keyword and extracts engine/model/focus hints")
+    @Test("Accepts GitHub PR @mention with keyword and extracts model/focus hints (a model id never picks a direct engine)")
     func githubMentionWithHints() {
         let rules = TriggerRules()
         let event = IncomingCollaborationEvent(
@@ -14,14 +14,14 @@ struct TriggerRuleEngineTests {
             externalRef: "#482",
             triggerKind: .mention,
             actor: "alice",
-            body: "@boris 帮忙 review 一下鉴权边界 --model gemini-4-neon-xhigh --focus security"
+            body: "@dev 帮忙 review 一下鉴权边界 --model gemini-4-neon-xhigh --focus security"
         )
 
-        let evaluation = engine.evaluate(event: event, currentHandle: "boris", rules: rules)
+        let evaluation = engine.evaluate(event: event, currentHandle: "dev", rules: rules)
         #expect(
             evaluation == .accept(
                 hints: ParsedTriggerHints(
-                    engine: .antigravity,
+                    engine: nil,
                     model: "gemini-4-neon-xhigh",
                     focus: "security"
                 )

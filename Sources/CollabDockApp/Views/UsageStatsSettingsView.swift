@@ -111,7 +111,7 @@ struct UsageStatsSettingsView: View {
                             .foregroundStyle(.tertiary)
                         Text(L("No review usage in the selected range"))
                             .font(.subheadline.weight(.medium))
-                        Text(L("Run PR reviews via Lody or local CLIs (Claude / Codex / Antigravity) to track tokens, models, and estimated API cost."))
+                        Text(L("Run PR reviews via Lody to track context usage, models, and estimated API cost."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -323,12 +323,12 @@ struct UsageStatsSettingsView: View {
 
     private var tokenBreakdownDetail: String {
         if report.exactTokensTotal > 0 && report.contextWindowTokensTotal > 0 {
-            return L("CLI exact + Lody context")
+            return L("Legacy CLI + Lody context")
         }
         if report.contextWindowTokensTotal > 0 {
             return L("Lody session context total")
         }
-        return L("Direct CLI exact measurement")
+        return L("Legacy CLI exact measurement")
     }
 
     private func metricTile(title: String, value: String, detail: String) -> some View {

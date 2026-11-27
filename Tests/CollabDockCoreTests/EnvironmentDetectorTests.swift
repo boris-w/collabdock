@@ -3,20 +3,6 @@ import Testing
 
 @Suite("EnvironmentDetector Tests [REQ-001][TASK-004]")
 struct EnvironmentDetectorTests {
-    @Test("Parses agy models TSV output skipping status headers")
-    func parsesAgyModelsOutput() {
-        let raw = """
-        Fetching available models...
-        gemini-4-neon-xhigh\tGemini 4 Neon (XHigh)
-        claude-opus-5-5-high\tClaude Opus 5.5 (High)
-        gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
-        """
-        let models = EnvironmentDetector.parseAgyModelsOutput(raw)
-        #expect(models.count == 3)
-        #expect(models[0] == ModelOption(id: "gemini-4-neon-xhigh", displayName: "Gemini 4 Neon (XHigh)"))
-        #expect(models[1] == ModelOption(id: "claude-opus-5-5-high", displayName: "Claude Opus 5.5 (High)"))
-    }
-
     @Test("Parses gh auth status username and OAuth scopes accurately")
     func parsesGHAuthStatus() {
         let output = """

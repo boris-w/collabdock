@@ -42,7 +42,7 @@ public struct SettingsView: View {
                 .tabItem { Label(L("Rules"), systemImage: "line.3.horizontal.decrease.circle") }
                 .tag(SettingsTab.triggerRules)
             enginesTab
-                .tabItem { Label(L("AI Engines"), systemImage: "cpu") }
+                .tabItem { Label("Lody", systemImage: "cube.transparent") }
                 .tag(SettingsTab.engines)
             workspacesTab
                 .tabItem { Label(L("Workspace"), systemImage: "folder") }
@@ -325,27 +325,12 @@ public struct SettingsView: View {
         .formStyle(.grouped)
     }
 
-    // MARK: - 3. AI 引擎与本机体检
+    // MARK: - 3. Lody 编排与本机体检
 
     private var enginesTab: some View {
-        let activeEngine = coordinator.settings.defaultEngine
         let lodyAgents = coordinator.lodyAgentConfigOptions
         let currentLodyAgent = coordinator.settings.lodyConfig.defaultAgentConfig
         let lodyModels = coordinator.modelsForLody(agentConfig: currentLodyAgent)
-        let directModels = coordinator.availableModelsByEngine[activeEngine] ?? activeEngine.defaultModels
-
-        let directModelBinding = Binding<String>(
-            get: {
-                let current = coordinator.settings.defaultModels[activeEngine] ?? ""
-                if directModels.contains(where: { $0.id == current }) {
-                    return current
-                }
-                return directModels.first?.id ?? ""
-            },
-            set: { newValue in
-                coordinator.settings.defaultModels[activeEngine] = newValue
-            }
-        )
 
         let lodyAgentSelectionBinding = Binding<String>(
             get: {
@@ -395,34 +380,6 @@ public struct SettingsView: View {
             }
         )
 
-        let lodyModes = coordinator.modesForLody(agentConfig: currentLodyAgent)
-        let lodyModeBinding = Binding<String>(
-            get: {
-                let preferred = coordinator.preferredLodyMode(forAgentConfig: currentLodyAgent)
-                if lodyModes.contains(where: { $0.id == preferred }) {
-                    return preferred
-                }
-                return lodyModes.first?.id ?? "__agent_default__"
-            },
-            set: { newValue in
-                coordinator.setPreferredLodyMode(newValue, forAgentConfig: currentLodyAgent)
-            }
-        )
-
-        let directModes = activeEngine.defaultModes
-        let directModeBinding = Binding<String>(
-            get: {
-                let preferred = coordinator.preferredMode(for: activeEngine)
-                if directModes.contains(where: { $0.id == preferred }) {
-                    return preferred
-                }
-                return directModes.first?.id ?? activeEngine.defaultSafeModeID
-            },
-            set: { newValue in
-                coordinator.settings.defaultModes[activeEngine] = newValue
-            }
-        )
-
         let discoveredWorkspaces = coordinator.lodyCatalog?.workspaces ?? []
         let lodyWorkspaceBinding = Binding<String>(
             get: {
@@ -451,53 +408,39 @@ public struct SettingsView: View {
 
         return Form {
             Section(L("Default Execution Preferences")) {
-                Picker(L("Default AI Engine"), selection: $coordinator.settings.defaultEngine) {
-                    ForEach(AgentEngine.allCases) { engine in
-                        Text(engine.displayName).tag(engine)
+                Picker(L("Default Lody Agent"), selection: lodyAgentSelectionBinding) {
+                    Text(L("Workspace Default Agent")).tag("default")
+                    Divider()
+                    ForEach(lodyAgents) { agent in
+                        Text(agent.models.isEmpty ? agent.name : L("%@ (%lld models)", agent.name, agent.models.count))
+                            .tag(agent.id)
+                    }
+                    Divider()
+                    Text(L("Custom Agent Config ID...")).tag("__custom__")
+                }
+
+                if useCustomLodyAgentConfig {
+                    labeledInputRow(
+                        title: L("Custom Agent Config ID"),
+                        placeholder: L("Enter Lody agent-config name or UUID"),
+                        text: $coordinator.settings.lodyConfig.defaultAgentConfig
+                    )
+                }
+
+                Picker(L("Default Model"), selection: lodyModelBinding) {
+                    ForEach(lodyModels) { option in
+                        Text(option.displayName).tag(option.id)
                     }
                 }
 
-                if activeEngine == .lody {
-                    Picker(L("Default Lody Agent"), selection: lodyAgentSelectionBinding) {
-                        Text(L("Workspace Default Agent")).tag("default")
-                        Divider()
-                        ForEach(lodyAgents) { agent in
-                            Text(agent.models.isEmpty ? agent.name : L("%@ (%lld models)", agent.name, agent.models.count))
-                                .tag(agent.id)
-                        }
-                        Divider()
-                        Text(L("Custom Agent Config ID...")).tag("__custom__")
-                    }
-
-                    if useCustomLodyAgentConfig {
-                        labeledInputRow(
-                            title: L("Custom Agent Config ID"),
-                            placeholder: L("Enter Lody agent-config name or UUID"),
-                            text: $coordinator.settings.lodyConfig.defaultAgentConfig
-                        )
-                    }
-
-                    Picker(L("Default Model"), selection: lodyModelBinding) {
-                        ForEach(lodyModels) { option in
-                            Text(option.displayName).tag(option.id)
-                        }
-                    }
-
-                    if currentLodyAgent.isEmpty || currentLodyAgent == "default" {
-                        Text(L("Select a specific Lody Agent (e.g. Antigravity / Claude Code / Codex) to view and choose from all models it provides."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if lodyModels.count <= 1 {
-                        Text(L("This Lody Agent did not report individual models; its default model will be used automatically."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Picker(L("Default Model"), selection: directModelBinding) {
-                        ForEach(directModels) { option in
-                            Text(option.displayName).tag(option.id)
-                        }
-                    }
+                if currentLodyAgent.isEmpty || currentLodyAgent == "default" {
+                    Text(L("Select a specific Lody Agent (e.g. Antigravity / Claude Code / Codex) to view and choose from all models it provides."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if lodyModels.count <= 1 {
+                    Text(L("This Lody Agent did not report individual models; its default model will be used automatically."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Picker(L("Default Reasoning Effort"), selection: $coordinator.settings.defaultEffort) {
@@ -505,105 +448,70 @@ public struct SettingsView: View {
                         Text(effort.displayName).tag(effort)
                     }
                 }
-
-                if activeEngine == .lody {
-                    Picker(L("Default Mode"), selection: lodyModeBinding) {
-                        ForEach(lodyModes) { modeOpt in
-                            Text(modeOpt.displayName).tag(modeOpt.id)
-                        }
-                    }
-                } else {
-                    Picker(L("Default Mode"), selection: directModeBinding) {
-                        ForEach(directModes) { modeOpt in
-                            Text(modeOpt.displayName).tag(modeOpt.id)
-                        }
-                    }
-                }
-
-                if activeEngine == .lody {
-                    HStack {
-                        Text(L("Launch Mode"))
-                        Spacer()
-                        Text(L("Lody Workspace Session · Markdown"))
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Picker(L("Default Launch Mode"), selection: $coordinator.settings.defaultLaunchMode) {
-                        ForEach(ExecutionLaunchMode.allCases) { mode in
-                            Text(mode.displayName).tag(mode)
-                        }
-                    }
-                }
             }
 
-            if activeEngine == .lody {
-                Section(L("Lody.ai Workspace Orchestration")) {
-                    if !discoveredWorkspaces.isEmpty {
-                        Picker(L("Target Workspace"), selection: lodyWorkspaceBinding) {
-                            Text(L("Use current default workspace automatically")).tag("")
-                            Divider()
-                            ForEach(discoveredWorkspaces) { ws in
-                                Text(ws.displayLabel).tag(ws.id)
-                            }
-                            Divider()
-                            Text(L("Enter Workspace manually...")).tag("__custom__")
+            Section(L("Lody.ai Workspace Orchestration")) {
+                if !discoveredWorkspaces.isEmpty {
+                    Picker(L("Target Workspace"), selection: lodyWorkspaceBinding) {
+                        Text(L("Use current default workspace automatically")).tag("")
+                        Divider()
+                        ForEach(discoveredWorkspaces) { ws in
+                            Text(ws.displayLabel).tag(ws.id)
                         }
-                        if useCustomLodyWorkspace {
-                            labeledInputRow(
-                                title: L("Custom Workspace"),
-                                placeholder: L("Enter Workspace name, slug, or ID"),
-                                text: $coordinator.settings.lodyConfig.workspace
-                            )
-                        }
-                    } else {
+                        Divider()
+                        Text(L("Enter Workspace manually...")).tag("__custom__")
+                    }
+                    if useCustomLodyWorkspace {
                         labeledInputRow(
-                            title: L("Workspace Name / ID"),
-                            placeholder: L("Leave empty to use current default workspace"),
+                            title: L("Custom Workspace"),
+                            placeholder: L("Enter Workspace name, slug, or ID"),
                             text: $coordinator.settings.lodyConfig.workspace
                         )
                     }
+                } else {
+                    labeledInputRow(
+                        title: L("Workspace Name / ID"),
+                        placeholder: L("Leave empty to use current default workspace"),
+                        text: $coordinator.settings.lodyConfig.workspace
+                    )
+                }
 
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            if coordinator.isRefreshingLodyCatalog {
-                                HStack(spacing: 6) {
-                                    ProgressView().controlSize(.small)
-                                    Text(L("Syncing Agents and model catalog from Lody workspace..."))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } else if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
-                                Text(L("Synced %1$lld agents · %2$lld models from Lody", catalog.agentConfigs.count, catalog.totalModelCount))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(L("Lody catalog not synced yet (showing built-in fallback list; click Refresh to fetch live)"))
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if coordinator.isRefreshingLodyCatalog {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text(L("Syncing Agents and model catalog from Lody workspace..."))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
+                        } else if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
+                            Text(L("Synced %1$lld agents · %2$lld models from Lody", catalog.agentConfigs.count, catalog.totalModelCount))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(L("Lody catalog not synced yet (showing built-in fallback list; click Refresh to fetch live)"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Button(coordinator.isRefreshingLodyCatalog ? L("Syncing...") : L("Refresh Lody Catalog")) {
-                            Task { await coordinator.refreshLodyCatalog() }
-                        }
-                        .controlSize(.small)
-                        .disabled(coordinator.isRefreshingLodyCatalog)
                     }
+                    Spacer()
+                    Button(coordinator.isRefreshingLodyCatalog ? L("Syncing...") : L("Refresh Lody Catalog")) {
+                        Task { await coordinator.refreshLodyCatalog() }
+                    }
+                    .controlSize(.small)
+                    .disabled(coordinator.isRefreshingLodyCatalog)
                 }
             }
 
             Section {
-                ForEach(AgentEngine.allCases) { engine in
+                ForEach(AgentEngine.selectableEngines) { engine in
                     let probe = coordinator.environment?.engines[engine]
                     let modelSummary: String = {
-                        if engine == .lody {
-                            if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
-                                return L("%1$lld agents · %2$lld models", catalog.agentConfigs.count, catalog.totalModelCount)
-                            }
-                            return L("%lld built-in agents", coordinator.lodyAgentConfigOptions.count)
+                        if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
+                            return L("%1$lld agents · %2$lld models", catalog.agentConfigs.count, catalog.totalModelCount)
                         }
-                        let count = coordinator.availableModelsByEngine[engine]?.count ?? engine.defaultModels.count
-                        return L("%lld models", count)
+                        return L("%lld built-in agents", coordinator.lodyAgentConfigOptions.count)
                     }()
                     HStack(spacing: 10) {
                         Circle()
@@ -694,15 +602,6 @@ public struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                Picker(L("Review Language"), selection: $coordinator.settings.reviewLanguage) {
-                    ForEach(ReviewLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
-                    }
-                }
-                Text(L("Language used by CollabDock for GitHub review headings, severity labels, local reports, and multi-model consensus text."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Section(L("Review Workspace & Search Roots")) {
@@ -837,7 +736,7 @@ public struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text(L("Repository → Local Directory Mapping (shared across all engines)"))
+                    Text(L("Repository → Local Directory Mapping"))
                     Spacer()
                     Button(L("Rescan")) {
                         coordinator.refreshDiscoveredLocalRepos()
@@ -891,7 +790,7 @@ public struct SettingsView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(L("Usage Sample Data"))
-                            Text(L("Inject 5-day / 4-engine sample usage stats to preview charts (never written to SQLite)."))
+                            Text(L("Inject 5-day sample usage stats to preview charts (never written to SQLite)."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -995,7 +894,7 @@ public struct SettingsView: View {
                 Toggle(L("Inject the selected prompt preset and read-only safety guardrails"), isOn: $coordinator.settings.injectPresetPrompt)
                 Text(
                     coordinator.settings.injectPresetPrompt
-                    ? L("Enabled: injects only the single selected preset plus read-only guardrails. Lody / background sessions output Markdown; managed drafts include a JSON Schema. Click \"Prompt\" on the confirmation card to inspect the full text.")
+                    ? L("Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text.")
                     : L("Disabled: no preset is injected; only the minimal PR / trigger context and your extra note are sent (with <untrusted_external_data> isolation preserved).")
                 )
                 .font(.caption)

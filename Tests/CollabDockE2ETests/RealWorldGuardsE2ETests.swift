@@ -3,7 +3,7 @@ import Testing
 @testable import CollabDockCore
 
 /// 安全网：这些行为来自真实机器上踩过的坑（见 pm/05-iterations/ITER-010、ITER-013、ITER-015 及 lody 修复提交）。
-/// 看起来像「奇怪的特判」，重构执行后端（直连 CLI / Lody）时必须保持。
+/// 看起来像「奇怪的特判」，改动 Lody 执行后端时必须保持。
 @Suite("E2E — real-world guards that the execution-backend refactor must keep", .serialized)
 struct RealWorldGuardsE2ETests {
     static let inheritedHostVariables: [String: String] = [
@@ -116,43 +116,6 @@ struct RealWorldGuardsE2ETests {
         } catch AgentRunnerError.processFailed(let code, let detail) {
             #expect(code == 1)
             #expect(detail.contains("Workspace quota exceeded"))
-        }
-    }
-
-    @Test(
-        "Antigravity: model IDs that already encode effort (-low…-max) are not sent a conflicting --effort",
-        arguments: [
-            ("gemini-3.8-flash-high", false),
-            ("gemini-4-neon-xhigh", false),
-            ("gemini-4-neon", true)
-        ]
-    )
-    func agyEffortSuffix(model: String, expectsEffortFlag: Bool) async throws {
-        let workspace = try makeWorkspace()
-        defer { try? FileManager.default.removeItem(at: workspace) }
-        let response = #"{\"summary\":\"ok\",\"recommendedVerdict\":\"COMMENT\",\"comments\":[]}"#
-        let fake = try FakeAgentCLI(
-            in: workspace,
-            name: "agy",
-            stdoutLines: [#"{"event":"result","result":{"conversation_id":"conv-1","status":"SUCCESS","response":"\#(response)"}}"#]
-        )
-
-        let run = try await AgentSessionRunner().run(
-            item: item(),
-            plan: ExecutionPlan(engine: .antigravity, model: model, effort: .medium),
-            preset: TaskPreset.defaults[0],
-            workspaceURL: workspace,
-            environmentSnapshot: fake.environmentSnapshot(engine: .antigravity),
-            lodyConfig: LodyConfig(),
-            cancellationToken: ProcessCancellationToken(),
-            onProgress: { _ in }
-        )
-
-        #expect(fake.argv.contains("--effort") == expectsEffortFlag)
-        #expect(fake.value(after: "--model") == model)
-        #expect(run.sessionHandle?.sessionID == "conv-1")
-        guard case .codeReview? = run.output else {
-            Issue.record("expected agy's nested result.response to be parsed as a code review"); return
         }
     }
 }
