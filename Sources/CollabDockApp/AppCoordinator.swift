@@ -306,6 +306,7 @@ public final class AppCoordinator {
 
         let candidates = usageRuns
             .filter { !$0.id.hasPrefix("demo-usage-") && $0.engine == .lody && $0.syncedAt == nil && ($0.sessionID?.isEmpty == false) }
+            .sorted { $0.createdAt < $1.createdAt }
             .prefix(10)
         guard !candidates.isEmpty else { return }
 
@@ -324,29 +325,7 @@ public final class AppCoordinator {
                 resolvedPATH: resolvedPATH
             ) {
                 guard let idx = usageRuns.firstIndex(where: { $0.id == run.id }) else { continue }
-                var updated = usageRuns[idx]
-                if let modelName = snap.modelName, !modelName.isEmpty {
-                    updated.model = modelName
-                } else if let modelID = snap.modelID, !modelID.isEmpty {
-                    updated.model = modelID
-                }
-                if snap.contextUsedTokens > 0 {
-                    updated.usage = AgentUsageMetrics(
-                        totalTokens: snap.contextUsedTokens,
-                        durationSeconds: snap.durationSeconds ?? updated.usage.durationSeconds,
-                        metricKind: .contextWindow
-                    )
-                    updated.estimatedCostUSD = UsageCostEstimator.estimateUSD(
-                        model: snap.modelID ?? updated.model,
-                        engine: .lody,
-                        usage: updated.usage
-                    )
-                }
-                if snap.isSettledIdle && snap.contextUsedTokens > 0 {
-                    updated.syncedAt = clock.now
-                }
-                usageRuns[idx] = updated
-                await persistUsageRun(updated)
+                await applyLodySnapshot(snap, toRunAt: idx)
             }
         }
     }
@@ -1522,8 +1501,12 @@ public final class AppCoordinator {
 
                 if snap.isSettledIdle {
                     self.items[idx].remoteSessionStatus = .completed
+                    let dispatchedAt = self.matchingLodyUsageRunIndex(itemID: itemID, sessionID: sessionID)
+                        .map { self.usageRuns[$0].createdAt }
+                    let roundDuration = dispatchedAt.flatMap { snap.roundDurationSeconds(since: $0) }
+                        ?? (dispatchedAt == nil ? snap.durationSeconds : nil)
                     var parts: [String] = ["\(modelLabel) 已完成审查"]
-                    if let dur = snap.durationSeconds, dur > 0 {
+                    if let dur = roundDuration, dur > 0 {
                         parts.append("耗时 \(UsageAggregator.formatDuration(dur))")
                     }
                     if snap.contextUsedTokens > 0 {
@@ -1535,7 +1518,7 @@ public final class AppCoordinator {
                     )
                     let updated = self.items[idx]
                     await self.persistItem(updated)
-                    await self.applyLodySnapshotToUsageLedger(sessionID: sessionID, snapshot: snap)
+                    await self.applyLodySnapshotToUsageLedger(itemID: itemID, sessionID: sessionID, snapshot: snap)
                     self.systemIntegration.postCompletionNotification(
                         for: updated,
                         summary: summary,
@@ -1560,23 +1543,50 @@ public final class AppCoordinator {
         lodyMonitorTasks[itemID] = task
     }
 
+    private func matchingLodyUsageRunIndex(itemID: String, sessionID: String) -> Int? {
+        if let exact = usageRuns.firstIndex(where: {
+            $0.itemID == itemID && $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-")
+        }) {
+            return exact
+        }
+        return usageRuns.firstIndex(where: {
+            $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-")
+        })
+    }
+
     private func applyLodySnapshotToUsageLedger(
+        itemID: String,
         sessionID: String,
         snapshot snap: EnvironmentDetector.LodySessionUsageSnapshot
     ) async {
-        guard let runIdx = usageRuns.firstIndex(where: { $0.sessionID == sessionID && !$0.id.hasPrefix("demo-usage-") }) else {
+        guard let runIdx = matchingLodyUsageRunIndex(itemID: itemID, sessionID: sessionID) else {
             return
         }
+        await applyLodySnapshot(snap, toRunAt: runIdx)
+    }
+
+    /// 统一的 Lody 快照落账逻辑（供 `syncPendingLodyUsage` 与实时监控共用）：
+    /// - 耗时按本轮派发时间（`updated.createdAt`）计算
+    /// - 续聊轮次仅记相对同会话更早且已同步轮次的新增上下文（若发生上下文压缩则回退记录当前上下文，绝不记负数）
+    private func applyLodySnapshot(
+        _ snap: EnvironmentDetector.LodySessionUsageSnapshot,
+        toRunAt runIdx: Int
+    ) async {
         var updated = usageRuns[runIdx]
         if let modelName = snap.modelName, !modelName.isEmpty {
             updated.model = modelName
         } else if let modelID = snap.modelID, !modelID.isEmpty {
             updated.model = modelID
         }
+        let roundDuration = snap.roundDurationSeconds(since: updated.createdAt)
         if snap.contextUsedTokens > 0 {
+            let roundContextTokens = effectiveLodyRoundContextTokens(
+                for: updated,
+                snapshotContextTokens: snap.contextUsedTokens
+            )
             updated.usage = AgentUsageMetrics(
-                totalTokens: snap.contextUsedTokens,
-                durationSeconds: snap.durationSeconds ?? updated.usage.durationSeconds,
+                totalTokens: roundContextTokens,
+                durationSeconds: roundDuration ?? updated.usage.durationSeconds,
                 metricKind: .contextWindow
             )
             updated.estimatedCostUSD = UsageCostEstimator.estimateUSD(
@@ -1590,6 +1600,31 @@ public final class AppCoordinator {
         }
         usageRuns[runIdx] = updated
         await persistUsageRun(updated)
+    }
+
+    private func effectiveLodyRoundContextTokens(
+        for run: ReviewUsageRun,
+        snapshotContextTokens: Int
+    ) -> Int {
+        guard snapshotContextTokens > 0,
+              let sessionID = run.sessionID, !sessionID.isEmpty else {
+            return max(0, snapshotContextTokens)
+        }
+        let priorSyncedTokens = usageRuns
+            .filter { other in
+                other.id != run.id
+                    && !other.id.hasPrefix("demo-usage-")
+                    && other.engine == .lody
+                    && other.sessionID == sessionID
+                    && other.syncedAt != nil
+                    && other.createdAt < run.createdAt
+            }
+            .reduce(0) { $0 + $1.usage.totalTokens }
+        guard priorSyncedTokens > 0 else {
+            return snapshotContextTokens
+        }
+        let delta = snapshotContextTokens - priorSyncedTokens
+        return delta >= 0 ? delta : snapshotContextTokens
     }
 
     private func runDemoSimulation(ticket: ExecutionRunTicket, targetItem: CollaborationItem, plan: ExecutionPlan) -> Task<Void, Never> {
