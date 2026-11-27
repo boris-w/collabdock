@@ -49,11 +49,14 @@ final class RecordingSystemIntegration: SystemIntegrating {
     private(set) var incoming: [String] = []
     private(set) var completions: [String] = []
     private(set) var launchAtLogin: [Bool] = []
+    /// 每次应用界面语言时写入的 `AppleLanguages` 覆盖（nil 表示移除覆盖、跟随系统）
+    private(set) var languageOverrides: [[String]?] = []
 
     func configureNotificationsIfAvailable() { configureCount += 1 }
     func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool) { if enabled { incoming.append(item.id) } }
     func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool) { if enabled { completions.append(item.id) } }
     func setLaunchAtLogin(_ enabled: Bool) -> String? { launchAtLogin.append(enabled); return nil }
+    func applyInterfaceLanguage(_ appleLanguages: [String]?) { languageOverrides.append(appleLanguages) }
     func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {}
     func openLocalReport(path: String) {}
 }
@@ -137,11 +140,16 @@ final class RecordingSink: CollaborationSink, @unchecked Sendable {
     let platform: PlatformKind = .github
     private let lock = NSLock()
     private var delivered: [String] = []
+    private var recordedContexts: [DeliveryContext] = []
     var deliveries: [String] { lock.withLock { delivered } }
+    var contexts: [DeliveryContext] { lock.withLock { recordedContexts } }
 
     func supportedDeliveryModes(for item: CollaborationItem) -> [DeliveryMode] { ConnectorCatalog.supportedDeliveryModes(for: item) }
     func deliver(output: ExecutionOutput, for item: CollaborationItem, mode: DeliveryMode, context: DeliveryContext) async throws -> DeliveryReceipt {
-        lock.withLock { delivered.append(item.id) }
+        lock.withLock {
+            delivered.append(item.id)
+            recordedContexts.append(context)
+        }
         return DeliveryReceipt(deliveredMode: mode, destinationURL: item.url, localReportPath: URL(fileURLWithPath: "/tmp/collabdock-app-test-report.md"))
     }
 }
