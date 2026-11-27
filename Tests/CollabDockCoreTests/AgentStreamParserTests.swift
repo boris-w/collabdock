@@ -6,14 +6,15 @@ import Testing
 struct AgentStreamParserTests {
     @Test("Extracts session ID, tool progress, and structured output from Claude/Agy/Lody JSON lines")
     func parsesStreamingEvents() {
+        let isZH = (CoreL10n.currentLanguage == .zhHans)
         let claudeInit = #"{"type":"system","session_id":"sess_claude_01"}"#
         let p1 = AgentStreamParser.parseLine(claudeInit)
         #expect(p1.sessionID == "sess_claude_01")
-        #expect(p1.progressHint?.contains("初始化") == true)
+        #expect(p1.progressHint?.contains(isZH ? "初始化" : "initialized") == true)
 
         let claudeTool = #"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/repo/Sources/Auth.swift"}}]}}"#
         let p2 = AgentStreamParser.parseLine(claudeTool)
-        #expect(p2.progressHint == "正在 Read：Auth.swift")
+        #expect(p2.progressHint == (isZH ? "正在 Read：Auth.swift" : "Running Read: Auth.swift"))
 
         let lodyResp = #"{"session":{"id":"ses_lody_99"}}"#
         let p3 = AgentStreamParser.parseLine(lodyResp)
@@ -27,7 +28,7 @@ struct AgentStreamParserTests {
         let agyTool = #"{"event":"step_update","step_update":{"conversation_id":"conv_agy_1","step_type":"tool","tool_name":"view_file","tool_info":{"parameters":{"Path":"/repo/src/cli.ts"}}}}"#
         let p5 = AgentStreamParser.parseLine(agyTool)
         #expect(p5.sessionID == "conv_agy_1")
-        #expect(p5.progressHint == "正在 view_file：cli.ts")
+        #expect(p5.progressHint == (isZH ? "正在 view_file：cli.ts" : "Running view_file: cli.ts"))
 
         let agyResult = #"{"event":"result","result":{"conversation_id":"conv_agy_1","status":"SUCCESS","response":"{\"summary\":\"ok\",\"recommendedVerdict\":\"APPROVE\",\"comments\":[]}"}}"#
         let p6 = AgentStreamParser.parseLine(agyResult)

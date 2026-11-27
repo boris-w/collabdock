@@ -51,17 +51,17 @@ public enum GitHubConnectorError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .missingToken:
-            return "未检测到 GitHub 凭据，请运行 `gh auth login` 或在设置中填入 PAT"
+            return CoreL10n.string("No GitHub credentials detected. Run `gh auth login` or enter a PAT in Settings.")
         case .invalidResponse:
-            return "GitHub 返回了无效的 HTTP 响应"
+            return CoreL10n.string("GitHub returned an invalid HTTP response")
         case .unauthorized:
-            return "GitHub Token 认证失败或已过期，请重新执行 `gh auth login`"
+            return CoreL10n.string("GitHub token authentication failed or expired. Please run `gh auth login` again.")
         case .rateLimited(let retryAfter):
-            return "触发 GitHub API 速率限制，已自动退避 \(retryAfter) 秒后重试"
+            return CoreL10n.format("GitHub API rate limit reached; backing off for %lld seconds", retryAfter)
         case .httpError(let code, let msg):
-            return "GitHub API 错误 (HTTP \(code)): \(msg)"
+            return CoreL10n.format("GitHub API error (HTTP %lld): %@", code, msg)
         case .pendingReviewAlreadyExists:
-            return "该 PR 上你已有一个未提交的 Pending Review 草稿，请先在 GitHub 提交或删除旧草稿（本地 Markdown 报告已保存）"
+            return CoreL10n.string("You already have an unsubmitted Pending Review draft on this PR. Submit or discard it on GitHub first (local Markdown report saved).")
         }
     }
 }
@@ -129,7 +129,7 @@ public struct GitHubConnector: CodeReviewConnector {
         if knownNotificationsScope == false {
             notificationsForbidden = true
             pollInterval = 180
-            diagnostic = "当前 gh Token 缺少 notifications 权限（运行 `gh auth refresh -s notifications` 可解锁 304 零配额监听）；已自动按 180s 间隔走 Search API 降级"
+            diagnostic = CoreL10n.string("Your gh token lacks the notifications scope (run `gh auth refresh -s notifications` to unlock 304 zero-quota polling); automatically fell back to Search API every 180s")
         } else {
             let notifURL = baseURL.appendingPathComponent("notifications")
             var notifReq = makeRequest(url: notifURL, token: token)
@@ -174,7 +174,7 @@ public struct GitHubConnector: CodeReviewConnector {
             case 403:
                 notificationsForbidden = true
                 pollInterval = max(pollInterval ?? 180, 180)
-                diagnostic = "当前 gh Token 缺少 notifications 权限（运行 `gh auth refresh -s notifications` 可解锁 304 零配额监听）；已自动按 180s 间隔走 Search API 降级"
+                diagnostic = CoreL10n.string("Your gh token lacks the notifications scope (run `gh auth refresh -s notifications` to unlock 304 zero-quota polling); automatically fell back to Search API every 180s")
             default:
                 throw GitHubConnectorError.httpError(
                     statusCode: notifResp.statusCode,
@@ -268,14 +268,20 @@ public struct GitHubConnector: CodeReviewConnector {
     /// 按 PR 链接或 `owner/repo#123` 直接拉取真实 GitHub PR（便于手动导入审查与端到端实跑）
     public func fetchPullRequest(reference: String) async throws -> CollaborationItem {
         guard let parsed = Self.parsePullRequestReference(reference) else {
-            throw GitHubConnectorError.httpError(statusCode: 400, message: "请输入有效的 GitHub PR 链接或 owner/repo#编号")
+            throw GitHubConnectorError.httpError(
+                statusCode: 400,
+                message: CoreL10n.string("Please enter a valid GitHub PR URL or owner/repo#number")
+            )
         }
         guard let token = await tokenProvider.fetchToken(), !token.isEmpty else {
             throw GitHubConnectorError.missingToken
         }
         let prURL = baseURL.appendingPathComponent("repos/\(parsed.repository)/pulls/\(parsed.number)")
         guard let pr = await fetchPRDetail(url: prURL, token: token) else {
-            throw GitHubConnectorError.httpError(statusCode: 404, message: "未能读取 \(parsed.repository)#\(parsed.number)，请确认仓库权限与编号")
+            throw GitHubConnectorError.httpError(
+                statusCode: 404,
+                message: CoreL10n.format("Could not load %@#%lld. Check repository permissions and PR number.", parsed.repository, parsed.number)
+            )
         }
         let dedupeKey = "github:\(parsed.repository)#\(pr.number):manual:\(pr.head.sha.prefix(7))"
         return makeCandidate(
@@ -300,7 +306,8 @@ public struct GitHubConnector: CodeReviewConnector {
             mode: mode,
             plan: context.plan,
             unifiedDiff: context.unifiedDiff,
-            reportsDirectory: context.reportsDirectory
+            reportsDirectory: context.reportsDirectory,
+            language: context.language
         )
     }
 
@@ -319,9 +326,15 @@ public struct GitHubConnector: CodeReviewConnector {
         mode: DeliveryMode,
         plan: ExecutionPlan?,
         unifiedDiff: String?,
-        reportsDirectory: URL? = nil
+        reportsDirectory: URL? = nil,
+        language: ResolvedLanguage = .zhHans
     ) async throws -> DeliveryReceipt {
-        let markdown = GitHubReviewFormatter.renderLocalMarkdownReport(item: item, output: output, plan: plan)
+        let markdown = GitHubReviewFormatter.renderLocalMarkdownReport(
+            item: item,
+            output: output,
+            plan: plan,
+            language: language
+        )
         let localReportURL = try GitHubReviewFormatter.saveLocalReport(
             markdown: markdown,
             itemID: item.id,
@@ -361,7 +374,8 @@ public struct GitHubConnector: CodeReviewConnector {
                 review: review,
                 commitSHA: code.headSHA,
                 unifiedDiff: effectiveDiff,
-                mode: mode
+                mode: mode,
+                language: language
             )
 
             let reviewsURL = baseURL.appendingPathComponent("repos/\(code.repository)/pulls/\(code.number)/reviews")

@@ -31,8 +31,8 @@ public struct DirectCLIBackend: ExecutionBackend {
 
         onProgress(
             request.plan.useIsolatedWorktree
-                ? "正在创建隔离只读 Git Worktree..."
-                : "正在准备项目主目录上下文..."
+                ? CoreL10n.string("Creating isolated read-only Git Worktree...")
+                : CoreL10n.string("Preparing project directory context...")
         )
         return try await worktreeManager.prepareContext(
             for: request.item,
@@ -137,7 +137,7 @@ public struct DirectCLIBackend: ExecutionBackend {
         }
 
         let sanitizedEnv = AgentSessionRunner.sanitizedEnvironment(from: request.environment)
-        onProgress("启动 \(request.plan.engine.displayName) (\(request.plan.model))...")
+        onProgress(CoreL10n.format("Starting %@ (%@)...", request.plan.engine.displayName, request.plan.model))
 
         let startedAt = Date()
         let execResult = try await AgentSessionRunner.executeStreaming(
@@ -228,7 +228,11 @@ public struct DirectCLIBackend: ExecutionBackend {
         // 若未严格按 JSON Schema 返回，仍优雅降级为 StructuredReplyResult（绝不把 stream-json init 日志当作正文）
         let trimmedFallback = candidateText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedFallback.isEmpty, !trimmedFallback.hasPrefix(#"{"event":"init""#) else {
-            throw AgentRunnerError.unparseableOutput(raw.stderr.isEmpty ? "AI 返回内容为空或被只读权限拦截" : raw.stderr)
+            throw AgentRunnerError.unparseableOutput(
+                raw.stderr.isEmpty
+                    ? CoreL10n.string("AI returned empty output or was blocked by read-only permissions")
+                    : raw.stderr
+            )
         }
         let fallbackSummary = String(trimmedFallback.prefix(180))
         return AgentRunResult(

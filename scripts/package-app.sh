@@ -45,6 +45,16 @@ if [[ -f "${ROOT_DIR}/Resources/AppIcon.icns" ]]; then
   cp "${ROOT_DIR}/Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 fi
 
+# Bundle SwiftPM resource bundles (compiled String Catalogs) inside Contents/Resources
+for bundle in "${BIN_DIR}"/*.bundle; do
+  if [[ -d "${bundle}" ]]; then
+    cp -R "${bundle}" "${APP_BUNDLE}/Contents/Resources/"
+  fi
+done
+
+# Declare app-level localization directories alongside CFBundleLocalizations
+mkdir -p "${APP_BUNDLE}/Contents/Resources/en.lproj" "${APP_BUNDLE}/Contents/Resources/zh-Hans.lproj"
+
 if [[ "${SIGN_IDENTITY}" == "-" ]]; then
   echo "[CollabDock] Applying ad-hoc code signature..."
   codesign --force --deep --sign - "${APP_BUNDLE}"

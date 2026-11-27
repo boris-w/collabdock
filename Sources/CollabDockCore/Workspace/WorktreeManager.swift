@@ -40,13 +40,13 @@ public enum WorkspaceError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .gitUnavailable:
-            return "未检测到 git 可执行文件"
+            return CoreL10n.string("git executable not found")
         case .cloneFailed(let msg):
-            return "浅克隆仓库失败：\(msg)"
+            return CoreL10n.format("Shallow clone failed: %@", msg)
         case .fetchFailed(let msg):
-            return "拉取 PR 分支失败：\(msg)"
+            return CoreL10n.format("Failed to fetch PR branch: %@", msg)
         case .worktreeFailed(let msg):
-            return "创建隔离 Git Worktree 失败：\(msg)"
+            return CoreL10n.format("Failed to create isolated Git Worktree: %@", msg)
         }
     }
 }

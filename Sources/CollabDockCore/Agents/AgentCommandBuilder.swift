@@ -152,8 +152,8 @@ public struct AgentCommandBuilder: Sendable {
         }
 
         let untrustedInner = Self.sanitizeUntrustedContent("""
-        platform: \(item.platform.displayName)
-        item_kind: \(item.itemKind.shortLabel)
+        platform: \(item.platform.displayName(in: .zhHans))
+        item_kind: \(item.itemKind.shortLabel(in: .zhHans))
         scope: \(item.scope)
         external_ref: \(item.externalRef)
         title: \(item.title)

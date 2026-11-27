@@ -1,0 +1,2148 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "## Inline Comments (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Inline Comments (%lld)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 行级审查意见（共 %lld 条）"
+          }
+        }
+      }
+    },
+    "## Key Points": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Key Points"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 关键要点"
+          }
+        }
+      }
+    },
+    "## Referenced Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Referenced Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 关联文件"
+          }
+        }
+      }
+    },
+    "## Suggested Reply Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Suggested Reply Draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 建议回复草稿"
+          }
+        }
+      }
+    },
+    "## Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Summary"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 摘要"
+          }
+        }
+      }
+    },
+    "## Summary (Recommended: %@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## Summary (Recommended: %@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "## 总体结论（建议：%@）"
+          }
+        }
+      }
+    },
+    "### %@ Perspective\n%@\n\n### %@ Perspective\n%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "### %@ Perspective\n%@\n\n### %@ Perspective\n%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "### %@ 观点\n%@\n\n### %@ 观点\n%@"
+          }
+        }
+      }
+    },
+    "### Additional Review Comments (outside changed lines)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "### Additional Review Comments (outside changed lines)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "### 补充审查意见（变更行范围外）"
+          }
+        }
+      }
+    },
+    "%@ Pending Draft (recommended, only visible to you)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Pending Draft (recommended, only visible to you)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Pending 草稿（推荐，仅自己可见）"
+          }
+        }
+      }
+    },
+    "%@ not found in PATH": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ not found in PATH"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未在 PATH 中找到 %@"
+          }
+        }
+      }
+    },
+    "**%@**: %@\n\n**%@**: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**%@**: %@\n\n**%@**: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**%@**：%@\n\n**%@**：%@"
+          }
+        }
+      }
+    },
+    "**Multi-model council complete (%@ × %@)**: %lld findings in total, including **%lld consensus findings**.\n\n- **%@**: %@\n- **%@**: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**Multi-model council complete (%@ × %@)**: %lld findings in total, including **%lld consensus findings**.\n\n- **%@**: %@\n- **%@**: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "**多模型会诊完成（%@ × %@）**：共发现 %lld 条意见，其中 **%lld 条为双方共识问题**。\n\n- **%@**：%@\n- **%@**：%@"
+          }
+        }
+      }
+    },
+    "- **%@ · `%@:%lld`** — **%@**: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **%@ · `%@:%lld`** — **%@**: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **%@ · `%@:%lld`** — **%@**：%@"
+          }
+        }
+      }
+    },
+    "- **Engine**: %@ · `%@` (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **Engine**: %@ · `%@` (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **执行引擎**：%@ · `%@`（%@）"
+          }
+        }
+      }
+    },
+    "- **Link**: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **Link**: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **链接**：%@"
+          }
+        }
+      }
+    },
+    "- **Source**: %@ · `%@`": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **Source**: %@ · `%@`"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **来源**：%@ · `%@`"
+          }
+        }
+      }
+    },
+    "- **Triggered by**: @%@ (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **Triggered by**: @%@ (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "- **触发者**：@%@（%@）"
+          }
+        }
+      }
+    },
+    "30 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 Days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天"
+          }
+        }
+      }
+    },
+    "7 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 Days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天"
+          }
+        }
+      }
+    },
+    "AI process exited with error (code %lld): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI process exited with error (code %lld): %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 执行异常退出 (code %lld)：%@"
+          }
+        }
+      }
+    },
+    "AI returned empty output or was blocked by read-only permissions": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI returned empty output or was blocked by read-only permissions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 返回内容为空或被只读权限拦截"
+          }
+        }
+      }
+    },
+    "Accept edits (auto edit)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept edits (auto edit)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accept edits（自动编辑）"
+          }
+        }
+      }
+    },
+    "All": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
+          }
+        }
+      }
+    },
+    "Approved": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已 Approve"
+          }
+        }
+      }
+    },
+    "Auto (auto decide)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto (auto decide)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto（自动决策）"
+          }
+        }
+      }
+    },
+    "Auto (auto execute)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto (auto execute)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto（自动执行）"
+          }
+        }
+      }
+    },
+    "Background Session": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background Session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生后台会话"
+          }
+        }
+      }
+    },
+    "Background session created: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background session created: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "后台会话已创建: %@"
+          }
+        }
+      }
+    },
+    "Calling tool: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calling tool: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在调用工具：%@"
+          }
+        }
+      }
+    },
+    "Chat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "群聊"
+          }
+        }
+      }
+    },
+    "Closed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已关闭"
+          }
+        }
+      }
+    },
+    "Completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成"
+          }
+        }
+      }
+    },
+    "Computing incremental fix diff since %@...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Computing incremental fix diff since %@..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在计算相对 %@ 的增量修复 Diff..."
+          }
+        }
+      }
+    },
+    "Conditional polling for Notifications / PR Reviews with Pending draft write-back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conditional polling for Notifications / PR Reviews with Pending draft write-back"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "条件轮询 Notifications / PR Review，支持 Pending 草稿回写"
+          }
+        }
+      }
+    },
+    "Context": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Context"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文"
+          }
+        }
+      }
+    },
+    "Continue Session · Incremental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue Session · Incremental"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "续聊原会话 · 增量 Diff"
+          }
+        }
+      }
+    },
+    "Continue previous session · new commits only (recommended)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue previous session · new commits only (recommended)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "续聊原会话 · 仅审新增改动（推荐，保留上轮记忆）"
+          }
+        }
+      }
+    },
+    "Could not load %@#%lld. Check repository permissions and PR number.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not load %@#%lld. Check repository permissions and PR number."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能读取 %@#%lld，请确认仓库权限与编号"
+          }
+        }
+      }
+    },
+    "Could not parse structured output (raw text kept): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not parse structured output (raw text kept): %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能解析结构化输出（已保留原文）：%@"
+          }
+        }
+      }
+    },
+    "Creating isolated read-only Git Worktree...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creating isolated read-only Git Worktree..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在创建隔离只读 Git Worktree..."
+          }
+        }
+      }
+    },
+    "Current connector does not support manual PR fetching": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current connector does not support manual PR fetching"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前连接器不支持手动拉取 PR"
+          }
+        }
+      }
+    },
+    "Custom Webhook / SSE bridge for internal team systems (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Webhook / SSE bridge for internal team systems (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 Webhook / SSE 桥接接入任意团队内部系统（规划扩展）"
+          }
+        }
+      }
+    },
+    "Default (ask by default)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default (ask by default)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default（默认询问）"
+          }
+        }
+      }
+    },
+    "Direct Reply": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direct Reply"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接回复"
+          }
+        }
+      }
+    },
+    "Dispatch as native background session": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispatch as native background session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "派发为原生后台会话（类定时任务）"
+          }
+        }
+      }
+    },
+    "Dispatched as a native %@ background session. Click \"Resume Session\" to inspect.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dispatched as a native %@ background session. Click \"Resume Session\" to inspect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已派发为 %@ 原生后台会话，可点「接管会话」查看。"
+          }
+        }
+      }
+    },
+    "Exact": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精确"
+          }
+        }
+      }
+    },
+    "Executable not found: %@. Check installation status in Settings → AI Engines.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable not found: %@. Check installation status in Settings → AI Engines."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到可执行文件：%@，请先在设置 → AI 引擎中确认安装状态"
+          }
+        }
+      }
+    },
+    "Failed to create isolated Git Worktree: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to create isolated Git Worktree: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建隔离 Git Worktree 失败：%@"
+          }
+        }
+      }
+    },
+    "Failed to fetch PR branch: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to fetch PR branch: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拉取 PR 分支失败：%@"
+          }
+        }
+      }
+    },
+    "Feishu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feishu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "飞书"
+          }
+        }
+      }
+    },
+    "Feishu group chats / doc comment @mentions with local troubleshooting drafts (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feishu group chats / doc comment @mentions with local troubleshooting drafts (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "飞书群聊 / 文档评论 @我，本地生成排查回复草稿（规划扩展）"
+          }
+        }
+      }
+    },
+    "Follow Agent Default": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Agent Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随 Agent 默认模型"
+          }
+        }
+      }
+    },
+    "Follow Agent Default Mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Agent Default Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随 Agent 默认模式"
+          }
+        }
+      }
+    },
+    "Follow UI": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow UI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随界面语言"
+          }
+        }
+      }
+    },
+    "Follow Workspace Default": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow Workspace Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随 Workspace 默认模型"
+          }
+        }
+      }
+    },
+    "Full access": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full access（完全权限）"
+          }
+        }
+      }
+    },
+    "Generating review findings...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generating review findings..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在生成审查结论..."
+          }
+        }
+      }
+    },
+    "GitHub API error (HTTP %lld): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub API error (HTTP %lld): %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub API 错误 (HTTP %lld): %@"
+          }
+        }
+      }
+    },
+    "GitHub API rate limit reached; backing off for %lld seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub API rate limit reached; backing off for %lld seconds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "触发 GitHub API 速率限制，已自动退避 %lld 秒后重试"
+          }
+        }
+      }
+    },
+    "GitHub returned an invalid HTTP response": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub returned an invalid HTTP response"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub 返回了无效的 HTTP 响应"
+          }
+        }
+      }
+    },
+    "GitHub token authentication failed or expired. Please run `gh auth login` again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub token authentication failed or expired. Please run `gh auth login` again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Token 认证失败或已过期，请重新执行 `gh auth login`"
+          }
+        }
+      }
+    },
+    "Jira ticket comments and assignments (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jira ticket comments and assignments (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jira 工单评论与指派触发（规划扩展）"
+          }
+        }
+      }
+    },
+    "Linear issue assignments and comments for root-cause analysis (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linear issue assignments and comments for root-cause analysis (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Linear Issue 指派与评论触发，输出根因分析与方案（规划扩展）"
+          }
+        }
+      }
+    },
+    "Local Draft Only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Draft Only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅本地草稿"
+          }
+        }
+      }
+    },
+    "Local draft / report only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local draft / report only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅本地生成草稿/报告"
+          }
+        }
+      }
+    },
+    "Local storage operation failed (%@): %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local storage operation failed (%@): %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地存储操作失败（%@）：%@"
+          }
+        }
+      }
+    },
+    "Lody CLI login expired. Run `npx -y lody@latest login` in Terminal, then click Retry. (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody CLI login expired. Run `npx -y lody@latest login` in Terminal, then click Retry. (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody CLI 登录已失效，请在终端运行 `npx -y lody@latest login` 后点击重试。（%@）"
+          }
+        }
+      }
+    },
+    "Lody Desktop (requires Node/npx or lody CLI)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody Desktop (requires Node/npx or lody CLI)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody Desktop (需安装 Node/npx 或 lody CLI)"
+          }
+        }
+      }
+    },
+    "Lody is reviewing in the background. Click \"Open Lody\" anytime to view live progress.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody is reviewing in the background. Click \"Open Lody\" anytime to view live progress."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lody 正在后台执行审查，可随时点「打开 Lody」查看实时进度。"
+          }
+        }
+      }
+    },
+    "Managed + Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Managed + Draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "托管并生成草稿"
+          }
+        }
+      }
+    },
+    "Managed run with draft (resume anytime)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Managed run with draft (resume anytime)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "托管执行并生成草稿（可随时接管会话）"
+          }
+        }
+      }
+    },
+    "Manual (ask before edits)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual (ask before edits)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual（修改前询问）"
+          }
+        }
+      }
+    },
+    "Merge Request @mentions and Draft Notes (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge Request @mentions and Draft Notes (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge Request @mention 与 Draft Notes（规划扩展）"
+          }
+        }
+      }
+    },
+    "Merged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merged"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已合并"
+          }
+        }
+      }
+    },
+    "New Session · Full PR": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Session · Full PR"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新开会话 · 全量 PR"
+          }
+        }
+      }
+    },
+    "New Session · Incremental": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Session · Incremental"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新开会话 · 增量 Diff"
+          }
+        }
+      }
+    },
+    "New session · full PR re-review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New session · full PR re-review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新开会话 · 全量重审整个 PR"
+          }
+        }
+      }
+    },
+    "New session · new commits only (with prior summary)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New session · new commits only (with prior summary)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新开会话 · 仅审新增改动（附带上次摘要）"
+          }
+        }
+      }
+    },
+    "No GitHub credentials detected. Run `gh auth login` or enter a PAT in Settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No GitHub credentials detected. Run `gh auth login` or enter a PAT in Settings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到 GitHub 凭据，请运行 `gh auth login` 或在设置中填入 PAT"
+          }
+        }
+      }
+    },
+    "Pending Draft": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending Draft"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending 草稿"
+          }
+        }
+      }
+    },
+    "Pending Sync": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending Sync"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待同步"
+          }
+        }
+      }
+    },
+    "Plan (read-only)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan (read-only)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan（只读规划）"
+          }
+        }
+      }
+    },
+    "Please enter a valid GitHub PR URL or owner/repo#number": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please enter a valid GitHub PR URL or owner/repo#number"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入有效的 GitHub PR 链接或 owner/repo#编号"
+          }
+        }
+      }
+    },
+    "Preparing isolated context...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing isolated context..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备隔离上下文..."
+          }
+        }
+      }
+    },
+    "Preparing project directory context...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing project directory context..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备项目目录上下文..."
+          }
+        }
+      }
+    },
+    "Read-only (sandbox)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read-only (sandbox)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read-only（只读沙箱）"
+          }
+        }
+      }
+    },
+    "Refreshing PR branch refs in local project %@...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing PR branch refs in local project %@..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在刷新本地项目 %@ 的 PR 分支引用..."
+          }
+        }
+      }
+    },
+    "Reply directly on %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reply directly on %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接回复到 %@"
+          }
+        }
+      }
+    },
+    "Review cancelled by user": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review cancelled by user"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户已中止本次审查"
+          }
+        }
+      }
+    },
+    "Running %@...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running %@..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在执行 %@..."
+          }
+        }
+      }
+    },
+    "Running %@: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running %@: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在 %@：%@"
+          }
+        }
+      }
+    },
+    "Running two-model council: %@ (%@) × %@ (%@)...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running two-model council: %@ (%@) × %@ (%@)..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双模型会诊中：%@ (%@) × %@ (%@)..."
+          }
+        }
+      }
+    },
+    "SQLite execution failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite execution failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite 执行失败: %@"
+          }
+        }
+      }
+    },
+    "SQLite open failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite open failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite 打开失败: %@"
+          }
+        }
+      }
+    },
+    "SQLite prepare failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite prepare failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SQLite 预处理失败: %@"
+          }
+        }
+      }
+    },
+    "Sending round %lld follow-up review to the existing Lody session...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending round %lld follow-up review to the existing Lody session..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在向原 Lody 会话发送第 %lld 轮复审追问..."
+          }
+        }
+      }
+    },
+    "Sent round %1$lld follow-up review to the existing %2$@ session. Click \"Resume Session\" to inspect.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent round %1$lld follow-up review to the existing %2$@ session. Click \"Resume Session\" to inspect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已向原 %2$@ 会话追加第 %1$lld 轮复审，可点「接管会话」查看。"
+          }
+        }
+      }
+    },
+    "Sent round %lld incremental re-review to the existing Lody session; analyzing in background...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sent round %lld incremental re-review to the existing Lody session; analyzing in background..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已向原 Lody 会话追加第 %lld 轮增量复审，正在后台分析中..."
+          }
+        }
+      }
+    },
+    "Session initialized, starting code analysis...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session initialized, starting code analysis..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话已初始化，开始分析代码..."
+          }
+        }
+      }
+    },
+    "Shallow clone failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shallow clone failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浅克隆仓库失败：%@"
+          }
+        }
+      }
+    },
+    "Simplified Chinese": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简体中文"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简体中文"
+          }
+        }
+      }
+    },
+    "Slack thread @mentions with read-only local repo investigation (planned)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slack thread @mentions with read-only local repo investigation (planned)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slack Thread @mention，支持关联本地代码库只读排查（规划扩展）"
+          }
+        }
+      }
+    },
+    "Starting %@ (%@)...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting %@ (%@)..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在启动 %@ (%@)..."
+          }
+        }
+      }
+    },
+    "Subprocess produced no error output": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subprocess produced no error output"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "子进程无错误输出"
+          }
+        }
+      }
+    },
+    "Summarizing review findings...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summarizing review findings..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在汇总审查结论..."
+          }
+        }
+      }
+    },
+    "Superseded by next round": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Superseded by next round"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已进入下一轮"
+          }
+        }
+      }
+    },
+    "System": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随系统"
+          }
+        }
+      }
+    },
+    "Target branch ref not found in the local project. Check `git fetch` or switch to \"Project Directory\" and retry. (%@)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Target branch ref not found in the local project. Check `git fetch` or switch to \"Project Directory\" and retry. (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地项目缺少目标分支引用，请确认 git fetch 可用或先切换为「直用主目录」重试。（%@）"
+          }
+        }
+      }
+    },
+    "Ticket": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ticket"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工单"
+          }
+        }
+      }
+    },
+    "Today": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日"
+          }
+        }
+      }
+    },
+    "Two-model council (%@ × %@): %@ / %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two-model council (%@ × %@): %@ / %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "双模型会诊（%@ × %@）：%@ / %@"
+          }
+        }
+      }
+    },
+    "Validating diff lines and generating %@...": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Validating diff lines and generating %@..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在校验行号并生成 %@..."
+          }
+        }
+      }
+    },
+    "Workspace Default": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace Default"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace 默认"
+          }
+        }
+      }
+    },
+    "Workspace write": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace write"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace write（工作区可写）"
+          }
+        }
+      }
+    },
+    "You already have an unsubmitted Pending Review draft on this PR. Submit or discard it on GitHub first (local Markdown report saved).": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have an unsubmitted Pending Review draft on this PR. Submit or discard it on GitHub first (local Markdown report saved)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该 PR 上你已有一个未提交的 Pending Review 草稿，请先在 GitHub 提交或删除旧草稿（本地 Markdown 报告已保存）"
+          }
+        }
+      }
+    },
+    "Your gh token lacks the notifications scope (run `gh auth refresh -s notifications` to unlock 304 zero-quota polling); automatically fell back to Search API every 180s": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your gh token lacks the notifications scope (run `gh auth refresh -s notifications` to unlock 304 zero-quota polling); automatically fell back to Search API every 180s"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 gh Token 缺少 notifications 权限（运行 `gh auth refresh -s notifications` 可解锁 304 零配额监听）；已自动按 180s 间隔走 Search API 降级"
+          }
+        }
+      }
+    },
+    "gh CLI not detected. Install gh or enter a PAT.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gh CLI not detected. Install gh or enter a PAT."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到 gh CLI，请先安装或填写 PAT"
+          }
+        }
+      }
+    },
+    "gh is not logged in. Run `gh auth login`.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gh is not logged in. Run `gh auth login`."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gh 尚未登录，请运行 `gh auth login`"
+          }
+        }
+      }
+    },
+    "git executable not found": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git executable not found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到 git 可执行文件"
+          }
+        }
+      }
+    },
+    "lody CLI or Lody.app not detected (run `npx lody daemon start` to connect)": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lody CLI or Lody.app not detected (run `npx lody daemon start` to connect)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到 lody CLI 或 Lody.app（可运行 `npx lody daemon start` 接入）"
+          }
+        }
+      }
+    },
+    "lody CLI or npx not found. Install Node.js (with npx) or global lody CLI and retry.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lody CLI or npx not found. Install Node.js (with npx) or global lody CLI and retry."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到 lody CLI 或 npx，请先安装 Node.js（含 npx）或全局安装 lody 后重试"
+          }
+        }
+      }
+    },
+    "⚪ Nit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚪ Nit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚪ 细节"
+          }
+        }
+      }
+    },
+    "🔴 Critical": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🔴 Critical"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🔴 严重"
+          }
+        }
+      }
+    },
+    "🟡 Warning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🟡 Warning"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🟡 建议"
+          }
+        }
+      }
+    },
+    "🤝 Consensus · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🤝 Consensus · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "🤝 共识 · %@"
+          }
+        }
+      }
+    }
+  }
+}

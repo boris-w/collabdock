@@ -35,16 +35,16 @@ public enum AgentRunnerError: Error, LocalizedError {
         switch self {
         case .executableNotFound(let name):
             if name == "lody" {
-                return "未找到 lody CLI 或 npx，请先安装 Node.js（含 npx）或全局安装 lody 后重试"
+                return CoreL10n.string("lody CLI or npx not found. Install Node.js (with npx) or global lody CLI and retry.")
             }
-            return "未找到可执行文件：\(name)，请先在设置 → AI 引擎中确认安装状态"
+            return CoreL10n.format("Executable not found: %@. Check installation status in Settings → AI Engines.", name)
         case .processFailed(let code, let stderr):
-            let brief = stderr.trimmingCharacters(in: .whitespacesAndNewlines).prefix(220)
-            return "AI 执行异常退出 (code \(code))：\(brief)"
+            let brief = String(stderr.trimmingCharacters(in: .whitespacesAndNewlines).prefix(220))
+            return CoreL10n.format("AI process exited with error (code %lld): %@", Int(code), brief)
         case .cancelled:
-            return "用户已中止本次审查"
+            return CoreL10n.string("Review cancelled by user")
         case .unparseableOutput(let sample):
-            return "未能解析结构化输出（已保留原文）：\(sample.prefix(160))"
+            return CoreL10n.format("Could not parse structured output (raw text kept): %@", String(sample.prefix(160)))
         }
     }
 }
@@ -395,7 +395,7 @@ public struct AgentSessionRunner: Sendable {
                     .filter { !$0.isEmpty }
                     .suffix(3)
                     .joined(separator: " ")
-                rawDetail = tailLines.isEmpty ? "子进程无错误输出" : tailLines
+                rawDetail = tailLines.isEmpty ? CoreL10n.string("Subprocess produced no error output") : tailLines
             }
         }
 
@@ -407,10 +407,10 @@ public struct AgentSessionRunner: Sendable {
             || lower.contains("not logged in")
             || lower.contains("unauthorized")
         ) {
-            return "Lody CLI 登录已失效，请在终端运行 `npx -y lody@latest login` 后点击重试。（\(rawDetail)）"
+            return CoreL10n.format("Lody CLI login expired. Run `npx -y lody@latest login` in Terminal, then click Retry. (%@)", rawDetail)
         }
         if engine == .lody && lower.contains("local project branch not found") {
-            return "本地项目缺少目标分支引用，请确认 git fetch 可用或先切换为「直用主目录」重试。（\(rawDetail)）"
+            return CoreL10n.format("Target branch ref not found in the local project. Check `git fetch` or switch to \"Project Directory\" and retry. (%@)", rawDetail)
         }
         return rawDetail
     }

@@ -835,7 +835,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
         }
 
         guard let execPath = resolved else {
-            return CLIProbeStatus(name: name, isInstalled: false, errorMessage: "未在 PATH 中找到 \(name)")
+            return CLIProbeStatus(name: name, isInstalled: false, errorMessage: CoreL10n.format("%@ not found in PATH", name))
         }
 
         let res = await runner.run(
@@ -885,14 +885,14 @@ public struct EnvironmentDetector: EnvironmentDetecting {
                 name: "lody",
                 isInstalled: true,
                 executablePath: "/Applications/Lody.app",
-                version: "Lody Desktop (需安装 Node/npx 或 lody CLI)"
+                version: CoreL10n.string("Lody Desktop (requires Node/npx or lody CLI)")
             )
         }
 
         return CLIProbeStatus(
             name: "lody",
             isInstalled: false,
-            errorMessage: "未检测到 lody CLI 或 Lody.app（可运行 `npx lody daemon start` 接入）"
+            errorMessage: CoreL10n.string("lody CLI or Lody.app not detected (run `npx lody daemon start` to connect)")
         )
     }
 
@@ -914,7 +914,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
             return GitHubAuthSnapshot(
                 isAuthenticated: false,
                 tokenSource: .none,
-                errorMessage: "未检测到 gh CLI，请先安装或填写 PAT"
+                errorMessage: CoreL10n.string("gh CLI not detected. Install gh or enter a PAT.")
             )
         }
 
@@ -952,7 +952,7 @@ public struct EnvironmentDetector: EnvironmentDetecting {
         return GitHubAuthSnapshot(
             isAuthenticated: false,
             tokenSource: .none,
-            errorMessage: "gh 尚未登录，请运行 `gh auth login`"
+            errorMessage: CoreL10n.string("gh is not logged in. Run `gh auth login`.")
         )
     }
 

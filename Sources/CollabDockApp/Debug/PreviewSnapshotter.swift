@@ -13,19 +13,48 @@ public enum PreviewSnapshotter {
         let outDir = URL(fileURLWithPath: args[idx + 1], isDirectory: true)
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
+        let langArg: String? = {
+            if let lIdx = args.firstIndex(of: "--snapshot-lang"), lIdx + 1 < args.count {
+                return args[lIdx + 1].lowercased()
+            }
+            return nil
+        }()
+
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
 
-        renderAll(to: outDir)
+        switch langArg {
+        case "en":
+            CoreL10n.overrideLanguage = .en
+            renderAll(to: outDir, language: .en)
+        case "zh-hans", "zh":
+            CoreL10n.overrideLanguage = .zhHans
+            renderAll(to: outDir, language: .zhHans)
+        case "system":
+            CoreL10n.overrideLanguage = nil
+            renderAll(to: outDir, language: CoreL10n.currentLanguage)
+        default:
+            CoreL10n.overrideLanguage = .zhHans
+            renderAll(to: outDir, language: .zhHans)
+
+            let enDir = outDir.appendingPathComponent("en", isDirectory: true)
+            try? FileManager.default.createDirectory(at: enDir, withIntermediateDirectories: true)
+            CoreL10n.overrideLanguage = .en
+            renderAll(to: enDir, language: .en)
+        }
+        CoreL10n.overrideLanguage = nil
         exit(0)
     }
 
-    private static func renderAll(to dir: URL) {
+    private static func renderAll(to dir: URL, language: ResolvedLanguage) {
+        let isZH = (language == .zhHans)
+
         let inboxLight = AppCoordinator(previewMode: true)
         render(
             view: MenuBarContentView(coordinator: inboxLight),
             scheme: .light,
             height: 416,
+            language: language,
             to: dir.appendingPathComponent("inbox-light.png")
         )
 
@@ -34,6 +63,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: inboxDark),
             scheme: .dark,
             height: 416,
+            language: language,
             to: dir.appendingPathComponent("inbox-dark.png")
         )
 
@@ -42,6 +72,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: ghDetailLight, initialDetailItemID: "demo-gh-482"),
             scheme: .light,
             height: CDTheme.detailHeight,
+            language: language,
             to: dir.appendingPathComponent("detail-github-light.png")
         )
 
@@ -53,6 +84,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: feishuDetailDark, initialDetailItemID: "demo-feishu-oncall"),
             scheme: .dark,
             height: CDTheme.detailHeight,
+            language: language,
             to: dir.appendingPathComponent("detail-lody-dark.png")
         )
 
@@ -68,7 +100,7 @@ public enum PreviewSnapshotter {
                 reviewedAt: Date().addingTimeInterval(-3600),
                 engine: .lody,
                 sessionID: "ses_r1_demo",
-                summarySnippet: "发现 1 处并发刷新竞态",
+                summarySnippet: isZH ? "发现 1 处并发刷新竞态" : "Found 1 concurrent refresh race condition",
                 reviewRound: 1
             )
             reReviewCoord.items[idx].reviewRound = 2
@@ -77,6 +109,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: reReviewCoord, initialDetailItemID: "demo-gh-482"),
             scheme: .dark,
             height: CDTheme.detailHeight,
+            language: language,
             to: dir.appendingPathComponent("detail-rereview-lody-dark.png")
         )
 
@@ -89,6 +122,7 @@ public enum PreviewSnapshotter {
             scheme: .light,
             width: 684,
             height: 580,
+            language: language,
             to: dir.appendingPathComponent("settings-lody-engines-light.png")
         )
 
@@ -99,6 +133,7 @@ public enum PreviewSnapshotter {
             scheme: .light,
             width: 684,
             height: 580,
+            language: language,
             to: dir.appendingPathComponent("settings-claude-engines-light.png")
         )
 
@@ -107,6 +142,7 @@ public enum PreviewSnapshotter {
             scheme: .light,
             width: 684,
             height: 580,
+            language: language,
             to: dir.appendingPathComponent("settings-workspaces-light.png")
         )
 
@@ -115,6 +151,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: statsPopoverDark, initialShowStats: true),
             scheme: .dark,
             height: 524,
+            language: language,
             to: dir.appendingPathComponent("stats-popover-dark.png")
         )
 
@@ -123,6 +160,7 @@ public enum PreviewSnapshotter {
             scheme: .light,
             width: 704,
             height: 600,
+            language: language,
             to: dir.appendingPathComponent("settings-stats-light.png")
         )
 
@@ -133,6 +171,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: emptyInboxCoord),
             scheme: .light,
             height: 360,
+            language: language,
             to: dir.appendingPathComponent("inbox-empty-light.png")
         )
 
@@ -148,15 +187,17 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: completedCoord),
             scheme: .light,
             height: 360,
+            language: language,
             to: dir.appendingPathComponent("completed-light.png")
         )
 
-        renderMenuBarIconsSheet(to: dir.appendingPathComponent("menubar-icons-peekcat.png"))
-        renderInboxShowcase(to: dir)
+        renderMenuBarIconsSheet(to: dir.appendingPathComponent("menubar-icons-peekcat.png"), language: language)
+        renderInboxShowcase(to: dir, language: language)
     }
 
     /// 生成覆盖收件箱全部类型与状态的 8 张完整视觉测试截图
-    private static func renderInboxShowcase(to dir: URL) {
+    private static func renderInboxShowcase(to dir: URL, language: ResolvedLanguage) {
+        let isZH = (language == .zhHans)
         let previewEnv = EnvironmentSnapshot(
             resolvedPATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
             git: CLIProbeStatus(name: "git", isInstalled: true, executablePath: "/usr/bin/git", version: "2.48"),
@@ -188,6 +229,16 @@ public enum PreviewSnapshotter {
             c.settings.lodyConfig.defaultAgentConfig = "lody-antigravity"
             c.setPreferredLodyModel("gemini-4-neon", forAgentConfig: "lody-antigravity")
             c.setPreferredLodyMode("plan", forAgentConfig: "lody-antigravity")
+            if !isZH {
+                c.settings.presets = [
+                    TaskPreset(
+                        id: "code-review-general",
+                        name: "Review this PR",
+                        category: .codeReview,
+                        promptInstructions: "Please review this PR."
+                    )
+                ]
+            }
             return c
         }
 
@@ -198,6 +249,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s1),
             scheme: .light,
             height: 350,
+            language: language,
             to: dir.appendingPathComponent("showcase-01-empty-light.png")
         )
 
@@ -211,7 +263,7 @@ public enum PreviewSnapshotter {
                 reviewedAt: Date().addingTimeInterval(-3600),
                 engine: .lody,
                 sessionID: "ses_r1",
-                summarySnippet: "发现 1 处并发竞态",
+                summarySnippet: isZH ? "发现 1 处并发竞态" : "Found 1 concurrency race condition",
                 reviewRound: 1
             )
             s2.items[idx].reviewRound = 2
@@ -220,6 +272,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s2),
             scheme: .light,
             height: 390,
+            language: language,
             to: dir.appendingPathComponent("showcase-02-pending-multiplatform-light.png")
         )
 
@@ -239,7 +292,9 @@ public enum PreviewSnapshotter {
                 triggerKind: .mention,
                 payload: .codeChange(CodeChangePayload(repository: "acme/web", number: 4812, baseRef: "develop", headRef: "perf/formula", headSHA: "aa11", additions: 210, deletions: 45, changedFiles: 7)),
                 status: .running,
-                progressMessage: "Claude Opus 正在只读审查 Diff (已读 5/7 文件)..."
+                progressMessage: isZH
+                    ? "Claude Opus 正在只读审查 Diff (已读 5/7 文件)..."
+                    : "Claude Opus reviewing diff read-only (5/7 files read)..."
             ),
             CollaborationItem(
                 id: "sc-failed",
@@ -254,7 +309,9 @@ public enum PreviewSnapshotter {
                 triggerKind: .reviewRequested,
                 payload: .codeChange(CodeChangePayload(repository: "acme/infra", number: 1024, baseRef: "main", headRef: "chore/helm", headSHA: "bb22", additions: 18, deletions: 4, changedFiles: 2)),
                 status: .failed,
-                errorMessage: "本地项目缺少目标分支引用，请确认 git fetch 可用或先切换为「直用主目录」重试。"
+                errorMessage: isZH
+                    ? "本地项目缺少目标分支引用，请确认 git fetch 可用或先切换为「直用主目录」重试。"
+                    : "Target branch ref not found in the local project. Check git fetch or switch to \"Main Dir\" and retry."
             ),
             CollaborationItem(
                 id: "sc-lody-running",
@@ -271,7 +328,12 @@ public enum PreviewSnapshotter {
                 status: .draftReady,
                 sessionID: "sess-demo-1",
                 sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "sess-demo-1", workspacePath: "/Users/dev/code/web", launchMode: .nativeBackgroundSession),
-                executionOutput: .structuredReply(StructuredReplyResult(summary: "Gemini 4 Neon 正在后台审查中 · 已用上下文 156.0K", replyMarkdown: "")),
+                executionOutput: .structuredReply(StructuredReplyResult(
+                    summary: isZH
+                        ? "Gemini 4 Neon 正在后台审查中 · 已用上下文 156.0K"
+                        : "Gemini 4 Neon reviewing in background · Context 156.0K",
+                    replyMarkdown: ""
+                )),
                 remoteSessionStatus: .running
             )
         ]
@@ -279,6 +341,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s3),
             scheme: .dark,
             height: 486,
+            language: language,
             to: dir.appendingPathComponent("showcase-03-running-lody-failed-dark.png")
         )
 
@@ -302,12 +365,14 @@ public enum PreviewSnapshotter {
                 sessionHandle: AgentSessionHandle(engine: .claudeCode, sessionID: "claude_sess_9", workspacePath: "/tmp/wt", launchMode: .managedStructuredRun),
                 localReportPath: "/tmp/report.md",
                 executionOutput: .codeReview(CodeReviewResult(
-                    summary: "批处理主链路清晰，发现 1 处并发取消未释放信号量的边界问题及 2 处建议优化。",
+                    summary: isZH
+                        ? "批处理主链路清晰，发现 1 处并发取消未释放信号量的边界问题及 2 处建议优化。"
+                        : "Batch flushing path is clean; found 1 critical semaphore leak on cancellation and 2 suggested improvements.",
                     recommendedVerdict: .requestChanges,
                     comments: [
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 88, severity: .critical, title: "取消分支未释放许可", body: "建议移入 defer"),
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 112, severity: .warning, title: "缺少最大批大小兜底", body: "建议限制 500"),
-                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 140, severity: .nit, title: "日志字段命名统一", body: "改为 batchSize")
+                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 88, severity: .critical, title: isZH ? "取消分支未释放许可" : "Permit not released on cancel", body: isZH ? "建议移入 defer" : "Move release into defer"),
+                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 112, severity: .warning, title: isZH ? "缺少最大批大小兜底" : "Missing max batch cap", body: isZH ? "建议限制 500" : "Cap at 500"),
+                        CodeInlineComment(path: "Sources/BatchFlusher.swift", line: 140, severity: .nit, title: isZH ? "日志字段命名统一" : "Consistent log field name", body: isZH ? "改为 batchSize" : "Rename to batchSize")
                     ]
                 ))
             ),
@@ -326,7 +391,12 @@ public enum PreviewSnapshotter {
                 status: .draftReady,
                 sessionID: "sess-demo-2",
                 sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "sess-demo-2", workspacePath: "/Users/dev/code/cli", launchMode: .nativeBackgroundSession),
-                executionOutput: .structuredReply(StructuredReplyResult(summary: "Gemini 4 Neon 已完成审查 · 耗时 4m 35s · 上下文 84.9K", replyMarkdown: "")),
+                executionOutput: .structuredReply(StructuredReplyResult(
+                    summary: isZH
+                        ? "Gemini 4 Neon 已完成审查 · 耗时 4m 35s · 上下文 84.9K"
+                        : "Gemini 4 Neon finished review · Duration 4m 35s · Context 84.9K",
+                    replyMarkdown: ""
+                )),
                 remoteSessionStatus: .completed
             ),
             CollaborationItem(
@@ -344,7 +414,12 @@ public enum PreviewSnapshotter {
                 status: .draftReady,
                 sessionID: "sess-demo-1",
                 sessionHandle: AgentSessionHandle(engine: .lody, sessionID: "sess-demo-1", workspacePath: "/Users/dev/code/web", launchMode: .nativeBackgroundSession),
-                executionOutput: .structuredReply(StructuredReplyResult(summary: "Gemini 4 Neon 已完成审查 · 耗时 3m 12s · 上下文 188.6K", replyMarkdown: "")),
+                executionOutput: .structuredReply(StructuredReplyResult(
+                    summary: isZH
+                        ? "Gemini 4 Neon 已完成审查 · 耗时 3m 12s · 上下文 188.6K"
+                        : "Gemini 4 Neon finished review · Duration 3m 12s · Context 188.6K",
+                    replyMarkdown: ""
+                )),
                 remoteSessionStatus: .completed,
                 gitHubReviewVerdict: "CHANGES_REQUESTED"
             )
@@ -353,6 +428,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s4),
             scheme: .light,
             height: 540,
+            language: language,
             to: dir.appendingPathComponent("showcase-04-drafts-and-waitfix-light.png")
         )
 
@@ -364,6 +440,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s5, initialShowImportBar: true),
             scheme: .dark,
             height: 416,
+            language: language,
             to: dir.appendingPathComponent("showcase-05-import-bar-paused-dark.png")
         )
 
@@ -435,14 +512,14 @@ public enum PreviewSnapshotter {
                 id: "sc-done-manual",
                 platform: .feishu,
                 itemKind: .conversation,
-                scope: "#支付值班群",
-                externalRef: "话题",
-                title: "线上回调偶发 504，疑似重试队列堆积",
+                scope: isZH ? "#支付值班群" : "#payments-oncall",
+                externalRef: isZH ? "话题" : "Thread",
+                title: isZH ? "线上回调偶发 504，疑似重试队列堆积" : "Intermittent 504 on production callbacks, suspected retry queue backlog",
                 url: URL(string: "https://open.feishu.cn/")!,
                 author: "diana",
                 triggeredBy: "diana",
                 triggerKind: .mention,
-                payload: .conversation(ConversationPayload(channelName: "#支付值班群", threadID: "om_1", recentSnippets: [], linkedRepository: "acme/backend")),
+                payload: .conversation(ConversationPayload(channelName: isZH ? "#支付值班群" : "#payments-oncall", threadID: "om_1", recentSnippets: [], linkedRepository: "acme/backend")),
                 status: .completed,
                 completionReason: .manual
             ),
@@ -466,6 +543,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s6),
             scheme: .light,
             height: 390,
+            language: language,
             to: dir.appendingPathComponent("showcase-06-completed-all-reasons-light.png")
         )
 
@@ -475,6 +553,7 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s7, initialDetailItemID: "demo-gh-482"),
             scheme: .dark,
             height: CDTheme.detailHeight,
+            language: language,
             to: dir.appendingPathComponent("showcase-07-detail-confirm-dark.png")
         )
 
@@ -488,7 +567,7 @@ public enum PreviewSnapshotter {
                 engine: .codex,
                 model: "gpt-5.3-codex",
                 sessionID: "0199c3a2-7b1e-7f30-9a4d-5e2f8c61d0b7",
-                summarySnippet: "发现 1 处并发刷新竞态",
+                summarySnippet: isZH ? "发现 1 处并发刷新竞态" : "Found 1 concurrent refresh race condition",
                 reviewRound: 1
             )
             s8.items[idx].reviewRound = 2
@@ -497,28 +576,30 @@ public enum PreviewSnapshotter {
             view: MenuBarContentView(coordinator: s8, initialDetailItemID: "demo-gh-482"),
             scheme: .dark,
             height: CDTheme.detailHeight,
+            language: language,
             to: dir.appendingPathComponent("showcase-08-detail-rereview-dark.png")
         )
     }
 
-    private static func renderMenuBarIconsSheet(to url: URL) {
+    private static func renderMenuBarIconsSheet(to url: URL, language: ResolvedLanguage) {
+        let isZH = (language == .zhHans)
         let states: [(label: String, isPaused: Bool, running: Int, pending: Int, draft: Int, err: Bool, blink: Bool, iconState: PeekCatMenuBarState)] = [
-            ("空闲", false, 0, 0, 0, false, false, .idle),
-            ("待确认 3", false, 0, 3, 0, false, false, .pending),
-            ("执行中 1", false, 1, 0, 0, false, false, .running(blinking: false)),
-            ("执行眨眼", false, 1, 0, 0, false, true, .running(blinking: true)),
-            ("草稿就绪", false, 0, 0, 1, false, false, .draftReady),
-            ("已暂停", true, 0, 0, 0, false, false, .paused),
-            ("异常", false, 0, 0, 0, true, false, .error)
+            (isZH ? "空闲" : "Idle", false, 0, 0, 0, false, false, .idle),
+            (isZH ? "待确认 3" : "Pending 3", false, 0, 3, 0, false, false, .pending),
+            (isZH ? "执行中 1" : "Running 1", false, 1, 0, 0, false, false, .running(blinking: false)),
+            (isZH ? "执行眨眼" : "Blinking", false, 1, 0, 0, false, true, .running(blinking: true)),
+            (isZH ? "草稿就绪" : "Draft Ready", false, 0, 0, 1, false, false, .draftReady),
+            (isZH ? "已暂停" : "Paused", true, 0, 0, 0, false, false, .paused),
+            (isZH ? "异常" : "Error", false, 0, 0, 0, true, false, .error)
         ]
 
         let sheet = VStack(alignment: .leading, spacing: 18) {
-            Text("CollabDock · 猫坞 PeekCat 歪头招手猫 菜单栏实渲染验真")
+            Text(isZH ? "CollabDock · 猫坞 PeekCat 歪头招手猫 菜单栏实渲染验真" : "CollabDock · PeekCat Menu Bar Icon States")
                 .font(.system(size: 14, weight: .semibold))
 
             // 1. 浅色 macOS 菜单栏 1:1 实测
             VStack(alignment: .leading, spacing: 6) {
-                Text("浅色菜单栏（18×18pt 真实尺寸）")
+                Text(isZH ? "浅色菜单栏（18×18pt 真实尺寸）" : "Light Menu Bar (18×18pt actual size)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 18) {
@@ -546,7 +627,7 @@ public enum PreviewSnapshotter {
 
             // 2. 深色 macOS 菜单栏 1:1 实测
             VStack(alignment: .leading, spacing: 6) {
-                Text("深色菜单栏（18×18pt 真实尺寸）")
+                Text(isZH ? "深色菜单栏（18×18pt 真实尺寸）" : "Dark Menu Bar (18×18pt actual size)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 18) {
@@ -574,7 +655,7 @@ public enum PreviewSnapshotter {
 
             // 3. 3x 放大细节验真（54×54pt）
             VStack(alignment: .leading, spacing: 6) {
-                Text("3× 放大细节验真（检查歪头角度、招手爪、镂空眼睛与角标）")
+                Text(isZH ? "3× 放大细节验真（检查歪头角度、招手爪、镂空眼睛与角标）" : "3× Zoomed Detail (54×54pt)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 14) {
@@ -600,15 +681,23 @@ public enum PreviewSnapshotter {
         }
         .padding(20)
 
-        renderWindow(view: sheet, scheme: .light, width: 620, height: 350, to: url)
+        renderWindow(view: sheet, scheme: .light, width: 620, height: 350, language: language, to: url)
     }
 
-    private static func renderWindow<V: View>(view: V, scheme: ColorScheme, width: CGFloat, height: CGFloat, to url: URL) {
+    private static func renderWindow<V: View>(
+        view: V,
+        scheme: ColorScheme,
+        width: CGFloat,
+        height: CGFloat,
+        language: ResolvedLanguage,
+        to url: URL
+    ) {
         let size = NSSize(width: width, height: height)
         let wrapped = view
             .frame(width: width, height: height)
             .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.96))
             .environment(\.colorScheme, scheme)
+            .environment(\.locale, Locale(identifier: language.lprojCode))
         let hosting = NSHostingView(rootView: wrapped)
         hosting.frame = NSRect(origin: .zero, size: size)
         hosting.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
@@ -627,7 +716,13 @@ public enum PreviewSnapshotter {
         try? pngData.write(to: url)
     }
 
-    private static func render<V: View>(view: V, scheme: ColorScheme, height: CGFloat, to url: URL) {
+    private static func render<V: View>(
+        view: V,
+        scheme: ColorScheme,
+        height: CGFloat,
+        language: ResolvedLanguage,
+        to url: URL
+    ) {
         let backdrop = scheme == .dark
             ? Color(red: 0.11, green: 0.11, blue: 0.125)
             : Color(red: 0.945, green: 0.945, blue: 0.96)
@@ -643,6 +738,7 @@ public enum PreviewSnapshotter {
             .padding(16)
             .background(scheme == .dark ? Color(white: 0.06) : Color(white: 0.86))
             .environment(\.colorScheme, scheme)
+            .environment(\.locale, Locale(identifier: language.lprojCode))
 
         let size = NSSize(width: CDTheme.popoverWidth + 32, height: height + 32)
         let hosting = NSHostingView(rootView: wrapped)

@@ -12,6 +12,7 @@ public struct ReviewExecutionRequest: Sendable {
     public let injectPresetPrompt: Bool
     public let reportsDirectory: URL?
     public let lodyAgentDisplayName: String?
+    public let reviewLanguage: ResolvedLanguage
 
     public init(
         item: CollaborationItem,
@@ -23,7 +24,8 @@ public struct ReviewExecutionRequest: Sendable {
         environment: EnvironmentSnapshot? = nil,
         injectPresetPrompt: Bool = true,
         reportsDirectory: URL? = nil,
-        lodyAgentDisplayName: String? = nil
+        lodyAgentDisplayName: String? = nil,
+        reviewLanguage: ResolvedLanguage = .zhHans
     ) {
         self.item = item
         self.plan = plan
@@ -35,6 +37,7 @@ public struct ReviewExecutionRequest: Sendable {
         self.injectPresetPrompt = injectPresetPrompt
         self.reportsDirectory = reportsDirectory
         self.lodyAgentDisplayName = lodyAgentDisplayName
+        self.reviewLanguage = reviewLanguage
     }
 }
 
@@ -137,7 +140,7 @@ public struct ReviewExecutionService: Sendable {
         }
 
         // 1. 准备隔离上下文（双模型会诊固定走 directBackend 共享只读 Worktree）
-        emit(.preparing, "正在准备隔离上下文...")
+        emit(.preparing, CoreL10n.string("Preparing isolated context..."))
         let prepBackend = (plan.councilPartner != nil) ? directBackend : backend(for: plan.engine)
         let prepRequest = WorkspacePreparationRequest(
             item: item,
@@ -170,7 +173,16 @@ public struct ReviewExecutionService: Sendable {
         var usageRuns: [ReviewUsageRun] = []
 
         if let partner = plan.councilPartner {
-            emit(.running, "双模型会诊中：\(plan.engine.displayName) (\(plan.model)) × \(partner.engine.displayName) (\(partner.model))...")
+            emit(
+                .running,
+                CoreL10n.format(
+                    "Running two-model council: %@ (%@) × %@ (%@)...",
+                    plan.engine.displayName,
+                    plan.model,
+                    partner.engine.displayName,
+                    partner.model
+                )
+            )
 
             var primaryPlan = plan
             primaryPlan.launchMode = .managedStructuredRun
@@ -255,7 +267,8 @@ public struct ReviewExecutionService: Sendable {
 
             finalOutput = CouncilSynthesizer.synthesize(
                 primary: CouncilContribution(label: "\(primaryPlan.engine.displayName)/\(primaryPlan.model)", output: outA),
-                secondary: CouncilContribution(label: "\(partnerPlan.engine.displayName)/\(partnerPlan.model)", output: outB)
+                secondary: CouncilContribution(label: "\(partnerPlan.engine.displayName)/\(partnerPlan.model)", output: outB),
+                language: request.reviewLanguage
             )
             primaryHandle = resA.sessionHandle ?? resB.sessionHandle
         } else {
@@ -265,8 +278,8 @@ public struct ReviewExecutionService: Sendable {
             emit(
                 .running,
                 isResumingSameLody
-                    ? "正在向原 Lody 会话发送第 \(item.reviewRound) 轮复审追问..."
-                    : "正在启动 \(plan.engine.displayName) (\(plan.model))..."
+                    ? CoreL10n.format("Sending round %lld follow-up review to the existing Lody session...", item.reviewRound)
+                    : CoreL10n.format("Starting %@ (%@)...", plan.engine.displayName, plan.model)
             )
 
             let runRequest = AgentRunRequest(
@@ -321,12 +334,12 @@ public struct ReviewExecutionService: Sendable {
                 let summaryText: String
                 if plan.engine == .lody {
                     summaryText = isResumingSameLody
-                        ? "已向原 Lody 会话追加第 \(item.reviewRound) 轮增量复审，正在后台分析中..."
-                        : "Lody 正在后台执行审查，可随时点「打开 Lody」查看实时进度。"
+                        ? CoreL10n.format("Sent round %lld incremental re-review to the existing Lody session; analyzing in background...", item.reviewRound)
+                        : CoreL10n.string("Lody is reviewing in the background. Click \"Open Lody\" anytime to view live progress.")
                 } else {
                     summaryText = isResumingSameLody
-                        ? "已向原 \(plan.engine.displayName) 会话追加第 \(item.reviewRound) 轮复审，可点「接管会话」查看。"
-                        : "已派发为 \(plan.engine.displayName) 原生后台会话，可点「接管会话」查看。"
+                        ? CoreL10n.format("Sent round %1$lld follow-up review to the existing %2$@ session. Click \"Resume Session\" to inspect.", item.reviewRound, plan.engine.displayName)
+                        : CoreL10n.format("Dispatched as a native %@ background session. Click \"Resume Session\" to inspect.", plan.engine.displayName)
                 }
                 dispatched.executionOutput = .structuredReply(
                     StructuredReplyResult(summary: summaryText, replyMarkdown: "")
@@ -351,7 +364,7 @@ public struct ReviewExecutionService: Sendable {
         }
 
         // 3. 交付结果（非代码托管平台始终只落本地草稿）
-        emit(.publishing, "正在校验行号并生成 \(plan.deliveryMode.shortLabel(for: item.platform))...")
+        emit(.publishing, CoreL10n.format("Validating diff lines and generating %@...", plan.deliveryMode.shortLabel(for: item.platform)))
 
         let deliveryMode: DeliveryMode = (
             item.platform == sink.platform
@@ -361,7 +374,8 @@ public struct ReviewExecutionService: Sendable {
         let deliveryContext = DeliveryContext(
             plan: plan,
             unifiedDiff: preparedContext.unifiedDiff,
-            reportsDirectory: request.reportsDirectory
+            reportsDirectory: request.reportsDirectory,
+            language: request.reviewLanguage
         )
 
         let receipt: DeliveryReceipt

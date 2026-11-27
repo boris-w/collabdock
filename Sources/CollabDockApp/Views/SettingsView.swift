@@ -15,6 +15,7 @@ public struct SettingsView: View {
     @Bindable var coordinator: AppCoordinator
     @State private var selectedTab: SettingsTab
     @State private var copiedHint: String?
+    @State private var copiedHintIsError: Bool = false
     @State private var useCustomLodyAgentConfig: Bool = false
     @State private var useCustomLodyWorkspace: Bool = false
     @State private var newRepoKeyInput: String = ""
@@ -35,22 +36,22 @@ public struct SettingsView: View {
     public var body: some View {
         TabView(selection: $selectedTab) {
             connectorsTab
-                .tabItem { Label("协作来源", systemImage: "point.3.connected.trianglepath.dotted") }
+                .tabItem { Label(L("Sources"), systemImage: "point.3.connected.trianglepath.dotted") }
                 .tag(SettingsTab.connectors)
             triggerRulesTab
-                .tabItem { Label("触发规则", systemImage: "line.3.horizontal.decrease.circle") }
+                .tabItem { Label(L("Rules"), systemImage: "line.3.horizontal.decrease.circle") }
                 .tag(SettingsTab.triggerRules)
             enginesTab
-                .tabItem { Label("AI 引擎", systemImage: "cpu") }
+                .tabItem { Label(L("AI Engines"), systemImage: "cpu") }
                 .tag(SettingsTab.engines)
             workspacesTab
-                .tabItem { Label("工作区", systemImage: "folder") }
+                .tabItem { Label(L("Workspace"), systemImage: "folder") }
                 .tag(SettingsTab.workspaces)
             teamAndGeneralTab
-                .tabItem { Label("提示词与团队", systemImage: "text.badge.star") }
+                .tabItem { Label(L("Prompts & Team"), systemImage: "text.badge.star") }
                 .tag(SettingsTab.teamAndGeneral)
             UsageStatsSettingsView(coordinator: coordinator)
-                .tabItem { Label("用量统计", systemImage: "chart.bar.xaxis") }
+                .tabItem { Label(L("Usage"), systemImage: "chart.bar.xaxis") }
                 .tag(SettingsTab.stats)
         }
         .frame(width: 680, height: 560)
@@ -98,7 +99,7 @@ public struct SettingsView: View {
 
     private var connectorsTab: some View {
         Form {
-            Section("GitHub 实时认证状态") {
+            Section(L("GitHub Authentication Status")) {
                 if let auth = coordinator.environment?.githubAuth {
                     HStack(spacing: 12) {
                         if auth.isAuthenticated {
@@ -156,21 +157,25 @@ public struct SettingsView: View {
                                         .padding(.vertical, 1.5)
                                         .background(Color.secondary.opacity(0.12), in: Capsule())
                                 }
-                                Text(auth.hasNotificationsScope ? "已具备 notifications 权限（304 零配额快速通道已启用）" : "当前 Token 缺少 notifications 权限，已按 180s 低频自动走 Search API 降级")
+                                Text(auth.hasNotificationsScope ? L("notifications scope enabled (304 zero-quota fast path active)") : L("Token lacks notifications scope; falling back to Search API every 180s"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 if let rl = coordinator.latestRateLimit {
-                                    Text("API 剩余配额：\(rl.remaining) / \(rl.limit)\(coordinator.lastSyncWas304 ? " · 上次 304 零消耗" : "")")
+                                    Text(
+                                        coordinator.lastSyncWas304
+                                            ? L("API quota remaining: %1$lld / %2$lld · Last 304 zero-cost", rl.remaining, rl.limit)
+                                            : L("API quota remaining: %1$lld / %2$lld", rl.remaining, rl.limit)
+                                    )
                                         .font(.caption2.monospacedDigit())
                                         .foregroundStyle(.tertiary)
                                 }
                             } else {
-                                Text(auth.errorMessage ?? "未登录 GitHub")
+                                Text(auth.errorMessage ?? L("Not signed in to GitHub"))
                                     .font(.subheadline.weight(.medium))
                             }
                         }
                         Spacer()
-                        Button("立即同步") {
+                        Button(L("Sync Now")) {
                             coordinator.refreshNow()
                         }
                         .controlSize(.small)
@@ -183,7 +188,7 @@ public struct SettingsView: View {
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Button(copiedHint == "gh-refresh" ? "已复制" : "复制升级命令") {
+                            Button(copiedHint == "gh-refresh" ? L("Copied") : L("Copy Upgrade Command")) {
                                 copyToPasteboard("gh auth refresh -s notifications", tag: "gh-refresh")
                             }
                             .controlSize(.small)
@@ -192,14 +197,14 @@ public struct SettingsView: View {
                 } else {
                     HStack {
                         ProgressView().controlSize(.small)
-                        Text("正在检测本机 GitHub 认证状态...")
+                        Text(L("Checking local GitHub authentication status..."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
 
-            Section("可插拔协作连接器") {
+            Section(L("Pluggable Collaboration Connectors")) {
                 ForEach($coordinator.settings.connectors) { $connector in
                     let caps = ConnectorCatalog.capabilities(for: connector.platform)
                     VStack(alignment: .leading, spacing: 6) {
@@ -210,7 +215,7 @@ public struct SettingsView: View {
                             Text(connector.platform.displayName)
                                 .font(.body.weight(.medium))
                             if !caps.isImplementedInV1 {
-                                Text("架构已抽象 · 规划中")
+                                Text(L("Planned"))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 6)
@@ -227,14 +232,14 @@ public struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         if connector.isEnabled {
                             HStack {
-                                Text("账号标识")
+                                Text(L("Account Handle"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
                                 TextField(
                                     "",
                                     text: $connector.accountHandle,
-                                    prompt: Text("留空自动从 gh auth 获取")
+                                    prompt: Text(L("Leave empty to detect from gh auth"))
                                 )
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 240)
@@ -252,18 +257,18 @@ public struct SettingsView: View {
 
     private var triggerRulesTab: some View {
         Form {
-            Section("全局触发来源（可自由手动组合开关）") {
-                Toggle("评论 / 消息中 @我 (mention)", isOn: $coordinator.settings.globalTriggerRules.enableMention)
-                Toggle("代码审查指派 (review_requested)", isOn: $coordinator.settings.globalTriggerRules.enableReviewRequested)
-                Toggle("任务 / 工单指派给我 (assigned)", isOn: $coordinator.settings.globalTriggerRules.enableAssigned)
-                Toggle("团队指派 / Team Mention", isOn: $coordinator.settings.globalTriggerRules.enableTeamMention)
+            Section(L("Global Trigger Sources")) {
+                Toggle(L("@mention in comments / messages (mention)"), isOn: $coordinator.settings.globalTriggerRules.enableMention)
+                Toggle(L("Code review requested (review_requested)"), isOn: $coordinator.settings.globalTriggerRules.enableReviewRequested)
+                Toggle(L("Task / ticket assigned to me (assigned)"), isOn: $coordinator.settings.globalTriggerRules.enableAssigned)
+                Toggle(L("Team assignment / Team Mention"), isOn: $coordinator.settings.globalTriggerRules.enableTeamMention)
             }
 
-            Section("@mention 关键词与建议解析") {
-                Toggle("要求包含触发关键词（避免普通闲聊打扰）", isOn: $coordinator.settings.globalTriggerRules.requireMentionKeywords)
+            Section(L("@mention Keywords & Hints")) {
+                Toggle(L("Require trigger keywords (avoid casual chatter)"), isOn: $coordinator.settings.globalTriggerRules.requireMentionKeywords)
                 labeledInputRow(
-                    title: "触发关键词",
-                    placeholder: "例如 review, cr, 帮忙看, check",
+                    title: L("Trigger Keywords"),
+                    placeholder: L("e.g. review, cr, check"),
                     text: Binding(
                         get: { coordinator.settings.globalTriggerRules.mentionKeywords.joined(separator: ", ") },
                         set: { raw in
@@ -276,22 +281,22 @@ public struct SettingsView: View {
                 )
                 .disabled(!coordinator.settings.globalTriggerRules.requireMentionKeywords)
 
-                Toggle("解析触发正文中的 --model / --focus 建议（仅预填，不绕过人工确认）", isOn: $coordinator.settings.globalTriggerRules.parseTriggerHints)
+                Toggle(L("Parse --model / --focus hints from comments (pre-fills only, never skips confirmation)"), isOn: $coordinator.settings.globalTriggerRules.parseTriggerHints)
             }
 
-            Section("自动归档规则") {
-                Toggle("PR 在 GitHub 被 Approve、合并或关闭后自动归档至「已完成」", isOn: $coordinator.settings.autoCompleteApprovedOrClosedPRs)
-                Text("通过单次批量 GraphQL 轻量对齐（收件箱为空时零请求）。仅对 Approved / Merged / Closed 自动归档；提交 Request Changes 的 PR 会保留在收件箱（标示「待修复」）继续跟进。")
+            Section(L("Auto-Archive Rules")) {
+                Toggle(L("Auto-archive PRs to Done when approved, merged, or closed on GitHub"), isOn: $coordinator.settings.autoCompleteApprovedOrClosedPRs)
+                Text(L("Synced via a single lightweight GraphQL batch request (zero calls when inbox is empty). Only Approved / Merged / Closed PRs are archived; PRs with Request Changes stay in your inbox as Awaiting Fix."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("作用域与降噪过滤") {
-                Toggle("忽略 Draft PR / 草稿项", isOn: $coordinator.settings.globalTriggerRules.ignoreDraftItems)
-                Toggle("忽略 Bot 账号触发", isOn: $coordinator.settings.globalTriggerRules.ignoreBots)
+            Section(L("Scope & Noise Filtering")) {
+                Toggle(L("Ignore Draft PRs / draft items"), isOn: $coordinator.settings.globalTriggerRules.ignoreDraftItems)
+                Toggle(L("Ignore bot accounts"), isOn: $coordinator.settings.globalTriggerRules.ignoreBots)
                 labeledInputRow(
-                    title: "作用域白名单",
-                    placeholder: "如 org/*, #oncall*（留空表示不限）",
+                    title: L("Scope Allowlist"),
+                    placeholder: L("e.g. org/*, #oncall* (empty allows all)"),
                     text: Binding(
                         get: { coordinator.settings.globalTriggerRules.scopeAllowlist.joined(separator: ", ") },
                         set: { raw in
@@ -303,8 +308,8 @@ public struct SettingsView: View {
                     )
                 )
                 labeledInputRow(
-                    title: "作用域黑名单",
-                    placeholder: "如 org/sandbox（优先级高于白名单）",
+                    title: L("Scope Denylist"),
+                    placeholder: L("e.g. org/sandbox (overrides allowlist)"),
                     text: Binding(
                         get: { coordinator.settings.globalTriggerRules.scopeDenylist.joined(separator: ", ") },
                         set: { raw in
@@ -445,70 +450,70 @@ public struct SettingsView: View {
         )
 
         return Form {
-            Section("默认执行与唤起偏好") {
-                Picker("默认 AI 引擎", selection: $coordinator.settings.defaultEngine) {
+            Section(L("Default Execution Preferences")) {
+                Picker(L("Default AI Engine"), selection: $coordinator.settings.defaultEngine) {
                     ForEach(AgentEngine.allCases) { engine in
                         Text(engine.displayName).tag(engine)
                     }
                 }
 
                 if activeEngine == .lody {
-                    Picker("默认 Lody Agent", selection: lodyAgentSelectionBinding) {
-                        Text("Workspace 默认 Agent").tag("default")
+                    Picker(L("Default Lody Agent"), selection: lodyAgentSelectionBinding) {
+                        Text(L("Workspace Default Agent")).tag("default")
                         Divider()
                         ForEach(lodyAgents) { agent in
-                            Text(agent.models.isEmpty ? agent.name : "\(agent.name)（\(agent.models.count) 个模型）")
+                            Text(agent.models.isEmpty ? agent.name : L("%@ (%lld models)", agent.name, agent.models.count))
                                 .tag(agent.id)
                         }
                         Divider()
-                        Text("自定义 Agent Config ID...").tag("__custom__")
+                        Text(L("Custom Agent Config ID...")).tag("__custom__")
                     }
 
                     if useCustomLodyAgentConfig {
                         labeledInputRow(
-                            title: "自定义 Agent Config ID",
-                            placeholder: "输入 Lody agent-config 名称或 UUID",
+                            title: L("Custom Agent Config ID"),
+                            placeholder: L("Enter Lody agent-config name or UUID"),
                             text: $coordinator.settings.lodyConfig.defaultAgentConfig
                         )
                     }
 
-                    Picker("默认模型", selection: lodyModelBinding) {
+                    Picker(L("Default Model"), selection: lodyModelBinding) {
                         ForEach(lodyModels) { option in
                             Text(option.displayName).tag(option.id)
                         }
                     }
 
                     if currentLodyAgent.isEmpty || currentLodyAgent == "default" {
-                        Text("选择具体的 Lody Agent（如 Antigravity / Claude Code / Codex）后，即可在此展开并选择该 Agent 下的全部模型。")
+                        Text(L("Select a specific Lody Agent (e.g. Antigravity / Claude Code / Codex) to view and choose from all models it provides."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else if lodyModels.count <= 1 {
-                        Text("当前 Lody Agent 未上报独立模型列表，派发时将自动使用其默认模型。")
+                        Text(L("This Lody Agent did not report individual models; its default model will be used automatically."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Picker("默认模型", selection: directModelBinding) {
+                    Picker(L("Default Model"), selection: directModelBinding) {
                         ForEach(directModels) { option in
                             Text(option.displayName).tag(option.id)
                         }
                     }
                 }
 
-                Picker("默认思考强度", selection: $coordinator.settings.defaultEffort) {
+                Picker(L("Default Reasoning Effort"), selection: $coordinator.settings.defaultEffort) {
                     ForEach(ReasoningEffort.allCases) { effort in
                         Text(effort.displayName).tag(effort)
                     }
                 }
 
                 if activeEngine == .lody {
-                    Picker("默认模式", selection: lodyModeBinding) {
+                    Picker(L("Default Mode"), selection: lodyModeBinding) {
                         ForEach(lodyModes) { modeOpt in
                             Text(modeOpt.displayName).tag(modeOpt.id)
                         }
                     }
                 } else {
-                    Picker("默认模式", selection: directModeBinding) {
+                    Picker(L("Default Mode"), selection: directModeBinding) {
                         ForEach(directModes) { modeOpt in
                             Text(modeOpt.displayName).tag(modeOpt.id)
                         }
@@ -517,13 +522,13 @@ public struct SettingsView: View {
 
                 if activeEngine == .lody {
                     HStack {
-                        Text("唤起方式")
+                        Text(L("Launch Mode"))
                         Spacer()
-                        Text("Lody 工作区持久化会话 · Markdown")
+                        Text(L("Lody Workspace Session · Markdown"))
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Picker("默认唤起方式", selection: $coordinator.settings.defaultLaunchMode) {
+                    Picker(L("Default Launch Mode"), selection: $coordinator.settings.defaultLaunchMode) {
                         ForEach(ExecutionLaunchMode.allCases) { mode in
                             Text(mode.displayName).tag(mode)
                         }
@@ -532,28 +537,28 @@ public struct SettingsView: View {
             }
 
             if activeEngine == .lody {
-                Section("Lody.ai 工作区编排设置") {
+                Section(L("Lody.ai Workspace Orchestration")) {
                     if !discoveredWorkspaces.isEmpty {
-                        Picker("目标 Workspace", selection: lodyWorkspaceBinding) {
-                            Text("自动使用当前默认工作区").tag("")
+                        Picker(L("Target Workspace"), selection: lodyWorkspaceBinding) {
+                            Text(L("Use current default workspace automatically")).tag("")
                             Divider()
                             ForEach(discoveredWorkspaces) { ws in
                                 Text(ws.displayLabel).tag(ws.id)
                             }
                             Divider()
-                            Text("手动输入 Workspace...").tag("__custom__")
+                            Text(L("Enter Workspace manually...")).tag("__custom__")
                         }
                         if useCustomLodyWorkspace {
                             labeledInputRow(
-                                title: "自定义 Workspace",
-                                placeholder: "输入 Workspace 名称、Slug 或 ID",
+                                title: L("Custom Workspace"),
+                                placeholder: L("Enter Workspace name, slug, or ID"),
                                 text: $coordinator.settings.lodyConfig.workspace
                             )
                         }
                     } else {
                         labeledInputRow(
-                            title: "Workspace 名称 / ID",
-                            placeholder: "留空自动使用当前默认工作区",
+                            title: L("Workspace Name / ID"),
+                            placeholder: L("Leave empty to use current default workspace"),
                             text: $coordinator.settings.lodyConfig.workspace
                         )
                     }
@@ -563,22 +568,22 @@ public struct SettingsView: View {
                             if coordinator.isRefreshingLodyCatalog {
                                 HStack(spacing: 6) {
                                     ProgressView().controlSize(.small)
-                                    Text("正在从 Lody 工作区同步 Agent 与模型目录...")
+                                    Text(L("Syncing Agents and model catalog from Lody workspace..."))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             } else if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
-                                Text("已从 Lody 同步 \(catalog.agentConfigs.count) 个 Agent · \(catalog.totalModelCount) 个真实模型")
+                                Text(L("Synced %1$lld agents · %2$lld models from Lody", catalog.agentConfigs.count, catalog.totalModelCount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             } else {
-                                Text("尚未同步 Lody 目录（当前展示内置回退列表，点右侧即可实时拉取）")
+                                Text(L("Lody catalog not synced yet (showing built-in fallback list; click Refresh to fetch live)"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         Spacer()
-                        Button(coordinator.isRefreshingLodyCatalog ? "同步中..." : "刷新 Lody 目录") {
+                        Button(coordinator.isRefreshingLodyCatalog ? L("Syncing...") : L("Refresh Lody Catalog")) {
                             Task { await coordinator.refreshLodyCatalog() }
                         }
                         .controlSize(.small)
@@ -593,12 +598,12 @@ public struct SettingsView: View {
                     let modelSummary: String = {
                         if engine == .lody {
                             if let catalog = coordinator.lodyCatalog, !catalog.agentConfigs.isEmpty {
-                                return "\(catalog.agentConfigs.count) Agent · \(catalog.totalModelCount) 模型"
+                                return L("%1$lld agents · %2$lld models", catalog.agentConfigs.count, catalog.totalModelCount)
                             }
-                            return "\(coordinator.lodyAgentConfigOptions.count) 个内置 Agent"
+                            return L("%lld built-in agents", coordinator.lodyAgentConfigOptions.count)
                         }
                         let count = coordinator.availableModelsByEngine[engine]?.count ?? engine.defaultModels.count
-                        return "\(count) 个模型"
+                        return L("%lld models", count)
                     }()
                     HStack(spacing: 10) {
                         Circle()
@@ -607,13 +612,13 @@ public struct SettingsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(engine.displayName)
                                 .font(.subheadline.weight(.medium))
-                            Text(probe?.executablePath ?? probe?.errorMessage ?? "检测中...")
+                            Text(probe?.executablePath ?? probe?.errorMessage ?? L("Detecting..."))
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(probe?.version ?? (probe?.isInstalled == false ? "未安装" : "..."))
+                            Text(probe?.version ?? (probe?.isInstalled == false ? L("Not installed") : "..."))
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                             Text(modelSummary)
@@ -629,9 +634,9 @@ public struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text("本机 CLI 实时探测")
+                    Text(L("Local CLI Detection"))
                     Spacer()
-                    Button(coordinator.isDetectingEnvironment ? "检测中..." : "重新检测") {
+                    Button(coordinator.isDetectingEnvironment ? L("Detecting...") : L("Re-detect")) {
                         Task { await coordinator.refreshEnvironment() }
                     }
                     .controlSize(.small)
@@ -649,12 +654,12 @@ public struct SettingsView: View {
                 .frame(width: 7, height: 7)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline)
-                Text(probe.executablePath ?? probe.errorMessage ?? "未找到")
+                Text(probe.executablePath ?? probe.errorMessage ?? L("Not found"))
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(probe.version ?? "未安装")
+            Text(probe.version ?? L("Not installed"))
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -667,14 +672,47 @@ public struct SettingsView: View {
         let mappings = coordinator.knownRepositoryMappings
 
         return Form {
-            Section("默认审查方式与代码搜索目录") {
-                Toggle("默认使用独立 Git Worktree 隔离审查（推荐，不碰当前开发分支）", isOn: $coordinator.settings.lodyConfig.useLodyWorktree)
-                Text("默认开：在独立 Worktree 签出 PR 分支审查（Lody 会话仍归属在对应项目下）；单次确认卡片里也可随时临时切为「直用主目录」。")
+            Section(L("Language")) {
+                Picker(L("Interface Language"), selection: $coordinator.settings.appLanguage) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                if coordinator.needsRestartForLanguageChange {
+                    HStack {
+                        Text(L("Restart CollabDock to apply the new interface language."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(L("Restart Now")) {
+                            coordinator.relaunchApp()
+                        }
+                        .controlSize(.small)
+                    }
+                } else {
+                    Text(L("Interface language changes take effect after restarting CollabDock."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Picker(L("Review Language"), selection: $coordinator.settings.reviewLanguage) {
+                    ForEach(ReviewLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                Text(L("Language used by CollabDock for GitHub review headings, severity labels, local reports, and multi-model consensus text."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(L("Review Workspace & Search Roots")) {
+                Toggle(L("Use isolated Git Worktrees by default (recommended; leaves your current branch untouched)"), isOn: $coordinator.settings.lodyConfig.useLodyWorktree)
+                Text(L("On by default: checks out PR branches in an isolated worktree (Lody sessions still stay under the project). You can switch to the main directory on any confirmation card."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
                 HStack {
-                    Text("代码搜索根目录")
+                    Text(L("Code Search Roots"))
                     Spacer(minLength: 12)
                     TextField(
                         "",
@@ -687,13 +725,13 @@ public struct SettingsView: View {
                                     .filter { !$0.isEmpty }
                             }
                         ),
-                        prompt: Text("~/work, ~/projects（逗号分隔）")
+                        prompt: Text(L("~/work, ~/projects (comma-separated)"))
                     )
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
 
-                    Button("添加目录...") {
-                        if let chosen = pickFolderPanel(title: "选择要扫描的代码根目录") {
+                    Button(L("Add Folder...")) {
+                        if let chosen = pickFolderPanel(title: L("Select a code root directory to scan")) {
                             let tildePath = abbreviateTilde(chosen)
                             if !coordinator.settings.workspaceSearchRoots.contains(tildePath)
                                 && !coordinator.settings.workspaceSearchRoots.contains(chosen) {
@@ -707,7 +745,7 @@ public struct SettingsView: View {
 
             Section {
                 if mappings.isEmpty {
-                    Text("暂未发现本地 Git 仓库。可添加代码根目录，或点下方直接为某个 owner/repo 指定本地目录。")
+                    Text(L("No local Git repositories found yet. Add a search root or bind an owner/repo to a local folder below."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
@@ -718,7 +756,7 @@ public struct SettingsView: View {
                                     Text(row.repository)
                                         .font(.subheadline.weight(.medium))
                                     if row.isOverridden {
-                                        Text("已固定")
+                                        Text(L("Pinned"))
                                             .font(.caption2)
                                             .foregroundStyle(Color.accentColor)
                                             .padding(.horizontal, 5)
@@ -733,7 +771,7 @@ public struct SettingsView: View {
                                             .background(Color.secondary.opacity(0.12), in: Capsule())
                                     }
                                 }
-                                Text(row.resolvedPath ?? "未绑定（将自动浅克隆）")
+                                Text(row.resolvedPath ?? L("Unbound (will auto shallow clone)"))
                                     .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -756,21 +794,21 @@ public struct SettingsView: View {
                                         }
                                     }
                                 } label: {
-                                    Text("切换副本")
+                                    Text(L("Switch Copy"))
                                 }
                                 .controlSize(.small)
                                 .fixedSize()
                             }
 
-                            Button("选目录...") {
-                                if let chosen = pickFolderPanel(title: "为 \(row.repository) 指定本地目录", initialPath: row.resolvedPath) {
+                            Button(L("Choose...")) {
+                                if let chosen = pickFolderPanel(title: L("Choose local directory for %@", row.repository), initialPath: row.resolvedPath) {
                                     coordinator.setRepositoryDirectoryOverride(repository: row.repository, path: chosen)
                                 }
                             }
                             .controlSize(.small)
 
                             if row.isOverridden {
-                                Button("重置") {
+                                Button(L("Reset")) {
                                     coordinator.setRepositoryDirectoryOverride(repository: row.repository, path: nil)
                                 }
                                 .controlSize(.small)
@@ -781,15 +819,15 @@ public struct SettingsView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Text("手动绑定仓库")
+                    Text(L("Bind Repository"))
                     Spacer(minLength: 12)
-                    TextField("", text: $newRepoKeyInput, prompt: Text("如 acme/web"))
+                    TextField("", text: $newRepoKeyInput, prompt: Text(L("e.g. acme/web")))
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 200)
-                    Button("选目录绑定...") {
+                    Button(L("Bind Folder...")) {
                         let repo = newRepoKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !repo.isEmpty else { return }
-                        if let chosen = pickFolderPanel(title: "为 \(repo) 选择本地目录") {
+                        if let chosen = pickFolderPanel(title: L("Choose local directory for %@", repo)) {
                             coordinator.setRepositoryDirectoryOverride(repository: repo, path: chosen)
                             newRepoKeyInput = ""
                         }
@@ -799,30 +837,30 @@ public struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text("仓库 → 本地目录映射（全引擎共用，支持自动发现与手动指定）")
+                    Text(L("Repository → Local Directory Mapping (shared across all engines)"))
                     Spacer()
-                    Button("重新扫描") {
+                    Button(L("Rescan")) {
                         coordinator.refreshDiscoveredLocalRepos()
                     }
                     .controlSize(.small)
                 }
             }
 
-            Section("系统集成与轮询") {
+            Section(L("System & Polling")) {
                 Stepper(
-                    "同步间隔：\(coordinator.settings.pollIntervalSeconds) 秒",
+                    L("Sync interval: %llds", coordinator.settings.pollIntervalSeconds),
                     value: $coordinator.settings.pollIntervalSeconds,
                     in: 60...600,
                     step: 30
                 )
-                Toggle("开机自动启动", isOn: $coordinator.settings.launchAtLogin)
-                Toggle("有新协作请求或草稿就绪时发送 macOS 原生通知", isOn: $coordinator.settings.notificationsEnabled)
+                Toggle(L("Launch at login"), isOn: $coordinator.settings.launchAtLogin)
+                Toggle(L("Send macOS notifications for new requests or ready drafts"), isOn: $coordinator.settings.notificationsEnabled)
             }
 
             if coordinator.settings.developerModeEnabled {
-                Section("开发者模式") {
+                Section(L("Developer Mode")) {
                     Toggle(
-                        "启用开发者模式（关闭将自动清理演示数据）",
+                        L("Enable Developer Mode (disabling clears sample data)"),
                         isOn: Binding(
                             get: { coordinator.settings.developerModeEnabled },
                             set: { coordinator.setDeveloperMode($0) }
@@ -831,19 +869,19 @@ public struct SettingsView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("收件箱演示任务")
-                            Text("向收件箱注入示例 PR 与多平台消息，仅驻留内存。")
+                            Text(L("Inbox Sample Tasks"))
+                            Text(L("Inject sample PRs and multi-platform items into the inbox (in-memory only)."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         if coordinator.hasDemoItems {
-                            Button("清除演示任务") {
+                            Button(L("Clear Sample Tasks")) {
                                 coordinator.clearDemoItems()
                             }
                             .controlSize(.small)
                         } else {
-                            Button("加载演示任务") {
+                            Button(L("Load Sample Tasks")) {
                                 coordinator.loadDemoItems()
                             }
                             .controlSize(.small)
@@ -852,19 +890,19 @@ public struct SettingsView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("用量统计示例数据")
-                            Text("向统计页注入跨 5 天 / 四引擎示例数据预览图表，绝不写入本地 SQLite 账本。")
+                            Text(L("Usage Sample Data"))
+                            Text(L("Inject 5-day / 4-engine sample usage stats to preview charts (never written to SQLite)."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
                         if coordinator.hasDemoUsageRuns {
-                            Button("清除示例统计") {
+                            Button(L("Clear Sample Stats")) {
                                 coordinator.clearDemoUsageRuns()
                             }
                             .controlSize(.small)
                         } else {
-                            Button("加载示例统计") {
+                            Button(L("Load Sample Stats")) {
                                 coordinator.loadDemoUsageRuns()
                             }
                             .controlSize(.small)
@@ -909,15 +947,16 @@ public struct SettingsView: View {
             toggleDeveloperModeWithFeedback()
         } else if versionTapCount >= 3 {
             let remaining = 5 - versionTapCount
-            let actionLabel = coordinator.settings.developerModeEnabled ? "关闭" : "开启"
-            devModeToast = "再点 \(remaining) 次\(actionLabel)开发者模式"
+            devModeToast = coordinator.settings.developerModeEnabled
+                ? L("Tap %lld more times to disable Developer Mode", remaining)
+                : L("Tap %lld more times to enable Developer Mode", remaining)
         }
     }
 
     private func toggleDeveloperModeWithFeedback() {
         let next = !coordinator.settings.developerModeEnabled
         coordinator.setDeveloperMode(next)
-        devModeToast = next ? "已开启开发者模式" : "已关闭开发者模式"
+        devModeToast = next ? L("Developer Mode enabled") : L("Developer Mode disabled")
         let currentToast = devModeToast
         Task {
             try? await Task.sleep(for: .seconds(2.5))
@@ -952,12 +991,12 @@ public struct SettingsView: View {
 
     private var teamAndGeneralTab: some View {
         Form {
-            Section("唤起提示词注入策略") {
-                Toggle("唤起 AI 时自动注入选中的任务模板与只读防注入边界", isOn: $coordinator.settings.injectPresetPrompt)
+            Section(L("Prompt Injection Strategy")) {
+                Toggle(L("Inject the selected prompt preset and read-only safety guardrails"), isOn: $coordinator.settings.injectPresetPrompt)
                 Text(
                     coordinator.settings.injectPresetPrompt
-                    ? "已开启：每次唤起仅注入当前选中的 1 条模板（不会全量注入）+ 只读安全边界；Lody / 后台会话输出人类可读 Markdown，托管草稿模式附加 JSON Schema。确认卡片点「预览提示词」可实时查看完整原文。"
-                    : "已关闭：不注入任何模板，仅发送最精简的 PR / 触发上下文与你的补充指令（仍保留 <untrusted_external_data> 隔离）。"
+                    ? L("Enabled: injects only the single selected preset plus read-only guardrails. Lody / background sessions output Markdown; managed drafts include a JSON Schema. Click \"Prompt\" on the confirmation card to inspect the full text.")
+                    : L("Disabled: no preset is injected; only the minimal PR / trigger context and your extra note are sent (with <untrusted_external_data> isolation preserved).")
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -968,7 +1007,7 @@ public struct SettingsView: View {
                     let presetID = preset.id
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 6) {
-                            TextField("模板名称", text: $preset.name)
+                            TextField(L("Preset Name"), text: $preset.name)
                                 .textFieldStyle(.roundedBorder)
                             TextEditor(text: $preset.promptInstructions)
                                 .font(.system(size: 11.5))
@@ -981,7 +1020,7 @@ public struct SettingsView: View {
                             if coordinator.settings.presets.count > 1 {
                                 HStack {
                                     Spacer()
-                                    Button("删除此模板", role: .destructive) {
+                                    Button(L("Delete Preset"), role: .destructive) {
                                         coordinator.settings.presets.removeAll { $0.id == presetID }
                                     }
                                     .controlSize(.small)
@@ -1001,49 +1040,51 @@ public struct SettingsView: View {
                 }
             } header: {
                 HStack {
-                    Text("任务模板（仅注入当前选中的 1 条，按个人习惯自由增删）")
+                    Text(L("Prompt Presets (only the selected preset is injected)"))
                     Spacer()
-                    Button("+ 新建模板") {
+                    Button(L("+ New Preset")) {
                         let newPreset = TaskPreset(
                             id: "custom-\(Int(Date().timeIntervalSince1970))",
-                            name: "自定义模板",
+                            name: L("Custom Preset"),
                             category: .codeReview,
-                            promptInstructions: "请帮我 review 这个 PR，重点关注..."
+                            promptInstructions: L("Please review this PR, focusing on...")
                         )
                         coordinator.settings.presets.append(newPreset)
                     }
                     .controlSize(.small)
-                    Button("恢复默认") {
+                    Button(L("Reset Defaults")) {
                         coordinator.settings.presets = TaskPreset.defaults
                     }
                     .controlSize(.small)
                 }
             }
 
-            Section("团队配置包分发") {
+            Section(L("Team Config Bundle")) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("导出 / 导入团队共享配置（作用域、关键词与任务模板）")
+                        Text(L("Export / import shared team config (scopes, keywords, and prompt presets)"))
                             .font(.subheadline)
-                        Text("同事导入时不会覆盖其个人账号、本地路径或默认模型偏好。")
+                        Text(L("Importing never overwrites personal accounts, local paths, or model preferences."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(copiedHint == "team-json" ? "已复制" : "复制 JSON") {
+                    Button(copiedHint == "team-json" ? L("Copied") : L("Copy JSON")) {
                         if let json = coordinator.exportTeamPresetJSON(teamName: "Team") {
                             copyToPasteboard(json, tag: "team-json")
                         }
                     }
                     .controlSize(.small)
 
-                    Button("从剪贴板导入") {
+                    Button(L("Import from Clipboard")) {
                         if let raw = NSPasteboard.general.string(forType: .string) {
                             switch coordinator.importTeamPresetJSON(raw) {
                             case .success(let msg):
+                                copiedHintIsError = false
                                 copiedHint = msg
                             case .failure(let err):
-                                copiedHint = "导入失败：\(err.localizedDescription)"
+                                copiedHintIsError = true
+                                copiedHint = L("Import failed: %@", err.localizedDescription)
                             }
                         }
                     }
@@ -1053,7 +1094,7 @@ public struct SettingsView: View {
                 if let notice = copiedHint, notice != "team-json", notice != "gh-refresh" {
                     Text(notice)
                         .font(.caption)
-                        .foregroundStyle(notice.hasPrefix("导入失败") ? CDTheme.diffDeletion : CDTheme.statusGreen)
+                        .foregroundStyle(copiedHintIsError ? CDTheme.diffDeletion : CDTheme.statusGreen)
                 }
             }
         }

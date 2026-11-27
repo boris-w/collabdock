@@ -443,7 +443,7 @@ struct AgentCommandBuilderTests {
             stdout: #"{"ok":false,"error":"Local project branch not found: fix/foo"}"#,
             engine: .lody
         )
-        #expect(branchErr.contains("缺少目标分支"))
+        #expect(branchErr.contains(CoreL10n.currentLanguage == .zhHans ? "缺少目标分支" : "Target branch ref not found"))
 
         // 5. Lody 侧边栏精简标题格式 + 远端会话实时状态解析（running / idle / error）
         let prItem = CollaborationItem(

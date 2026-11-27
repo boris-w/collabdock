@@ -14,10 +14,14 @@ public enum PlatformKind: String, CaseIterable, Codable, Hashable, Sendable, Ide
     public var id: String { rawValue }
 
     public var displayName: String {
+        displayName(in: CoreL10n.currentLanguage)
+    }
+
+    public func displayName(in language: ResolvedLanguage) -> String {
         switch self {
         case .github: return "GitHub"
         case .gitlab: return "GitLab"
-        case .feishu: return "飞书"
+        case .feishu: return CoreL10n.string("Feishu", language: language)
         case .slack: return "Slack"
         case .linear: return "Linear"
         case .jira: return "Jira"
@@ -46,12 +50,16 @@ public enum CollaborationItemKind: String, Codable, Hashable, Sendable {
     case ticket
 
     public var shortLabel: String {
+        shortLabel(in: CoreL10n.currentLanguage)
+    }
+
+    public func shortLabel(in language: ResolvedLanguage) -> String {
         switch self {
         case .pullRequest: return "PR"
         case .mergeRequest: return "MR"
         case .issue: return "Issue"
-        case .conversation: return "群聊"
-        case .ticket: return "工单"
+        case .conversation: return CoreL10n.string("Chat", language: language)
+        case .ticket: return CoreL10n.string("Ticket", language: language)
         }
     }
 }
@@ -215,7 +223,7 @@ public enum AgentEngine: String, CaseIterable, Codable, Sendable, Identifiable {
             ]
         case .lody:
             return [
-                ModelOption(id: "default", displayName: "跟随 Agent 默认模型")
+                ModelOption(id: "default", displayName: CoreL10n.string("Follow Agent Default"))
             ]
         }
     }
@@ -225,27 +233,27 @@ public enum AgentEngine: String, CaseIterable, Codable, Sendable, Identifiable {
         switch self {
         case .claudeCode:
             return [
-                AgentModeOption(id: "plan", displayName: "Plan（只读规划）"),
-                AgentModeOption(id: "default", displayName: "Manual（修改前询问）"),
-                AgentModeOption(id: "acceptEdits", displayName: "Accept edits（自动编辑）"),
-                AgentModeOption(id: "auto", displayName: "Auto（自动决策）")
+                AgentModeOption(id: "plan", displayName: CoreL10n.string("Plan (read-only)")),
+                AgentModeOption(id: "default", displayName: CoreL10n.string("Manual (ask before edits)")),
+                AgentModeOption(id: "acceptEdits", displayName: CoreL10n.string("Accept edits (auto edit)")),
+                AgentModeOption(id: "auto", displayName: CoreL10n.string("Auto (auto decide)"))
             ]
         case .antigravity:
             return [
-                AgentModeOption(id: "plan", displayName: "Plan（只读规划）"),
-                AgentModeOption(id: "default", displayName: "Default（默认询问）"),
-                AgentModeOption(id: "accept-edits", displayName: "Accept edits（自动编辑）"),
-                AgentModeOption(id: "auto", displayName: "Auto（自动执行）")
+                AgentModeOption(id: "plan", displayName: CoreL10n.string("Plan (read-only)")),
+                AgentModeOption(id: "default", displayName: CoreL10n.string("Default (ask by default)")),
+                AgentModeOption(id: "accept-edits", displayName: CoreL10n.string("Accept edits (auto edit)")),
+                AgentModeOption(id: "auto", displayName: CoreL10n.string("Auto (auto execute)"))
             ]
         case .codex:
             return [
-                AgentModeOption(id: "read-only", displayName: "Read-only（只读沙箱）"),
-                AgentModeOption(id: "workspace-write", displayName: "Workspace write（工作区可写）"),
-                AgentModeOption(id: "danger-full-access", displayName: "Full access（完全权限）")
+                AgentModeOption(id: "read-only", displayName: CoreL10n.string("Read-only (sandbox)")),
+                AgentModeOption(id: "workspace-write", displayName: CoreL10n.string("Workspace write")),
+                AgentModeOption(id: "danger-full-access", displayName: CoreL10n.string("Full access"))
             ]
         case .lody:
             return [
-                AgentModeOption(id: "__agent_default__", displayName: "跟随 Agent 默认模式")
+                AgentModeOption(id: "__agent_default__", displayName: CoreL10n.string("Follow Agent Default Mode"))
             ]
         }
     }
@@ -537,11 +545,11 @@ public struct LodyCatalogSnapshot: Codable, Equatable, Sendable {
         catalog: LodyCatalogSnapshot?,
         fallbackByEngine: [AgentEngine: [ModelOption]]
     ) -> [ModelOption] {
-        let defaultFollow = ModelOption(id: "default", displayName: "跟随 Agent 默认模型")
+        let defaultFollow = ModelOption(id: "default", displayName: CoreL10n.string("Follow Agent Default"))
         let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmed.isEmpty || trimmed == "default" {
-            return [ModelOption(id: "default", displayName: "跟随 Workspace 默认模型")]
+            return [ModelOption(id: "default", displayName: CoreL10n.string("Follow Workspace Default"))]
         }
 
         if let matched = catalog?.matchAgentConfig(selector: trimmed) {
@@ -623,18 +631,18 @@ public enum ExecutionLaunchMode: String, CaseIterable, Codable, Hashable, Sendab
     public var displayName: String {
         switch self {
         case .managedStructuredRun:
-            return "托管执行并生成草稿（可随时接管会话）"
+            return CoreL10n.string("Managed run with draft (resume anytime)")
         case .nativeBackgroundSession:
-            return "派发为原生后台会话（类定时任务）"
+            return CoreL10n.string("Dispatch as native background session")
         }
     }
 
     public var shortLabel: String {
         switch self {
         case .managedStructuredRun:
-            return "托管并生成草稿"
+            return CoreL10n.string("Managed + Draft")
         case .nativeBackgroundSession:
-            return "原生后台会话"
+            return CoreL10n.string("Background Session")
         }
     }
 }
@@ -653,22 +661,22 @@ public enum DeliveryMode: String, CaseIterable, Codable, Hashable, Sendable, Ide
     public func displayName(for platform: PlatformKind) -> String {
         switch self {
         case .platformDraft:
-            return "\(platform.displayName) Pending 草稿（推荐，仅自己可见）"
+            return CoreL10n.format("%@ Pending Draft (recommended, only visible to you)", platform.displayName)
         case .localDraftOnly:
-            return "仅本地生成草稿/报告"
+            return CoreL10n.string("Local draft / report only")
         case .directReply:
-            return "直接回复到 \(platform.displayName)"
+            return CoreL10n.format("Reply directly on %@", platform.displayName)
         }
     }
 
     public func shortLabel(for platform: PlatformKind) -> String {
         switch self {
         case .platformDraft:
-            return "Pending 草稿"
+            return CoreL10n.string("Pending Draft")
         case .localDraftOnly:
-            return "仅本地草稿"
+            return CoreL10n.string("Local Draft Only")
         case .directReply:
-            return "直接回复"
+            return CoreL10n.string("Direct Reply")
         }
     }
 }
@@ -711,11 +719,11 @@ public enum TaskCompletionReason: String, Codable, Hashable, Sendable {
 
     public var displayLabel: String {
         switch self {
-        case .manual: return "已完成"
-        case .prApproved: return "已 Approve"
-        case .prMerged: return "已合并"
-        case .prClosed: return "已关闭"
-        case .superseded: return "已进入下一轮"
+        case .manual: return CoreL10n.string("Completed")
+        case .prApproved: return CoreL10n.string("Approved")
+        case .prMerged: return CoreL10n.string("Merged")
+        case .prClosed: return CoreL10n.string("Closed")
+        case .superseded: return CoreL10n.string("Superseded by next round")
         }
     }
 }
@@ -772,17 +780,17 @@ public enum ReviewContinuityMode: String, CaseIterable, Codable, Hashable, Senda
 
     public var shortLabel: String {
         switch self {
-        case .continueSessionIncremental: return "续聊原会话 · 增量 Diff"
-        case .freshSessionIncremental: return "新开会话 · 增量 Diff"
-        case .freshSessionFull: return "新开会话 · 全量 PR"
+        case .continueSessionIncremental: return CoreL10n.string("Continue Session · Incremental")
+        case .freshSessionIncremental: return CoreL10n.string("New Session · Incremental")
+        case .freshSessionFull: return CoreL10n.string("New Session · Full PR")
         }
     }
 
     public var displayName: String {
         switch self {
-        case .continueSessionIncremental: return "续聊原会话 · 仅审新增改动（推荐，保留上轮记忆）"
-        case .freshSessionIncremental: return "新开会话 · 仅审新增改动（附带上次摘要）"
-        case .freshSessionFull: return "新开会话 · 全量重审整个 PR"
+        case .continueSessionIncremental: return CoreL10n.string("Continue previous session · new commits only (recommended)")
+        case .freshSessionIncremental: return CoreL10n.string("New session · new commits only (with prior summary)")
+        case .freshSessionFull: return CoreL10n.string("New session · full PR re-review")
         }
     }
 }

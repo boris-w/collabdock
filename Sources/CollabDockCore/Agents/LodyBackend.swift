@@ -70,7 +70,7 @@ public struct LodyBackend: ExecutionBackend {
             var incLog: String?
             var forcePushed = false
             if let prCode, let prevSHA = prevSHAForIncremental, !prevSHA.isEmpty {
-                onProgress("正在计算相对 \(prevSHA.prefix(7)) 的增量修复 Diff...")
+                onProgress(CoreL10n.format("Computing incremental fix diff since %@...", String(prevSHA.prefix(7))))
                 let inc = await worktreeManager.computeIncrementalChanges(
                     inRepositoryAt: localPath,
                     previousSHA: prevSHA,
@@ -83,7 +83,7 @@ public struct LodyBackend: ExecutionBackend {
                 forcePushed = inc.wasForcePushed
             } else if let prCode, request.plan.useIsolatedWorktree {
                 let displayName = URL(fileURLWithPath: localPath).lastPathComponent
-                onProgress("正在刷新本地项目 \(displayName) 的 PR 分支引用...")
+                onProgress(CoreL10n.format("Refreshing PR branch refs in local project %@...", displayName))
                 await worktreeManager.refreshRemoteRefs(
                     inRepositoryAt: localPath,
                     code: prCode,
@@ -112,8 +112,8 @@ public struct LodyBackend: ExecutionBackend {
 
         onProgress(
             request.plan.useIsolatedWorktree
-                ? "正在创建隔离只读 Git Worktree..."
-                : "正在准备项目目录上下文..."
+                ? CoreL10n.string("Creating isolated read-only Git Worktree...")
+                : CoreL10n.string("Preparing project directory context...")
         )
         let extraLocalRepos = catalog?.localProjects.map(\.rootPath) ?? []
         return try await worktreeManager.prepareContext(
@@ -212,7 +212,7 @@ public struct LodyBackend: ExecutionBackend {
         )
 
         let sanitizedEnv = AgentSessionRunner.sanitizedEnvironment(from: request.environment)
-        onProgress("启动 \(request.plan.engine.displayName) (\(request.plan.model))...")
+        onProgress(CoreL10n.format("Starting %@ (%@)...", request.plan.engine.displayName, request.plan.model))
 
         let startedAt = Date()
         let execResult = try await AgentSessionRunner.executeStreaming(

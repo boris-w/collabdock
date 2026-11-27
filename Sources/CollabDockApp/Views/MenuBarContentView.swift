@@ -117,8 +117,8 @@ public struct MenuBarContentView: View {
     private var topChromeBar: some View {
         HStack(spacing: 8) {
             HStack(spacing: 2) {
-                tabPill(tab: .inbox, title: "收件箱", count: coordinator.inboxItems.count)
-                tabPill(tab: .completed, title: "已完成", count: coordinator.completedItems.count)
+                tabPill(tab: .inbox, title: L("Inbox"), count: coordinator.inboxItems.count)
+                tabPill(tab: .completed, title: L("Done"), count: coordinator.completedItems.count)
             }
             .padding(2.5)
             .background(CDTheme.subtleSurface(for: scheme), in: Capsule())
@@ -128,7 +128,7 @@ public struct MenuBarContentView: View {
             HStack(spacing: 2) {
                 CDHoverIconButton(
                     systemImage: "chart.bar",
-                    helpText: "查看 Review Token 与模型统计"
+                    helpText: L("View review token & model usage")
                 ) {
                     withAnimation(.snappy(duration: 0.2)) {
                         showQuickStats = true
@@ -136,7 +136,7 @@ public struct MenuBarContentView: View {
                 }
                 CDHoverIconButton(
                     systemImage: "plus",
-                    helpText: "粘贴 GitHub PR 链接立即审查",
+                    helpText: L("Paste a GitHub PR URL to review now"),
                     isActive: showImportPRBar
                 ) {
                     withAnimation(.snappy(duration: 0.16)) {
@@ -146,13 +146,13 @@ public struct MenuBarContentView: View {
                 }
                 CDHoverIconButton(
                     systemImage: "arrow.clockwise",
-                    helpText: "立即同步协作来源"
+                    helpText: L("Sync collaboration sources now")
                 ) {
                     coordinator.refreshNow()
                 }
                 CDHoverIconButton(
                     systemImage: "gearshape",
-                    helpText: "偏好设置 (⌘,)"
+                    helpText: L("Settings (⌘,)")
                 ) {
                     openSettingsWindow()
                 }
@@ -165,7 +165,7 @@ public struct MenuBarContentView: View {
     private var importPRBar: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
-                TextField("粘贴 PR 链接或 owner/repo#123", text: $importPRInput)
+                TextField(L("Paste PR URL or owner/repo#123"), text: $importPRInput)
                     .textFieldStyle(.plain)
                     .font(.system(size: 11.5))
                     .padding(.horizontal, 8)
@@ -182,7 +182,7 @@ public struct MenuBarContentView: View {
                         submitImportPR()
                     }
 
-                Button(isImportingPR ? "..." : "导入") {
+                Button(isImportingPR ? "..." : L("Import")) {
                     submitImportPR()
                 }
                 .buttonStyle(.plain)
@@ -266,7 +266,7 @@ public struct MenuBarContentView: View {
     /// 多平台来源过滤胶囊（仅当收件箱同时存在多个平台时显现，保持单平台极简）
     private var platformFilterStrip: some View {
         HStack(spacing: 5) {
-            filterChip(title: "全部", platform: nil)
+            filterChip(title: L("All"), platform: nil)
             ForEach(coordinator.activePlatformsInInbox) { platform in
                 filterChip(title: platform.displayName, platform: platform)
             }
@@ -321,13 +321,13 @@ public struct MenuBarContentView: View {
         if visibleItems.isEmpty {
             emptyStateView(
                 icon: "checkmark.seal",
-                title: "收件箱已清空",
-                subtitle: "有人 @你 或指派 PR Review 时，\n会自动汇总到这里等待你处理。"
+                title: L("Inbox Clear"),
+                subtitle: L("When someone @mentions you or requests a PR review,\nit will appear here waiting for confirmation.")
             )
         } else {
             if !runningItems.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionHeader("正在执行", count: runningItems.count)
+                    sectionHeader(L("Running"), count: runningItems.count)
                     ForEach(runningItems) { item in
                         RunningTaskBannerView(item: item) {
                             coordinator.cancelRunningItem(id: item.id)
@@ -338,7 +338,7 @@ public struct MenuBarContentView: View {
 
             if !failedItems.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionHeader("执行失败", count: failedItems.count)
+                    sectionHeader(L("Failed"), count: failedItems.count)
                     ForEach(failedItems) { item in
                         CDInsetCard(padding: 10) {
                             VStack(alignment: .leading, spacing: 6) {
@@ -349,16 +349,16 @@ public struct MenuBarContentView: View {
                                         .lineLimit(1)
                                         .truncationMode(.middle)
                                     Spacer()
-                                    CDPillButton(title: "重试", systemImage: "arrow.clockwise") {
+                                    CDPillButton(title: L("Retry"), systemImage: "arrow.clockwise") {
                                         coordinator.retryFailedItem(id: item.id)
                                     }
-                                    CDHoverIconButton(systemImage: "trash", helpText: "删除此条") {
+                                    CDHoverIconButton(systemImage: "trash", helpText: L("Delete item")) {
                                         withAnimation(.snappy(duration: 0.16)) {
                                             coordinator.deleteItem(id: item.id)
                                         }
                                     }
                                 }
-                                Text(item.errorMessage ?? "执行异常")
+                                Text(item.errorMessage ?? L("Execution failed"))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(3)
@@ -370,7 +370,7 @@ public struct MenuBarContentView: View {
 
             if !pendingItems.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionHeader("待你确认", count: pendingItems.count)
+                    sectionHeader(L("Pending"), count: pendingItems.count)
                     CDInsetCard {
                         VStack(spacing: 0) {
                             ForEach(Array(pendingItems.enumerated()), id: \.element.id) { index, item in
@@ -403,7 +403,7 @@ public struct MenuBarContentView: View {
 
             if !draftItems.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionHeader("草稿与已派发", count: draftItems.count)
+                    sectionHeader(L("Drafts & Dispatched"), count: draftItems.count)
                     ForEach(draftItems) { item in
                         DraftResultCardView(
                             item: item,
@@ -435,13 +435,13 @@ public struct MenuBarContentView: View {
         if items.isEmpty {
             emptyStateView(
                 icon: "tray",
-                title: "还没有已完成事项",
-                subtitle: "审阅完并标为「完成」的 PR 或任务\n会归档在这里，可随时回看或删除。"
+                title: L("No completed items yet"),
+                subtitle: L("PRs and tasks you mark as done\nwill be archived here for quick reference.")
             )
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 5) {
-                    Text("已归档")
+                    Text(L("Archived"))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text("\(items.count)")
@@ -449,7 +449,7 @@ public struct MenuBarContentView: View {
                         .monospacedDigit()
                         .foregroundStyle(.tertiary)
                     Spacer()
-                    Button("清空已完成") {
+                    Button(L("Clear Done")) {
                         withAnimation(.snappy(duration: 0.18)) {
                             coordinator.clearCompletedItems()
                         }
@@ -457,7 +457,7 @@ public struct MenuBarContentView: View {
                     .buttonStyle(.plain)
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                    .help("清空已完成列表（保留本地用量统计账本）")
+                    .help(L("Clear completed list (keeps local usage stats)"))
                 }
                 .padding(.horizontal, 4)
 
@@ -496,7 +496,7 @@ public struct MenuBarContentView: View {
                     if coordinator.isSyncing {
                         ProgressView()
                             .controlSize(.mini)
-                        Text("正在同步...")
+                        Text(L("Syncing..."))
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -512,7 +512,7 @@ public struct MenuBarContentView: View {
                         Circle()
                             .fill(CDTheme.statusAmber)
                             .frame(width: 6, height: 6)
-                        Text("监听已暂停")
+                        Text(L("Polling paused"))
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -546,7 +546,7 @@ public struct MenuBarContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(coordinator.isPaused ? "点击恢复自动轮询" : "点击暂停自动轮询")
+            .help(coordinator.isPaused ? L("Click to resume auto-polling") : L("Click to pause auto-polling"))
 
             Spacer()
 
@@ -563,10 +563,10 @@ public struct MenuBarContentView: View {
                         .background(CDTheme.statusAmber.opacity(0.14), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .help("开发者模式已开启（点击前往设置管理）")
+                .help(L("Developer mode enabled (click to manage in Settings)"))
             }
 
-            Button("退出") {
+            Button(L("Quit")) {
                 NSApp.terminate(nil)
             }
             .buttonStyle(.plain)
@@ -623,16 +623,16 @@ public struct MenuBarContentView: View {
             return err
         }
         if coordinator.isSyncing {
-            return "正在同步..."
+            return L("Syncing...")
         }
         if coordinator.isPaused {
-            return "监听已暂停"
+            return L("Polling paused")
         }
         if !coordinator.resolvedGitHubUsername.isEmpty {
             return "@\(coordinator.resolvedGitHubUsername)"
         }
         let enabledCount = coordinator.settings.connectors.filter { $0.isEnabled }.count
-        return "\(enabledCount) 个协作来源在线"
+        return L("%lld active sources", enabledCount)
     }
 
     private func sectionHeader(_ title: String, count: Int) -> some View {
@@ -669,10 +669,10 @@ public struct MenuBarContentView: View {
 
     private func statusLabel(_ status: CollaborationTaskStatus) -> String {
         switch status {
-        case .draftReady: return "草稿就绪"
-        case .completed: return "已完成"
-        case .failed: return "执行失败"
-        case .dismissed: return "已忽略"
+        case .draftReady: return L("Draft Ready")
+        case .completed: return L("Done")
+        case .failed: return L("Failed")
+        case .dismissed: return L("Dismissed")
         default: return status.rawValue
         }
     }
@@ -727,7 +727,7 @@ private struct CollaborationRowView: View {
                         .lineLimit(1)
 
                     if item.previousReview != nil {
-                        Text("第\(item.reviewRound)轮复审")
+                        Text(L("Round %lld", item.reviewRound))
                             .font(.system(size: 9.5, weight: .semibold))
                             .foregroundStyle(CDTheme.statusAmber)
                             .padding(.horizontal, 5)
@@ -754,7 +754,7 @@ private struct CollaborationRowView: View {
                 .lineLimit(1)
 
                 if let body = item.triggerBody, !body.isEmpty {
-                    Text("“\(body)”")
+                    Text(L("\"%@\"", body))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary.opacity(0.85))
                         .lineLimit(1)
@@ -764,13 +764,13 @@ private struct CollaborationRowView: View {
 
             if isHovering {
                 HStack(spacing: 3) {
-                    CDHoverIconButton(systemImage: "checkmark", helpText: "标为已完成") {
+                    CDHoverIconButton(systemImage: "checkmark", helpText: L("Mark as Done")) {
                         onMarkCompleted()
                     }
-                    CDHoverIconButton(systemImage: "trash", helpText: "删除此条") {
+                    CDHoverIconButton(systemImage: "trash", helpText: L("Delete item")) {
                         onDelete()
                     }
-                    CDPillButton(title: "处理", systemImage: "chevron.right") {
+                    CDPillButton(title: L("Review"), systemImage: "chevron.right") {
                         onSelect()
                     }
                 }
@@ -833,9 +833,9 @@ private struct RunningTaskBannerView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
-                    CDHoverIconButton(systemImage: "stop.fill", helpText: "中止本次执行", action: onCancel)
+                    CDHoverIconButton(systemImage: "stop.fill", helpText: L("Stop run"), action: onCancel)
                 }
-                Text(item.progressMessage ?? "正在分析并生成审查草稿...")
+                Text(item.progressMessage ?? L("Analyzing and generating review draft..."))
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -856,25 +856,25 @@ private struct DraftResultCardView: View {
         if item.sessionHandle?.engine == .lody {
             switch item.remoteSessionStatus {
             case .running:
-                return ("审查中", CDTheme.statusAmber, true)
+                return (L("Reviewing"), CDTheme.statusAmber, true)
             case .completed:
                 if item.gitHubReviewVerdict == "CHANGES_REQUESTED" {
-                    return ("待修复", CDTheme.statusAmber, false)
+                    return (L("Awaiting Fix"), CDTheme.statusAmber, false)
                 }
-                return ("审查完成", CDTheme.statusGreen, false)
+                return (L("Reviewed"), CDTheme.statusGreen, false)
             case .failed:
-                return ("执行异常", CDTheme.diffDeletion, false)
+                return (L("Error"), CDTheme.diffDeletion, false)
             case nil:
                 if item.gitHubReviewVerdict == "CHANGES_REQUESTED" {
-                    return ("待修复", CDTheme.statusAmber, false)
+                    return (L("Awaiting Fix"), CDTheme.statusAmber, false)
                 }
-                return ("已派发", CDTheme.statusGreen, false)
+                return (L("Dispatched"), CDTheme.statusGreen, false)
             }
         }
         if item.gitHubReviewVerdict == "CHANGES_REQUESTED" {
-            return ("待修复", CDTheme.statusAmber, false)
+            return (L("Awaiting Fix"), CDTheme.statusAmber, false)
         }
-        return ("草稿就绪", CDTheme.statusGreen, false)
+        return (L("Draft Ready"), CDTheme.statusGreen, false)
     }
 
     var body: some View {
@@ -903,8 +903,8 @@ private struct DraftResultCardView: View {
                         .padding(.vertical, 2)
                         .background(badge.color.opacity(0.13), in: Capsule())
                         .fixedSize()
-                    CDHoverIconButton(systemImage: "checkmark", helpText: "标为已完成（归档）", action: onMarkCompleted)
-                    CDHoverIconButton(systemImage: "trash", helpText: "删除此条", action: onDelete)
+                    CDHoverIconButton(systemImage: "checkmark", helpText: L("Mark as Done (Archive)"), action: onMarkCompleted)
+                    CDHoverIconButton(systemImage: "trash", helpText: L("Delete item"), action: onDelete)
                 }
 
                 Text(item.title)
@@ -919,9 +919,9 @@ private struct DraftResultCardView: View {
 
                     if case .codeReview(let review) = output {
                         HStack(spacing: 10) {
-                            severityPill(count: review.criticalCount, label: "严重", color: CDTheme.diffDeletion)
-                            severityPill(count: review.warningCount, label: "建议", color: CDTheme.statusAmber)
-                            severityPill(count: review.nitCount, label: "细节", color: .secondary)
+                            severityPill(count: review.criticalCount, label: L("Critical"), color: CDTheme.diffDeletion)
+                            severityPill(count: review.warningCount, label: L("Warning"), color: CDTheme.statusAmber)
+                            severityPill(count: review.nitCount, label: L("Nit"), color: .secondary)
                             Spacer()
                         }
                     }
@@ -929,16 +929,16 @@ private struct DraftResultCardView: View {
                     HStack(spacing: 6) {
                         Spacer()
                         if let onOpenReport {
-                            CDHoverIconButton(systemImage: "doc.text", helpText: "打开本地 Markdown 报告", action: onOpenReport)
+                            CDHoverIconButton(systemImage: "doc.text", helpText: L("Open local Markdown report"), action: onOpenReport)
                         }
                         if let onHandoff {
                             CDPillButton(
-                                title: item.sessionHandle?.engine == .lody ? "打开 Lody" : "接管会话",
+                                title: item.sessionHandle?.engine == .lody ? L("Open Lody") : L("Resume"),
                                 systemImage: item.sessionHandle?.engine == .lody ? "cube.transparent" : "terminal",
                                 action: onHandoff
                             )
                         }
-                        CDPillButton(title: "去审阅", systemImage: "arrow.up.right", action: onOpenSource)
+                        CDPillButton(title: L("Open PR"), systemImage: "arrow.up.right", action: onOpenSource)
                     }
                     .padding(.top, 1)
                 }
@@ -988,9 +988,9 @@ private struct CompletedItemRowView: View {
     }
 
     private var statusText: String {
-        guard item.status == .completed else { return "已忽略" }
+        guard item.status == .completed else { return L("Dismissed") }
         if item.completionReason == .superseded {
-            return "已进入第 \(item.reviewRound + 1) 轮"
+            return L("Moved to Round %lld", item.reviewRound + 1)
         }
         return (item.completionReason ?? .manual).displayLabel
     }
@@ -1023,18 +1023,18 @@ private struct CompletedItemRowView: View {
             HStack(spacing: 2) {
                 if isHovering {
                     if let onOpenReport {
-                        CDHoverIconButton(systemImage: "doc.text", helpText: "打开本地报告", action: onOpenReport)
+                        CDHoverIconButton(systemImage: "doc.text", helpText: L("Open local report"), action: onOpenReport)
                     }
                     if let onHandoff {
                         CDHoverIconButton(
                             systemImage: item.sessionHandle?.engine == .lody ? "cube.transparent" : "terminal",
-                            helpText: item.sessionHandle?.engine == .lody ? "打开 Lody 会话" : "接管本地会话",
+                            helpText: item.sessionHandle?.engine == .lody ? L("Open Lody session") : L("Resume local session"),
                             action: onHandoff
                         )
                     }
-                    CDHoverIconButton(systemImage: "arrow.up.right", helpText: "在浏览器打开", action: onOpenSource)
+                    CDHoverIconButton(systemImage: "arrow.up.right", helpText: L("Open in browser"), action: onOpenSource)
                 }
-                CDHoverIconButton(systemImage: "trash", helpText: "删除此条记录", action: onDelete)
+                CDHoverIconButton(systemImage: "trash", helpText: L("Delete entry"), action: onDelete)
             }
         }
         .padding(.horizontal, 11)
