@@ -25,7 +25,8 @@ macOS 菜单栏应用：把 GitHub 上找你 Review 的 PR 收进一个收件箱
 
 - **GitHub 收件箱**：轮询 `/notifications`（`If-Modified-Since` 条件请求，304 不计配额）；token 缺 `notifications` scope 时自动降级为 Search API（每 180 秒对齐，打开弹窗距上次对齐超 60 秒自动同步）。也可以点 `+` 直接粘贴 PR 链接或 `owner/repo#123`。
 - **触发规则**：分别开关 `@我` 评论（可要求包含关键词，如 `review`、`cr`、`帮忙看`；你已是 reviewer 的 PR 免关键词放行）、Request Review、团队指派；支持仓库白/黑名单（`owner/*` 通配）、忽略 Draft PR 和 Bot。
-- **执行前人工确认**：每个任务都要你在确认卡片上选好 Lody Agent（如 Claude Code / Codex / Antigravity）、模型、思考强度、提示词模板和项目目录，点确认后才会派发会话。可以先预览完整提示词。
+- **执行前人工确认与可选自动开始**：默认每个任务都在确认卡片上由你选好 Lody Agent（如 Claude Code / Codex / Antigravity）、模型、思考强度、提示词模板和项目目录后再派发，并可预览提示词原文；也支持在「设置 → 触发规则」按触发方式与仓库白名单（`owner/*`）开启「收到请求自动开始审查」（默认关闭），并可在菜单栏底栏一键暂停/恢复，或在详情页停止并换设置重来。
+- **开始审查 👀 标记**：Lody 会话派发成功后，默认在触发评论或 PR 上加一个 👀 表情（`eyes` reaction），让作者知道已经在看了（ADR-009：CollabDock 唯一的 GitHub 写操作，可在设置中随时关闭以保持完全只读）。
 - **Lody 编排执行**：通过本机 `lody` CLI（未全局安装时自动回退到 `npx -y lody@latest`）实时拉取工作区、Agent、模型、本地项目与已绑定 GitHub 仓库目录，后台派发会话并持续轮询进度，一键通过 `lody://` 链接在 Lody Desktop 中打开或继续追问。
 - **隔离 worktree**：自动路由到本地 Lody 项目（使用 Lody 原生 `--worktree --branch` 隔离分支）、云端已绑定仓库或本地自动创建的隔离 worktree，不动你当前的工作分支和未提交修改。
 - **增量复审**：PR 有新提交后再次请求 Review，旧卡片自动归档为「已进入第 N 轮」，新卡片标为「第 N 轮复审」，默认续聊上一轮 Lody 会话（`lody session chat`）只看增量改动，也可以新开增量或全量会话；检测到 rebase / force-push 时自动回退为全量范围。
@@ -45,17 +46,17 @@ GitHub 通知 / 待审 PR
   → 实时跟踪会话状态与上下文用量 → 一键在 Lody Desktop 查看结论并继续对话
 ```
 
-CollabDock 自身对 GitHub 保持只读，不直接向 GitHub 写入审查评论或草稿；审查过程和后续操作都在 Lody 会话中完成。
+除开始审查时可选添加 👀 表情（默认开启，可关闭）外，CollabDock 对 GitHub 保持只读，不代发审查评论、草稿或 Approve；审查过程和后续操作都在 Lody 会话中完成。
 
 ## 安全模型
 
 PR 标题、评论和提交信息都是外部可控的输入。CollabDock 的防护分为几层：
 
-1. **人工门控**：不会自动执行任何东西。只有你在确认卡片上点击确认，才会派发 Lody 会话。
+1. **人工门控（默认）**：默认不会自动执行任何东西，只有你在确认卡片上点击确认才会派发 Lody 会话；如主动开启「自动开始审查」，也只对符合触发方式与仓库白名单的 GitHub PR 生效，且随时可暂停或停止重来。
 2. **默认只读模式**：若所选 Lody Agent 提供只读 / plan 模式（如 `plan`、`read-only`），派发时会自动传入该只读模式。
 3. **极简提示词边界**：发给 Lody 的消息只包含你配置的模板（首次审查 / PR 更新后复审）及可选补充指令，外部 PR 标题、正文、评论或分支名均不拼入提示词；仅渲染经严格校验的有限占位符（`{{pr_url}}`、`{{repo}}`、`{{number}}`、`{{head_sha}}`、`{{previous_sha}}`），降低提示词与命令注入风险（但不能替代人工审查）。
-4. **GitHub token 与宿主会话隔离**：token 由 `gh auth token` 获取，只在应用进程内用于只读查询 GitHub API。启动 `lody` 子进程前会剥离 `GITHUB_TOKEN`、`GH_TOKEN`、`GH_ENTERPRISE_TOKEN` 以及 `ELECTRON_RUN_AS_NODE`、`LODY_*` 宿主环境变量，并在中性临时目录启动，防止目标仓库内同名 `package.json` 劫持 `npx`。
-5. **不直接写 GitHub**：CollabDock 自身不发起任何 GitHub 评论或 Review 写请求。
+4. **GitHub token 与宿主会话隔离**：token 由 `gh auth token` 获取，只在应用进程内发往已配置的 GitHub API 主机。启动 `lody` 子进程前会剥离 `GITHUB_TOKEN`、`GH_TOKEN`、`GH_ENTERPRISE_TOKEN` 以及 `ELECTRON_RUN_AS_NODE`、`LODY_*` 宿主环境变量，并在中性临时目录启动，防止目标仓库内同名 `package.json` 劫持 `npx`。
+5. **最小化 GitHub 写入**：CollabDock 唯一可能发出的 GitHub 写请求是开始审查时的 👀 表情（默认开启，关掉后完全只读）；评论地址须经严格同源与路径校验才使用，否则一律退回 PR 本身，token 绝不发往其他主机。CollabDock 绝不代发任何评论、Review 草稿或 Approve。
 
 需要说明的边界：Lody 会话中的 Agent 仍以你的系统用户身份运行，其权限与网络访问由对应 Lody Agent 配置决定。CollabDock 本身没有服务端，也没有遥测，只访问 GitHub API 和本机 Lody CLI。
 

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Added
+- **可选的「收到请求自动开始审查」与「开始审查时在 PR 上标记 👀」** (`PR #21`, `ADR-009`)：
+  - 新增 `AutoStartSettings`（默认关闭、仅勾选 `reviewRequested`、支持 `owner/*` 仓库白名单、复审默认继续、开始通知与暂停状态，支持逐字段容错解码）与 `AutoStartPolicy.shouldAutoStart`，`AppSettings` 新增 `autoStart` 与 `markReviewStartWithReaction`（默认开启）。
+  - 新增 `CollaborationItem.wasAutoStarted` 与 `triggerCommentAPIURL`（兼容旧数据解码）；`GitHubConnector` 在通知与 Search 通道记住触发评论 API 地址，并实现 `PullRequestReacting.addReaction(.eyes, to:)` 与严格同源路径校验的 `GitHubReactionTarget.endpoint(for:apiBaseURL:)`（兼容 GitHub Enterprise base path，不可信地址一律退回 PR 本身）。
+  - `ReviewExecutionService` 在 Lody 后台会话派发成功后（首轮或复审，手动或自动）按开关添加一次 👀，失败静默忽略不影响审查结果；这是 CollabDock 唯一的 GitHub 写操作。
+  - `AppCoordinator` 在同步到符合规则的新请求时自动以 `defaultPlan(for:)` 派发（手动 `+` 导入永不自动开始，暂停期间不补派），改发「已自动开始」通知并对连续相同的自动开始失败错误去重（中间成功后重新计数）。
+  - UI 新增「设置 → 触发规则」自动开始分组与独立 👀 开关、收件箱「⚡ 自动 / 自动开始失败」标签、弹窗底栏「自动审查：开启中 / 已暂停」与暂停/恢复按钮，以及详情页顶部自动开始横条（「打开 Lody / 停止 / 停止并换个设置重来」）。
+
 ## [0.2.0] - 2026-11-28
 
 首个打包发布版本（0.1.0 是开源时的源码快照，未单独发布）。下面「要点」是这个版本相对开源时的净变化；再往下是逐条开发记录，其中有些功能在本周期内先加后删（如 Codex 续聊、双模型会诊），以「要点」为准。
