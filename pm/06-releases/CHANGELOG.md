@@ -4,6 +4,24 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-28
+
+首个打包发布版本（0.1.0 是开源时的源码快照，未单独发布）。下面「要点」是这个版本相对开源时的净变化；再往下是逐条开发记录，其中有些功能在本周期内先加后删（如 Codex 续聊、双模型会诊），以「要点」为准。
+
+### 要点
+- **执行方式只保留 Lody**（#14，见 ADR-008）：确认卡片里选 Lody Agent（Claude Code / Codex / Antigravity 等），后台派发会话，复审接着同一个 Lody 对话。直连 Claude / Codex / agy CLI、CollabDock 自己写的 GitHub Pending 草稿、双模型会诊、本地报告都已移除；旧设置和历史数据照常加载。
+- **提示词只发你的模板**（#16）：分「首次审查 / PR 更新后复审」两个模板，默认带 PR 链接，跟随界面语言；不再附加系统内容和 PR 标题、描述、diff 等外部文字。
+- **英文界面**（#13）：界面支持简体中文与英文，默认跟随系统，可在设置里切换。
+- **收件箱更准**：同一个 PR 只保留一张卡片，归档里也不重复（#10、#12、#15）；作者没推新提交、只是再次请你 review 也能触发（#7）；你是 reviewer 的 PR 上被直接 @ 就触发；没有 GitHub 网页通知时 3 分钟内发现新请求，打开弹窗自动同步（#11）。
+- **用量与耗时**：每一轮复审单独计时，续聊只计新增上下文（#9）。
+- **更轻的派发**：不再计算没人用的 diff，每次派发都刷新本地 PR 分支，Lody 里的 agent 总能看到最新提交（#18）。
+
+### 安装与要求
+- macOS 14+，`gh` 已登录，Lody CLI 已登录（全局 `lody` 或 `npx -y lody@latest`）。
+- DMG 为本机 ad-hoc 签名、未经 Apple 公证，首次打开需右键 →「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/CollabDock.app`。
+
+### 开发记录（按时间）
+
 ### Removed
 - **移除工作区准备阶段不再被消费的 `git diff` / `git log` 增量与全量 Diff 计算** (`PR #18`)：
   - `PreparedWorkspaceContext` 移除 `unifiedDiff`、`incrementalDiff`、`incrementalCommitLog`、`wasForcePushed`；`WorktreeManaging` 移除 `computeIncrementalChanges` 及 `prepareContext` 的 `previousReviewedSHA` 参数；`WorktreeManager` 删除 `computeIncrementalRange` 及主目录/隔离 Worktree 路径中的 `git diff` / `git log` 步骤，保留 PR head/base 拉取与 detached worktree 创建。

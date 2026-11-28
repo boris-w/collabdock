@@ -72,7 +72,9 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Install
 
-There are no prebuilt releases yet. Build from source:
+Download the latest `CollabDock-<version>.dmg` from [GitHub Releases](https://github.com/boris-w/collabdock/releases) (Apple silicon and Intel), open it and drag CollabDock to Applications.
+
+Or build from source:
 
 ```bash
 git clone https://github.com/boris-w/collabdock.git

@@ -72,7 +72,9 @@ PR 标题、评论和提交信息都是外部可控的输入。CollabDock 的防
 
 ## 安装
 
-目前还没有发布预编译版本，需要从源码构建：
+从 [GitHub Releases](https://github.com/boris-w/collabdock/releases) 下载最新的 `CollabDock-<版本>.dmg`（同时支持 Apple 芯片与 Intel），打开后把 CollabDock 拖到「应用程序」。
+
+也可以从源码构建：
 
 ```bash
 git clone https://github.com/boris-w/collabdock.git

@@ -1,6 +1,6 @@
 APP_NAME := CollabDock
 BUILD_DIR := build
-VERSION := 0.1.0
+VERSION := 0.2.0
 
 .PHONY: build test test-unit test-e2e coverage snapshots icon app dmg universal-dmg run clean
 
