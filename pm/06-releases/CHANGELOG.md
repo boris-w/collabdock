@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+- **修复「停止 / 停止并换个设置重来」未真正取消 Lody 远端审查轮次的问题，并补齐自动开始通知交互按钮** (`PR #22`)：
+  - Core 新增 `SessionCancelling` 协议并由 `LodyBackend` 实现：调用 `lody session cancel <sessionId> --json [--workspace <ws>]`（中性临时 cwd、剥离敏感环境变量、npx 回退一致、提取 stdout JSON error；空会话 ID 直接抛错且绝不启动 lody 以防回退到 `LODY_SESSION_ID`）。
+  - App `ExecutionBackendFactory` 新增 `makeSessionCanceller(config:)`，`cancelRunningItem` 与 `stopAndReconfigureItem` 对仍在运行（或状态未知）的 Lody 会话真正发起取消，卡片回到待确认，取消失败写入 `lastSystemNotice`。
+  - 新增 `NotificationAction`（`openLody` / `stop`）与 `SystemIntegrating.onNotificationAction`，为「已自动开始」系统通知注册带「打开 Lody / 停止」按钮的通知类别并由 `AppCoordinator` 接管回调。
+
 ### Added
 - **可选的「收到请求自动开始审查」与「开始审查时在 PR 上标记 👀」** (`PR #21`, `ADR-009`)：
   - 新增 `AutoStartSettings`（默认关闭、仅勾选 `reviewRequested`、支持 `owner/*` 仓库白名单、复审默认继续、开始通知与暂停状态，支持逐字段容错解码）与 `AutoStartPolicy.shouldAutoStart`，`AppSettings` 新增 `autoStart` 与 `markReviewStartWithReaction`（默认开启）。

@@ -126,3 +126,8 @@ public extension ExecutionBackend {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
+
+/// 取消远端正在运行的一轮 Lody 会话（关联 PR #22）
+public protocol SessionCancelling: Sendable {
+    func cancelSession(_ handle: AgentSessionHandle, environment: EnvironmentSnapshot?) async throws
+}

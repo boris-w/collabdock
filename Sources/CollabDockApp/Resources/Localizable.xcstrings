@@ -2144,6 +2144,23 @@
         }
       }
     },
+    "Failed to cancel Lody session: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to cancel Lody session: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消 Lody 会话失败：%@"
+          }
+        }
+      }
+    },
     "Failed to configure launch at login: %@": {
       "extractionState": "manual",
       "localizations": {

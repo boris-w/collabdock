@@ -179,6 +179,17 @@ public final class AppCoordinator {
                 self?.selectedTab = .inbox
                 self?.requestedDetailItemID = itemID
             }
+            self.systemIntegration.onNotificationAction = { [weak self] itemID, action in
+                guard let self else { return }
+                switch action {
+                case .stop:
+                    self.cancelRunningItem(id: itemID)
+                case .openLody:
+                    if let item = self.items.first(where: { $0.id == itemID }) {
+                        self.openHandoff(for: item)
+                    }
+                }
+            }
             if autoStart {
                 startLifecycle()
             }
@@ -1426,14 +1437,19 @@ public final class AppCoordinator {
     }
 
     public func cancelRunningItem(id: String) {
+        let itemBeforeCancel = items.first(where: { $0.id == id })
         lodyMonitorTasks[id]?.cancel()
         lodyMonitorTasks.removeValue(forKey: id)
         runRegistry.cancel(itemID: id)
         restorePendingOnCancel(itemID: id)
+        if let itemBeforeCancel {
+            cancelRemoteLodyTurnIfNeeded(for: itemBeforeCancel)
+        }
     }
 
     /// 停止自动开始的审查并切回「待确认」卡片，便于更换 Lody Agent / 模型 / 模板后重新派发
     public func stopAndReconfigureItem(id: String) {
+        let itemBeforeCancel = items.first(where: { $0.id == id })
         lodyMonitorTasks[id]?.cancel()
         lodyMonitorTasks.removeValue(forKey: id)
         runRegistry.cancel(itemID: id)
@@ -1449,6 +1465,37 @@ public final class AppCoordinator {
         let updated = items[idx]
         if !isPreviewMode && !id.hasPrefix("demo-") {
             Task { await self.persistItem(updated) }
+        }
+        if let itemBeforeCancel {
+            cancelRemoteLodyTurnIfNeeded(for: itemBeforeCancel)
+        }
+    }
+
+    private func activeLodyHandleToCancel(for item: CollaborationItem) -> AgentSessionHandle? {
+        guard let handle = item.sessionHandle,
+              handle.engine == .lody,
+              !handle.sessionID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        switch item.remoteSessionStatus {
+        case .running, nil:
+            return handle
+        case .completed, .failed:
+            return nil
+        }
+    }
+
+    private func cancelRemoteLodyTurnIfNeeded(for item: CollaborationItem) {
+        guard let handle = activeLodyHandleToCancel(for: item) else { return }
+        let lodyConfig = settings.lodyConfig
+        let envSnapshot = environment
+        let canceller = backendFactory.makeSessionCanceller(config: lodyConfig)
+        Task {
+            do {
+                try await canceller.cancelSession(handle, environment: envSnapshot)
+            } catch {
+                self.lastSystemNotice = L("Failed to cancel Lody session: %@", error.localizedDescription)
+            }
         }
     }
 
