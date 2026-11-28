@@ -154,6 +154,106 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("settings-prompts-light.png")
         )
 
+        // PR #21：设置页自动开始审查 + 👀 标记开关、收件箱自动开始卡片与底栏暂停条、详情页自动开始横条
+        let autoStartSettingsCoord = AppCoordinator(previewMode: true)
+        autoStartSettingsCoord.settings.defaultEngine = .lody
+        autoStartSettingsCoord.settings.lodyConfig.defaultAgentConfig = "lody-claude"
+        autoStartSettingsCoord.setPreferredLodyModel("opus", forAgentConfig: "lody-claude")
+        autoStartSettingsCoord.settings.autoStart = AutoStartSettings(
+            isEnabled: true,
+            triggerKinds: [.reviewRequested, .mention],
+            repositoryAllowlist: ["acme/web-*", "acme/backend"],
+            continueReReviews: true,
+            notifyOnStart: true,
+            isPaused: false
+        )
+        autoStartSettingsCoord.settings.markReviewStartWithReaction = true
+        renderWindow(
+            view: SettingsView(coordinator: autoStartSettingsCoord, initialTab: .triggerRules),
+            scheme: .light,
+            width: 684,
+            height: 580,
+            language: language,
+            to: dir.appendingPathComponent("settings-rules-autostart-light.png")
+        )
+
+        let autoStartInboxCoord = AppCoordinator(previewMode: true)
+        autoStartInboxCoord.settings.defaultEngine = .lody
+        autoStartInboxCoord.settings.lodyConfig.defaultAgentConfig = "lody-claude"
+        autoStartInboxCoord.setPreferredLodyModel("opus", forAgentConfig: "lody-claude")
+        if !isZH {
+            autoStartInboxCoord.settings.presets = [
+                TaskPreset(id: "code-review-general", name: "Review this PR", category: .codeReview)
+            ]
+        }
+        autoStartInboxCoord.settings.autoStart.isEnabled = true
+        autoStartInboxCoord.settings.autoStart.isPaused = false
+        let fixedSessionTime = Date(timeIntervalSince1970: 1_800_022_800)
+        autoStartInboxCoord.items = [
+            CollaborationItem(
+                id: "sc-auto-running",
+                platform: .github,
+                itemKind: .pullRequest,
+                scope: "acme/backend",
+                externalRef: "#512",
+                title: "feat(auth): rotate signing keys with grace window",
+                url: URL(string: "https://github.com/acme/backend/pull/512")!,
+                author: "alice",
+                triggeredBy: "alice",
+                triggerKind: .reviewRequested,
+                payload: .codeChange(CodeChangePayload(repository: "acme/backend", number: 512, baseRef: "main", headRef: "feat/key-rotation", headSHA: "a1b2c3d", additions: 124, deletions: 18, changedFiles: 5)),
+                status: .draftReady,
+                sessionID: "11111111-2222-4333-8444-555555555555",
+                sessionHandle: AgentSessionHandle(
+                    engine: .lody,
+                    sessionID: "11111111-2222-4333-8444-555555555555",
+                    workspacePath: "/Users/dev/code/backend",
+                    launchMode: .nativeBackgroundSession,
+                    createdAt: fixedSessionTime
+                ),
+                executionOutput: .structuredReply(StructuredReplyResult(
+                    summary: isZH ? "Opus 5.5 正在后台审查中 · 已用上下文 86.2K" : "Opus 5.5 reviewing in background · Context 86.2K",
+                    replyMarkdown: ""
+                )),
+                remoteSessionStatus: .running,
+                wasAutoStarted: true
+            ),
+            CollaborationItem(
+                id: "sc-auto-failed",
+                platform: .github,
+                itemKind: .pullRequest,
+                scope: "acme/web-console",
+                externalRef: "#209",
+                title: "fix(table): guard null comparator on empty columns",
+                url: URL(string: "https://github.com/acme/web-console/pull/209")!,
+                author: "bob",
+                triggeredBy: "bob",
+                triggerKind: .reviewRequested,
+                payload: .codeChange(CodeChangePayload(repository: "acme/web-console", number: 209, baseRef: "main", headRef: "fix/sort", headSHA: "f00ba12", additions: 34, deletions: 9, changedFiles: 2)),
+                status: .failed,
+                errorMessage: isZH ? "Lody CLI 登录态已过期，请先运行 `npx lody login`" : "Lody CLI login expired. Please run `npx lody login`.",
+                wasAutoStarted: true
+            )
+        ]
+        render(
+            view: MenuBarContentView(coordinator: autoStartInboxCoord),
+            scheme: .light,
+            height: 416,
+            language: language,
+            to: dir.appendingPathComponent("showcase-autostart-inbox-light.png")
+        )
+
+        render(
+            view: MenuBarContentView(
+                coordinator: autoStartInboxCoord,
+                initialDetailItemID: "sc-auto-running"
+            ),
+            scheme: .dark,
+            height: CDTheme.detailHeight,
+            language: language,
+            to: dir.appendingPathComponent("showcase-autostart-detail-dark.png")
+        )
+
         let detailPreviewCoord = AppCoordinator(previewMode: true)
         detailPreviewCoord.settings.defaultEngine = .lody
         detailPreviewCoord.settings.lodyConfig.defaultAgentConfig = "lody-claude"

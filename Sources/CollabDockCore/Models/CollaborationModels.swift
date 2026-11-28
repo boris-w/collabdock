@@ -750,6 +750,10 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
     public var completionReason: TaskCompletionReason?
     /// 远端 PR 审查状态辅助提示（如你已提交 `CHANGES_REQUESTED`，留在收件箱待作者修复）
     public var gitHubReviewVerdict: String?
+    /// 触发该条目的 GitHub 评论 API 地址（仅评论触发时有值，用于在原评论上加 👀 反应）
+    public var triggerCommentAPIURL: URL?
+    /// 是否由「自动开始审查」自动派发
+    public var wasAutoStarted: Bool
 
     public init(
         id: String,
@@ -780,7 +784,9 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
         reviewRound: Int = 1,
         remoteSessionStatus: RemoteSessionStatus? = nil,
         completionReason: TaskCompletionReason? = nil,
-        gitHubReviewVerdict: String? = nil
+        gitHubReviewVerdict: String? = nil,
+        triggerCommentAPIURL: URL? = nil,
+        wasAutoStarted: Bool = false
     ) {
         self.id = id
         self.platform = platform
@@ -811,6 +817,8 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
         self.remoteSessionStatus = remoteSessionStatus
         self.completionReason = completionReason
         self.gitHubReviewVerdict = gitHubReviewVerdict
+        self.triggerCommentAPIURL = triggerCommentAPIURL
+        self.wasAutoStarted = wasAutoStarted
     }
 
     enum CodingKeys: String, CodingKey {
@@ -820,6 +828,7 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
         case sessionID, sessionHandle, localReportPath, deliveryURL
         case executionOutput, errorMessage, previousReview, reviewRound
         case remoteSessionStatus, completionReason, gitHubReviewVerdict
+        case triggerCommentAPIURL, wasAutoStarted
     }
 
     /// 向后兼容解码：SQLite 旧行缺少新增字段时平滑补默认值
@@ -854,6 +863,8 @@ public struct CollaborationItem: Identifiable, Codable, Hashable, Sendable {
         self.remoteSessionStatus = try? c.decodeIfPresent(RemoteSessionStatus.self, forKey: .remoteSessionStatus)
         self.completionReason = try? c.decodeIfPresent(TaskCompletionReason.self, forKey: .completionReason)
         self.gitHubReviewVerdict = try? c.decodeIfPresent(String.self, forKey: .gitHubReviewVerdict)
+        self.triggerCommentAPIURL = try? c.decodeIfPresent(URL.self, forKey: .triggerCommentAPIURL)
+        self.wasAutoStarted = (try? c.decodeIfPresent(Bool.self, forKey: .wasAutoStarted)) ?? false
     }
 
     public var displayContextTag: String {

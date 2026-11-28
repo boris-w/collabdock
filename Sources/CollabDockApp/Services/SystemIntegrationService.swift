@@ -11,6 +11,8 @@ public protocol SystemIntegrating: AnyObject {
     func configureNotificationsIfAvailable()
     func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool)
     func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool)
+    func postAutoStartNotification(for item: CollaborationItem, enabled: Bool)
+    func postAutoStartFailureNotification(for item: CollaborationItem, message: String, enabled: Bool)
     func setLaunchAtLogin(_ enabled: Bool) -> String?
     func applyInterfaceLanguage(_ appleLanguages: [String]?)
     func relaunchApplication()
@@ -71,6 +73,40 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
 
         let request = UNNotificationRequest(
             identifier: "done-\(item.id)-\(Int(Date().timeIntervalSince1970))",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    public func postAutoStartNotification(for item: CollaborationItem, enabled: Bool) {
+        guard enabled, isRunningInsideAppBundle else { return }
+        let content = UNMutableNotificationContent()
+        content.title = L("CollabDock · Auto-Started Review")
+        content.subtitle = "\(item.platform.displayName) · \(item.displayContextTag)"
+        content.body = item.title
+        content.sound = .default
+        content.userInfo = ["itemID": item.id]
+
+        let request = UNNotificationRequest(
+            identifier: "autostart-\(item.id)-\(Int(Date().timeIntervalSince1970))",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    public func postAutoStartFailureNotification(for item: CollaborationItem, message: String, enabled: Bool) {
+        guard enabled, isRunningInsideAppBundle else { return }
+        let content = UNMutableNotificationContent()
+        content.title = L("CollabDock · Auto-Start Failed")
+        content.subtitle = "\(item.platform.displayName) · \(item.displayContextTag)"
+        content.body = String(message.prefix(140))
+        content.sound = .default
+        content.userInfo = ["itemID": item.id]
+
+        let request = UNNotificationRequest(
+            identifier: "autostart-fail-\(item.id)-\(Int(Date().timeIntervalSince1970))",
             content: content,
             trigger: nil
         )

@@ -268,6 +268,49 @@ public struct LodyConfig: Codable, Hashable, Sendable {
     }
 }
 
+/// 可选的「收到请求自动开始审查」配置（默认关闭，关联 PR #21）
+public struct AutoStartSettings: Codable, Hashable, Sendable {
+    public var isEnabled: Bool
+    public var triggerKinds: [TriggerKind]
+    /// 仓库白名单（空表示所有通过触发规则的仓库；支持 `owner/*` / `owner/prefix*` 通配）
+    public var repositoryAllowlist: [String]
+    public var continueReReviews: Bool
+    public var notifyOnStart: Bool
+    public var isPaused: Bool
+
+    public init(
+        isEnabled: Bool = false,
+        triggerKinds: [TriggerKind] = [.reviewRequested],
+        repositoryAllowlist: [String] = [],
+        continueReReviews: Bool = true,
+        notifyOnStart: Bool = true,
+        isPaused: Bool = false
+    ) {
+        self.isEnabled = isEnabled
+        self.triggerKinds = triggerKinds
+        self.repositoryAllowlist = repositoryAllowlist
+        self.continueReReviews = continueReReviews
+        self.notifyOnStart = notifyOnStart
+        self.isPaused = isPaused
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case isEnabled, triggerKinds, repositoryAllowlist, continueReReviews, notifyOnStart, isPaused
+    }
+
+    /// 逐字段容错解码：单个字段损坏（如来自未来版本的未知 TriggerKind）只回落该字段默认值，其余字段保留
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = AutoStartSettings()
+        self.isEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .isEnabled)) ?? fallback.isEnabled
+        self.triggerKinds = (try? c.decodeIfPresent([TriggerKind].self, forKey: .triggerKinds)) ?? fallback.triggerKinds
+        self.repositoryAllowlist = (try? c.decodeIfPresent([String].self, forKey: .repositoryAllowlist)) ?? fallback.repositoryAllowlist
+        self.continueReReviews = (try? c.decodeIfPresent(Bool.self, forKey: .continueReReviews)) ?? fallback.continueReReviews
+        self.notifyOnStart = (try? c.decodeIfPresent(Bool.self, forKey: .notifyOnStart)) ?? fallback.notifyOnStart
+        self.isPaused = (try? c.decodeIfPresent(Bool.self, forKey: .isPaused)) ?? fallback.isPaused
+    }
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
     public var pollIntervalSeconds: Int
     public var launchAtLogin: Bool
@@ -287,6 +330,10 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var developerModeEnabled: Bool
     /// 当收件箱中的 PR 在 GitHub 被你 Approve、或已合并/关闭时自动归档至「已完成」（Request Changes 保留跟进，关联 ITER-017）
     public var autoCompleteApprovedOrClosedPRs: Bool
+    /// 收到请求后自动开始审查的配置（默认关闭，关联 PR #21）
+    public var autoStart: AutoStartSettings
+    /// 开始审查（Lody 会话派发成功）时在 PR / 触发评论上添加 👀 表情（默认开启，关联 ADR-009）
+    public var markReviewStartWithReaction: Bool
     /// 界面语言（跟随系统 / 简体中文 / English，重启后生效，关联 issue #4）
     public var appLanguage: AppLanguage
     public var presets: [TaskPreset]
@@ -306,6 +353,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         usageCurrency: UsageCurrency = .usd,
         developerModeEnabled: Bool = false,
         autoCompleteApprovedOrClosedPRs: Bool = true,
+        autoStart: AutoStartSettings = AutoStartSettings(),
+        markReviewStartWithReaction: Bool = true,
         appLanguage: AppLanguage = .system,
         presets: [TaskPreset] = TaskPreset.defaults
     ) {
@@ -323,6 +372,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.usageCurrency = usageCurrency
         self.developerModeEnabled = developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = autoCompleteApprovedOrClosedPRs
+        self.autoStart = autoStart
+        self.markReviewStartWithReaction = markReviewStartWithReaction
         self.appLanguage = appLanguage
         self.presets = presets
     }
@@ -333,6 +384,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         case lodyConfig
         case customExecutablePaths, workspaceSearchRoots, repositoryDirectoryOverrides
         case usageCurrency, developerModeEnabled, autoCompleteApprovedOrClosedPRs
+        case autoStart, markReviewStartWithReaction
         case appLanguage, presets
     }
 
@@ -379,6 +431,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.usageCurrency = (try? c.decodeIfPresent(UsageCurrency.self, forKey: .usageCurrency)) ?? fallback.usageCurrency
         self.developerModeEnabled = (try? c.decodeIfPresent(Bool.self, forKey: .developerModeEnabled)) ?? fallback.developerModeEnabled
         self.autoCompleteApprovedOrClosedPRs = (try? c.decodeIfPresent(Bool.self, forKey: .autoCompleteApprovedOrClosedPRs)) ?? fallback.autoCompleteApprovedOrClosedPRs
+        self.autoStart = (try? c.decodeIfPresent(AutoStartSettings.self, forKey: .autoStart)) ?? fallback.autoStart
+        self.markReviewStartWithReaction = (try? c.decodeIfPresent(Bool.self, forKey: .markReviewStartWithReaction)) ?? fallback.markReviewStartWithReaction
         self.appLanguage = (try? c.decodeIfPresent(AppLanguage.self, forKey: .appLanguage)) ?? fallback.appLanguage
         var decodedPresets = (try? c.decodeIfPresent([TaskPreset].self, forKey: .presets)) ?? fallback.presets
         // 若用户从未改过旧版 6 条出厂预制，平滑精简为新版极简默认；若用户自定义过任何模板则 100% 保留

@@ -23,9 +23,10 @@ public protocol ConnectorFactory: Sendable {
     func makeSource(context: ConnectorBuildContext) -> (any CollaborationSource)?
     func makePRStatusQuery(context: ConnectorBuildContext) -> (any PRStatusQuerying)?
     func makePRFetcher(context: ConnectorBuildContext) -> (any PullRequestFetching)?
+    func makePRReactor(context: ConnectorBuildContext) -> (any PullRequestReacting)?
 }
 
-/// 生产默认连接器工厂：为 GitHub 提供只读轮询、状态对齐与单条拉取能力
+/// 生产默认连接器工厂：为 GitHub 提供轮询、状态对齐、单条拉取与开始审查 👀 表情能力
 public struct DefaultConnectorFactory: ConnectorFactory {
     private let detector: any EnvironmentDetecting
 
@@ -44,6 +45,11 @@ public struct DefaultConnectorFactory: ConnectorFactory {
     }
 
     public func makePRFetcher(context: ConnectorBuildContext) -> (any PullRequestFetching)? {
+        guard context.platform == .github else { return nil }
+        return makeGitHubConnector(context: context)
+    }
+
+    public func makePRReactor(context: ConnectorBuildContext) -> (any PullRequestReacting)? {
         guard context.platform == .github else { return nil }
         return makeGitHubConnector(context: context)
     }

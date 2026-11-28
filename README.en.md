@@ -25,7 +25,8 @@ A macOS menu bar app that collects the GitHub PRs waiting for your review into o
 
 - **GitHub inbox**: polls `/notifications` with `If-Modified-Since` (304 responses don't count against the rate limit). Falls back to the Search API if the token lacks the `notifications` scope (reconciling every 180 s, plus auto-sync when opening the popover after 60 s). You can also click `+` and paste a PR URL or `owner/repo#123`.
 - **Trigger rules**: separate toggles for `@mentions` in PR comments (optionally requiring a keyword such as `review` or `cr`, with keyword bypass when you are already a reviewer), review requests, and team requests; repository allow/deny lists with `owner/*` wildcards; ignore draft PRs and bots.
-- **Human confirmation before every run**: pick your Lody agent (Claude Code, Codex, Antigravity, …), model, reasoning effort, prompt preset, and project directory on the confirmation card, then click confirm. Nothing starts before that. The full prompt can be previewed.
+- **Human confirmation & optional auto-start**: by default every task waits on the confirmation card so you can pick your Lody agent (Claude Code, Codex, Antigravity, …), model, reasoning effort, prompt preset, and project directory (with live prompt preview). You can also opt in to **Auto-Start Review** in Settings → Rules (off by default) scoped by trigger kind and `owner/*` repository allowlist, pause/resume from the menu bar footer, or stop and reconfigure any auto-started run.
+- **👀 reaction on review start**: once a Lody session is dispatched, CollabDock adds an `eyes` reaction to the triggering comment or PR (on by default; CollabDock's only GitHub write action per ADR-009, and can be disabled for strictly read-only GitHub access).
 - **Lody orchestration**: uses the local `lody` CLI (automatically falling back to `npx -y lody@latest`) to sync workspaces, agents, models, local projects, and linked GitHub repositories. Tracks background session progress and jumps straight to Lody Desktop via `lody://` deep links.
 - **Isolated worktrees**: routes to your Lody local project (using Lody's native `--worktree --branch`), a cloud-linked repository, or a local isolated git worktree so your active branch and uncommitted changes stay untouched.
 - **Incremental re-review**: when a PR gets new commits and you're asked to review again, the previous card is archived as "Moved to Round N" and the new card defaults to continuing the existing Lody session (`lody session chat`) focused on the new commits. You can also start a fresh incremental or full review; rebases and force-pushes fall back to the full range.
@@ -45,17 +46,17 @@ GitHub notifications / review requests
   → track live status & context usage → open in Lody Desktop to read and continue
 ```
 
-CollabDock keeps GitHub access read-only and never posts reviews or comments itself; the review and any follow-ups live inside your Lody session.
+Aside from the optional 👀 reaction when a review starts (on by default, toggleable), CollabDock keeps GitHub access read-only and never posts reviews, comments, or approvals itself; the review and any follow-ups live inside your Lody session.
 
 ## Security model
 
 PR titles, comments, and commit messages are attacker-controllable input. CollabDock applies several layers:
 
-1. **Human gate**: nothing runs automatically. A Lody session starts only after you click confirm.
+1. **Human gate (default)**: nothing runs automatically out of the box — a Lody session starts only after you click confirm. When you opt into auto-start, it is restricted to selected trigger kinds and repository allowlists, and can be paused or stopped/reconfigured anytime.
 2. **Read-only mode by default**: when the selected Lody agent advertises a read-only / plan mode (`plan`, `read-only`), CollabDock passes it automatically.
 3. **Minimal prompt surface**: messages sent to Lody contain only your rendered template (first review / follow-up after PR update) and optional extra note — untrusted PR titles, descriptions, comments, and branch names never enter the prompt. Only strictly validated placeholders (`{{pr_url}}`, `{{repo}}`, `{{number}}`, `{{head_sha}}`, `{{previous_sha}}`) are substituted, reducing prompt and command injection risk (while never replacing human judgment).
-4. **Token & host-session isolation**: the GitHub token comes from `gh auth token` and is only used inside the app process for read-only GitHub API calls. `GITHUB_TOKEN`, `GH_TOKEN`, `GH_ENTERPRISE_TOKEN`, `ELECTRON_RUN_AS_NODE`, and `LODY_*` variables are stripped before spawning `lody`, and `lody` starts in a neutral temporary directory so a repository's `package.json` cannot hijack `npx`.
-5. **No GitHub writes**: CollabDock itself does not issue any write requests to GitHub.
+4. **Token & host-session isolation**: the GitHub token comes from `gh auth token` and is only sent inside the app process to the configured GitHub API host. `GITHUB_TOKEN`, `GH_TOKEN`, `GH_ENTERPRISE_TOKEN`, `ELECTRON_RUN_AS_NODE`, and `LODY_*` variables are stripped before spawning `lody`, and `lody` starts in a neutral temporary directory so a repository's `package.json` cannot hijack `npx`.
+5. **Single minimal GitHub write**: the only write CollabDock can issue to GitHub is the 👀 reaction when a review starts (turn off the switch for zero writes). Trigger comment URLs must pass strict same-origin and path validation before receiving the reaction; otherwise it falls back to the PR on the API host so the token never leaves it. CollabDock never posts comments, pending reviews, or approvals.
 
 Limits: the agent inside your Lody session still runs as your macOS user, with permissions and network access governed by that agent's configuration. CollabDock has no server and no telemetry; it only talks to the GitHub API and the local Lody CLI.
 

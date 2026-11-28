@@ -101,6 +101,8 @@ public final class AppCoordinator {
     private var runRegistry = ExecutionRunRegistry()
     private var syncState = InboxSyncState()
     private var isReconcilingPRStates: Bool = false
+    /// 连续自动开始失败时的最近一次错误文案（相同错误连续出现只通知一次，中间成功过则重置）
+    private var lastAutoStartFailureMessage: String? = nil
 
     public enum PopoverTab: String, CaseIterable, Identifiable {
         case inbox = "inbox"
@@ -856,14 +858,30 @@ public final class AppCoordinator {
                     items[idx] = superseded
                 }
             }
+            var newlyInsertedItems: [CollaborationItem] = []
             for newItem in result.newItems.reversed() {
                 if !items.contains(where: { $0.id == newItem.id }) {
                     items.insert(newItem, at: 0)
+                    newlyInsertedItems.append(newItem)
                 }
             }
+
+            var autoStartedIDs: Set<String> = []
+            for candidate in newlyInsertedItems.reversed() {
+                guard AutoStartPolicy.shouldAutoStart(candidate, settings: settings.autoStart) else {
+                    continue
+                }
+                autoStartedIDs.insert(candidate.id)
+                let plan = defaultPlan(for: candidate)
+                confirmAndRun(itemID: candidate.id, plan: plan, autoStarted: true)
+            }
+
             for notification in result.notifications {
                 switch notification {
                 case .incomingTask(let item):
+                    if autoStartedIDs.contains(item.id) {
+                        continue
+                    }
                     systemIntegration.postIncomingTaskNotification(
                         for: item,
                         enabled: settings.notificationsEnabled
@@ -1199,9 +1217,30 @@ public final class AppCoordinator {
         }
     }
 
-    /// Lody 审查执行管线：工作区路由 → 派发 Lody 后台会话 → 记账 → 实时追踪状态与上下文用量
+    /// 切换「自动开始审查」暂停/恢复状态（暂停期间进来的请求留在待确认，恢复后不补派）
+    public func toggleAutoStartPause() {
+        settings.autoStart.isPaused.toggle()
+    }
+
+    /// 设置页只读摘要：展示自动开始审查时采用的默认 Lody Agent 与模型
+    public var autoStartDefaultSummary: String {
+        let agentConfig = settings.lodyConfig.defaultAgentConfig
+        let agentLabel = lodyAgentConfigDisplayName(for: agentConfig)
+        let modelID = preferredLodyModel(forAgentConfig: agentConfig)
+        let modelLabel: String
+        if modelID.isEmpty || modelID == "default" {
+            modelLabel = L("Default Model")
+        } else {
+            modelLabel = modelsForLody(agentConfig: agentConfig)
+                .first(where: { $0.id == modelID })?
+                .displayName ?? modelID
+        }
+        return "\(agentLabel) · \(modelLabel)"
+    }
+
+    /// Lody 审查执行管线：工作区路由 → 派发 Lody 后台会话 → 记账 → 加 👀 → 实时追踪状态与上下文用量
     @discardableResult
-    public func confirmAndRun(itemID: String, plan: ExecutionPlan) -> Task<Void, Never>? {
+    public func confirmAndRun(itemID: String, plan: ExecutionPlan, autoStarted: Bool = false) -> Task<Void, Never>? {
         guard let idx = items.firstIndex(where: { $0.id == itemID }) else { return nil }
 
         var effectivePlan = plan
@@ -1215,16 +1254,19 @@ public final class AppCoordinator {
         let activeLodyCfg = effectivePlan.lodyAgentConfig ?? settings.lodyConfig.defaultAgentConfig
         effectivePlan.lodyAgentConfig = activeLodyCfg
 
-        settings.defaultEngine = .lody
-        settings.lodyConfig.defaultAgentConfig = activeLodyCfg
-        if !wasDirectEnginePlan {
-            setPreferredLodyModel(effectivePlan.model, forAgentConfig: activeLodyCfg)
-            if let chosenMode = effectivePlan.mode, !chosenMode.isEmpty {
-                setPreferredLodyMode(chosenMode, forAgentConfig: activeLodyCfg)
+        if !autoStarted {
+            settings.defaultEngine = .lody
+            settings.lodyConfig.defaultAgentConfig = activeLodyCfg
+            if !wasDirectEnginePlan {
+                setPreferredLodyModel(effectivePlan.model, forAgentConfig: activeLodyCfg)
+                if let chosenMode = effectivePlan.mode, !chosenMode.isEmpty {
+                    setPreferredLodyMode(chosenMode, forAgentConfig: activeLodyCfg)
+                }
             }
+            settings.defaultEffort = effectivePlan.effort
         }
-        settings.defaultEffort = effectivePlan.effort
 
+        items[idx].wasAutoStarted = autoStarted
         let targetItem = items[idx]
         items[idx].status = .preparing
         items[idx].errorMessage = nil
@@ -1243,6 +1285,9 @@ public final class AppCoordinator {
         let lodyConfig = settings.lodyConfig
         let lodyCatalogSnapshot = lodyCatalog
         let notifyEnabled = settings.notificationsEnabled
+        let notifyAutoStart = settings.autoStart.notifyOnStart
+        let addReaction = settings.markReviewStartWithReaction
+        let connectorRules = settings.effectiveRules(for: targetItem.platform)
         let lodyAgentDisplayName = lodyAgentConfigDisplayName(for: activeLodyCfg)
 
         let repoNameForResolve = targetItem.payload.linkedRepository
@@ -1257,9 +1302,13 @@ public final class AppCoordinator {
         guard let store = taskStore else {
             runRegistry.finish(ticket)
             if let updatedIdx = items.firstIndex(where: { $0.id == itemID }) {
+                let errMsg = L("Local database unavailable; cannot run review")
                 items[updatedIdx].status = .failed
                 items[updatedIdx].progressMessage = nil
-                items[updatedIdx].errorMessage = L("Local database unavailable; cannot run review")
+                items[updatedIdx].errorMessage = errMsg
+                if autoStarted {
+                    notifyAutoStartFailureIfNeeded(for: items[updatedIdx], message: errMsg, enabled: notifyEnabled)
+                }
             }
             return nil
         }
@@ -1287,10 +1336,17 @@ public final class AppCoordinator {
                     config: lodyConfig,
                     catalog: lodyCatalogSnapshot
                 )
+                let connectorContext = ConnectorBuildContext(
+                    platform: targetItem.platform,
+                    rules: connectorRules,
+                    environment: envSnapshot
+                )
+                let reactor = self.connectorFactory.makePRReactor(context: connectorContext)
                 let executionService = ReviewExecutionService(
                     backend: lodyBackend,
                     store: store,
-                    clock: self.clock
+                    clock: self.clock,
+                    reactor: reactor
                 )
                 let executionRequest = ReviewExecutionRequest(
                     item: targetItem,
@@ -1300,7 +1356,8 @@ public final class AppCoordinator {
                     searchRoots: searchRoots,
                     preferredLocalPath: resolvedDirInfo.path,
                     environment: envSnapshot,
-                    lodyAgentDisplayName: lodyAgentDisplayName
+                    lodyAgentDisplayName: lodyAgentDisplayName,
+                    addStartReaction: addReaction
                 )
 
                 let outcome = try await executionService.execute(executionRequest) { [weak self] progress in
@@ -1320,6 +1377,13 @@ public final class AppCoordinator {
                 case .backgroundDispatched(let dispatched, let handle, _, let recordedRuns):
                     for run in recordedRuns.reversed() {
                         usageRuns.insert(run, at: 0)
+                    }
+                    if autoStarted {
+                        self.lastAutoStartFailureMessage = nil
+                        self.systemIntegration.postAutoStartNotification(
+                            for: dispatched,
+                            enabled: notifyEnabled && notifyAutoStart
+                        )
                     }
                     if let updatedIdx = items.firstIndex(where: { $0.id == itemID }) {
                         items[updatedIdx] = dispatched
@@ -1342,18 +1406,50 @@ public final class AppCoordinator {
                     reportPersistenceFailure(persistenceError, operation: persistenceError.operation)
                 }
                 if let updatedIdx = items.firstIndex(where: { $0.id == itemID }) {
+                    let errMsg = error.localizedDescription
                     items[updatedIdx].status = .failed
                     items[updatedIdx].progressMessage = nil
-                    items[updatedIdx].errorMessage = error.localizedDescription
+                    items[updatedIdx].errorMessage = errMsg
                     selectedTab = .inbox
+                    if autoStarted {
+                        notifyAutoStartFailureIfNeeded(for: items[updatedIdx], message: errMsg, enabled: notifyEnabled)
+                    }
                 }
             }
         }
     }
 
+    private func notifyAutoStartFailureIfNeeded(for item: CollaborationItem, message: String, enabled: Bool) {
+        guard lastAutoStartFailureMessage != message else { return }
+        lastAutoStartFailureMessage = message
+        systemIntegration.postAutoStartFailureNotification(for: item, message: message, enabled: enabled)
+    }
+
     public func cancelRunningItem(id: String) {
+        lodyMonitorTasks[id]?.cancel()
+        lodyMonitorTasks.removeValue(forKey: id)
         runRegistry.cancel(itemID: id)
         restorePendingOnCancel(itemID: id)
+    }
+
+    /// 停止自动开始的审查并切回「待确认」卡片，便于更换 Lody Agent / 模型 / 模板后重新派发
+    public func stopAndReconfigureItem(id: String) {
+        lodyMonitorTasks[id]?.cancel()
+        lodyMonitorTasks.removeValue(forKey: id)
+        runRegistry.cancel(itemID: id)
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].status = .pendingConfirmation
+        items[idx].progressMessage = nil
+        items[idx].errorMessage = nil
+        items[idx].remoteSessionStatus = nil
+        items[idx].sessionHandle = nil
+        items[idx].sessionID = nil
+        items[idx].executionOutput = nil
+        items[idx].wasAutoStarted = false
+        let updated = items[idx]
+        if !isPreviewMode && !id.hasPrefix("demo-") {
+            Task { await self.persistItem(updated) }
+        }
     }
 
     // MARK: - Helpers

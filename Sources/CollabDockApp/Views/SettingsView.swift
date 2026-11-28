@@ -23,6 +23,7 @@ public struct SettingsView: View {
     @State private var lastVersionTapAt: Date = .distantPast
     @State private var devModeToast: String? = nil
     @State private var expandedPresetIDs: Set<String>
+    @State private var limitAutoStartRepos: Bool
 
     private var appVersionLabel: String {
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
@@ -34,6 +35,7 @@ public struct SettingsView: View {
         self._selectedTab = State(initialValue: initialTab)
         let firstID = coordinator.settings.presets.first?.id
         self._expandedPresetIDs = State(initialValue: firstID.map { [$0] } ?? [])
+        self._limitAutoStartRepos = State(initialValue: !coordinator.settings.autoStart.repositoryAllowlist.isEmpty)
     }
 
     public var body: some View {
@@ -258,8 +260,100 @@ public struct SettingsView: View {
 
     // MARK: - 2. 触发规则
 
+    private func autoStartTriggerBinding(for kind: TriggerKind) -> Binding<Bool> {
+        let order: [TriggerKind] = [.reviewRequested, .mention, .assigned, .teamMention]
+        return Binding(
+            get: { coordinator.settings.autoStart.triggerKinds.contains(kind) },
+            set: { enabled in
+                var set = Set(coordinator.settings.autoStart.triggerKinds)
+                if enabled {
+                    set.insert(kind)
+                } else {
+                    set.remove(kind)
+                }
+                coordinator.settings.autoStart.triggerKinds = order.filter { set.contains($0) }
+            }
+        )
+    }
+
     private var triggerRulesTab: some View {
-        Form {
+        let repoScopeBinding = Binding<Bool>(
+            get: { limitAutoStartRepos || !coordinator.settings.autoStart.repositoryAllowlist.isEmpty },
+            set: { limited in
+                limitAutoStartRepos = limited
+                if !limited {
+                    coordinator.settings.autoStart.repositoryAllowlist = []
+                }
+            }
+        )
+
+        return Form {
+            Section(L("Auto-Start Review")) {
+                Toggle(L("Auto-start review on incoming requests"), isOn: $coordinator.settings.autoStart.isEnabled)
+
+                if coordinator.settings.autoStart.isEnabled {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(L("Trigger Kinds"))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        HStack(spacing: 12) {
+                            Toggle(L("Review Requested"), isOn: autoStartTriggerBinding(for: .reviewRequested))
+                                .toggleStyle(.checkbox)
+                            Toggle(L("@mention"), isOn: autoStartTriggerBinding(for: .mention))
+                                .toggleStyle(.checkbox)
+                            Toggle(L("Assigned"), isOn: autoStartTriggerBinding(for: .assigned))
+                                .toggleStyle(.checkbox)
+                            Toggle(L("Team Mention"), isOn: autoStartTriggerBinding(for: .teamMention))
+                                .toggleStyle(.checkbox)
+                        }
+                    }
+
+                    Picker(L("Repositories"), selection: repoScopeBinding) {
+                        Text(L("All repositories")).tag(false)
+                        Text(L("Only these repositories")).tag(true)
+                    }
+
+                    if repoScopeBinding.wrappedValue {
+                        labeledInputRow(
+                            title: L("Repository Allowlist"),
+                            placeholder: L("e.g. acme/*, acme/web-*"),
+                            text: Binding(
+                                get: { coordinator.settings.autoStart.repositoryAllowlist.joined(separator: ", ") },
+                                set: { raw in
+                                    coordinator.settings.autoStart.repositoryAllowlist = raw
+                                        .split(separator: ",")
+                                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                        .filter { !$0.isEmpty }
+                                }
+                            )
+                        )
+                    }
+
+                    Toggle(L("Auto-continue re-reviews when PR updates"), isOn: $coordinator.settings.autoStart.continueReReviews)
+                    Toggle(L("Notify me when auto-started"), isOn: $coordinator.settings.autoStart.notifyOnStart)
+
+                    HStack {
+                        Text(L("Using default settings"))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(coordinator.autoStartDefaultSummary)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(L("When enabled, matching GitHub PR requests are dispatched to Lody automatically with your default Agent and model. You can pause anytime from the menu bar."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section(L("GitHub Feedback")) {
+                Toggle(L("Add 👀 reaction on PR when review starts"), isOn: $coordinator.settings.markReviewStartWithReaction)
+                Text(L("CollabDock's only GitHub write action: adds 👀 to the triggering comment or PR once Lody starts reviewing so the author knows it is being looked at. Turn off for read-only GitHub access."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section(L("Global Trigger Sources")) {
                 Toggle(L("@mention in comments / messages (mention)"), isOn: $coordinator.settings.globalTriggerRules.enableMention)
                 Toggle(L("Code review requested (review_requested)"), isOn: $coordinator.settings.globalTriggerRules.enableReviewRequested)

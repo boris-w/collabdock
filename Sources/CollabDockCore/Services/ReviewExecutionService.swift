@@ -10,6 +10,8 @@ public struct ReviewExecutionRequest: Sendable {
     public let preferredLocalPath: String?
     public let environment: EnvironmentSnapshot?
     public let lodyAgentDisplayName: String?
+    /// 派发成功后是否在 PR / 触发评论上添加 👀 表情（ADR-009）
+    public let addStartReaction: Bool
 
     public init(
         item: CollaborationItem,
@@ -19,7 +21,8 @@ public struct ReviewExecutionRequest: Sendable {
         searchRoots: [String] = [],
         preferredLocalPath: String? = nil,
         environment: EnvironmentSnapshot? = nil,
-        lodyAgentDisplayName: String? = nil
+        lodyAgentDisplayName: String? = nil,
+        addStartReaction: Bool = false
     ) {
         self.item = item
         self.plan = plan
@@ -29,6 +32,7 @@ public struct ReviewExecutionRequest: Sendable {
         self.preferredLocalPath = preferredLocalPath
         self.environment = environment
         self.lodyAgentDisplayName = lodyAgentDisplayName
+        self.addStartReaction = addStartReaction
     }
 }
 
@@ -72,15 +76,18 @@ public struct ReviewExecutionService: Sendable {
     public let backend: any ExecutionBackend
     public let store: any TaskStore
     public let clock: any ClockProviding
+    public let reactor: (any PullRequestReacting)?
 
     public init(
         backend: any ExecutionBackend = LodyBackend(),
         store: any TaskStore,
-        clock: any ClockProviding = SystemClock()
+        clock: any ClockProviding = SystemClock(),
+        reactor: (any PullRequestReacting)? = nil
     ) {
         self.backend = backend
         self.store = store
         self.clock = clock
+        self.reactor = reactor
     }
 
     /// 执行完整审查流水线：
@@ -219,6 +226,10 @@ public struct ReviewExecutionService: Sendable {
         )
 
         try await persist(.upsertItem) { try await store.upsertItem(dispatched) }
+        if request.addStartReaction, let reactor {
+            // ADR-009：加 👀 失败静默忽略，绝不影响已落盘的审查结果
+            try? await reactor.addReaction(.eyes, to: dispatched)
+        }
         return .backgroundDispatched(
             item: dispatched,
             handle: runResult.sessionHandle,

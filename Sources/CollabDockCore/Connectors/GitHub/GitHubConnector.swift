@@ -63,8 +63,8 @@ public enum GitHubConnectorError: Error, LocalizedError, Equatable {
     }
 }
 
-/// GitHub 协作连接器：支持 Notifications 304 零配额快速通道 + updated_at 指纹跳过 + 限流退避（关联 REQ-001, REQ-002, ADR-002, ADR-005）
-public struct GitHubConnector: CodeReviewConnector {
+/// GitHub 协作连接器：支持 Notifications 304 零配额快速通道 + updated_at 指纹跳过 + 限流退避 + 开始审查 👀 表情（关联 REQ-001, REQ-002, ADR-002, ADR-005, ADR-009）
+public struct GitHubConnector: CodeReviewConnector, PullRequestReacting {
     public let platform: PlatformKind = .github
     public let capabilities: ConnectorCapabilities = ConnectorCatalog.capabilities(for: .github)
 
@@ -287,6 +287,32 @@ public struct GitHubConnector: CodeReviewConnector {
         ).item
     }
 
+    /// 开始审查时在 PR 或触发评论上添加 👀 表情（ADR-009：CollabDock 唯一的 GitHub 写操作）
+    public func addReaction(_ content: GitHubReactionContent, to item: CollaborationItem) async throws {
+        guard let token = await tokenProvider.fetchToken(), !token.isEmpty else {
+            throw GitHubConnectorError.missingToken
+        }
+        guard let endpoint = GitHubReactionTarget.endpoint(for: item, apiBaseURL: baseURL) else {
+            throw GitHubConnectorError.invalidResponse
+        }
+        var req = makeRequest(url: endpoint, token: token)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["content": content.rawValue])
+
+        let (data, resp) = try await transport.data(for: req)
+        if resp.statusCode == 200 || resp.statusCode == 201 {
+            return
+        }
+        if resp.statusCode == 401 {
+            throw GitHubConnectorError.unauthorized
+        }
+        throw GitHubConnectorError.httpError(
+            statusCode: resp.statusCode,
+            message: String(data: data, encoding: .utf8) ?? ""
+        )
+    }
+
     // MARK: - Private Hydration Helpers
 
     private func hydrateFromNotificationThread(
@@ -305,6 +331,7 @@ public struct GitHubConnector: CodeReviewConnector {
 
         let repo = thread.repository.fullName
         var commentBody: String?
+        var triggerCommentAPIURL: URL?
         var actor = pr.user.login
         var revisionKey: String
         var viewerIsReviewer = false
@@ -325,6 +352,7 @@ public struct GitHubConnector: CodeReviewConnector {
                latestCommentStr != subjectURLStr,
                let comment = await fetchSingleComment(url: commentURL, token: token) {
                 commentBody = comment.body
+                triggerCommentAPIURL = commentURL
                 actor = comment.user.login
                 revisionKey = "c\(comment.id)"
             }
@@ -346,6 +374,7 @@ public struct GitHubConnector: CodeReviewConnector {
             triggerKind: triggerKind,
             actor: actor,
             commentBody: commentBody,
+            triggerCommentAPIURL: triggerCommentAPIURL,
             viewerIsReviewer: viewerIsReviewer
         )
     }
@@ -406,6 +435,7 @@ public struct GitHubConnector: CodeReviewConnector {
             }
 
             var commentBody: String?
+            var triggerCommentAPIURL: URL?
             var actor = pr.user.login
             var revisionKey = pr.head.sha
             var viewerIsReviewer = false
@@ -413,6 +443,7 @@ public struct GitHubConnector: CodeReviewConnector {
             if fetchLatestComment, let commentsURLStr = issue.commentsURL, let commentsURL = URL(string: commentsURLStr) {
                 if let latest = await fetchLatestIssueComment(url: commentsURL, token: token) {
                     commentBody = latest.body
+                    triggerCommentAPIURL = baseURL.appendingPathComponent("repos/\(repo)/issues/comments/\(latest.id)")
                     actor = latest.user.login
                     revisionKey = "c\(latest.id)"
                 } else if let prBody = issue.body, !prBody.isEmpty {
@@ -447,6 +478,7 @@ public struct GitHubConnector: CodeReviewConnector {
                     triggerKind: triggerKind,
                     actor: actor,
                     commentBody: commentBody,
+                    triggerCommentAPIURL: triggerCommentAPIURL,
                     viewerIsReviewer: viewerIsReviewer
                 )
             )
@@ -552,6 +584,7 @@ public struct GitHubConnector: CodeReviewConnector {
         triggerKind: TriggerKind,
         actor: String,
         commentBody: String?,
+        triggerCommentAPIURL: URL? = nil,
         viewerIsReviewer: Bool = false
     ) -> PolledCollaborationCandidate {
         let prURL = URL(string: pr.htmlURL) ?? URL(string: "https://github.com/\(repo)/pull/\(pr.number)")!
@@ -593,7 +626,8 @@ public struct GitHubConnector: CodeReviewConnector {
                     isDraft: pr.draft ?? false
                 )
             ),
-            createdAt: createdAt
+            createdAt: createdAt,
+            triggerCommentAPIURL: triggerCommentAPIURL
         )
 
         return PolledCollaborationCandidate(dedupeKey: dedupeKey, event: event, item: item)

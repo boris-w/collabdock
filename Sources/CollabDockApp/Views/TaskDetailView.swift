@@ -115,6 +115,16 @@ struct TaskDetailView: View {
         }
     }
 
+    private var isAutoStartedActive: Bool {
+        item.wasAutoStarted && item.status != .pendingConfirmation
+    }
+
+    private var autoStartedTimeString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: item.sessionHandle?.createdAt ?? item.createdAt)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             detailNavBar
@@ -122,11 +132,18 @@ struct TaskDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if isAutoStartedActive {
+                        autoStartedBanner
+                    }
                     contextBlock
                     if !isContinuingExistingLodySession && useAgentTiles {
                         lodyAgentTileRow
+                            .disabled(isAutoStartedActive)
+                            .opacity(isAutoStartedActive ? 0.6 : 1)
                     }
                     parametersCard
+                        .disabled(isAutoStartedActive)
+                        .opacity(isAutoStartedActive ? 0.6 : 1)
                     extraInstructionsSection
                 }
                 .padding(.horizontal, 14)
@@ -134,10 +151,57 @@ struct TaskDetailView: View {
             }
             .scrollIndicators(.hidden)
 
-            CDHairlineDivider(leadingInset: 0)
-            bottomActionBar
+            if !isAutoStartedActive {
+                CDHairlineDivider(leadingInset: 0)
+                bottomActionBar
+            }
         }
         .frame(width: CDTheme.popoverWidth, height: showPromptPreview ? CDTheme.detailHeight + 104 : CDTheme.detailHeight)
+    }
+
+    private var autoStartedBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(L("⚡ Auto"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(CDTheme.statusAmber)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(CDTheme.statusAmber.opacity(0.16), in: Capsule())
+                Text(L("Auto-started · dispatched at %@ with default settings", autoStartedTimeString))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.9))
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 6) {
+                if item.sessionHandle?.engine == .lody {
+                    CDPillButton(title: L("Open Lody"), systemImage: "cube.transparent") {
+                        coordinator.openHandoff(for: item)
+                    }
+                }
+                CDPillButton(title: L("Stop"), systemImage: "stop.fill") {
+                    coordinator.cancelRunningItem(id: item.id)
+                    onBack()
+                }
+                CDPillButton(title: L("Stop & Reconfigure"), systemImage: "slider.horizontal.3") {
+                    withAnimation(.snappy(duration: 0.16)) {
+                        coordinator.stopAndReconfigureItem(id: item.id)
+                        plan = coordinator.defaultPlan(for: item)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            CDTheme.statusAmber.opacity(scheme == .dark ? 0.12 : 0.09),
+            in: RoundedRectangle(cornerRadius: CDTheme.innerCornerRadius, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CDTheme.innerCornerRadius, style: .continuous)
+                .strokeBorder(CDTheme.statusAmber.opacity(0.32), lineWidth: 0.7)
+        )
     }
 
     // MARK: - 顶部返回导航

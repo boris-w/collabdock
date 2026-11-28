@@ -410,6 +410,23 @@
         }
       }
     },
+    "@mention": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "@mention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "@我"
+          }
+        }
+      }
+    },
     "@mention Keywords & Hints": {
       "extractionState": "manual",
       "localizations": {
@@ -546,6 +563,23 @@
         }
       }
     },
+    "Add 👀 reaction on PR when review starts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add 👀 reaction on PR when review starts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始审查时在 PR 上标记 👀"
+          }
+        }
+      }
+    },
     "All": {
       "extractionState": "manual",
       "localizations": {
@@ -559,6 +593,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "全部"
+          }
+        }
+      }
+    },
+    "All repositories": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All repositories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有仓库"
           }
         }
       }
@@ -597,6 +648,23 @@
         }
       }
     },
+    "Assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assigned"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指派给我"
+          }
+        }
+      }
+    },
     "Auto shallow clone": {
       "extractionState": "manual",
       "localizations": {
@@ -631,6 +699,57 @@
         }
       }
     },
+    "Auto-Review: Active": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Review: Active"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动审查：开启中"
+          }
+        }
+      }
+    },
+    "Auto-Review: Paused": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Review: Paused"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动审查：已暂停"
+          }
+        }
+      }
+    },
+    "Auto-Start Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Start Review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动开始审查"
+          }
+        }
+      }
+    },
     "Auto-archive PRs to Done when approved, merged, or closed on GitHub": {
       "extractionState": "manual",
       "localizations": {
@@ -644,6 +763,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "PR 在 GitHub 被 Approve、合并或关闭后自动归档至「已完成」"
+          }
+        }
+      }
+    },
+    "Auto-continue re-reviews when PR updates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-continue re-reviews when PR updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PR 更新后自动复审"
+          }
+        }
+      }
+    },
+    "Auto-start Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-start Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动开始失败"
+          }
+        }
+      }
+    },
+    "Auto-start review on incoming requests": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-start review on incoming requests"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收到请求自动开始审查"
+          }
+        }
+      }
+    },
+    "Auto-started · dispatched at %@ with default settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-started · dispatched at %@ with default settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已自动开始 · %@ 用默认设置派发"
           }
         }
       }
@@ -1039,6 +1226,40 @@
         }
       }
     },
+    "CollabDock · Auto-Start Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CollabDock · Auto-Start Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CollabDock · 自动开始失败"
+          }
+        }
+      }
+    },
+    "CollabDock · Auto-Started Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CollabDock · Auto-Started Review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CollabDock · 已自动开始审查"
+          }
+        }
+      }
+    },
     "CollabDock · Draft Ready": {
       "extractionState": "manual",
       "localizations": {
@@ -1052,6 +1273,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "CollabDock · 草稿已就绪"
+          }
+        }
+      }
+    },
+    "CollabDock's only GitHub write action: adds 👀 to the triggering comment or PR once Lody starts reviewing so the author knows it is being looked at. Turn off for read-only GitHub access.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CollabDock's only GitHub write action: adds 👀 to the triggering comment or PR once Lody starts reviewing so the author knows it is being looked at. Turn off for read-only GitHub access."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是 CollabDock 唯一的 GitHub 写操作：Lody 开始审查后在触发评论或 PR 上加一个 👀，告诉作者已经在看了；关掉后对 GitHub 保持完全只读。"
           }
         }
       }
@@ -2021,6 +2259,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "GitHub 实时认证状态"
+          }
+        }
+      }
+    },
+    "GitHub Feedback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub Feedback"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub 反馈"
           }
         }
       }
@@ -3079,6 +3334,23 @@
         }
       }
     },
+    "Notify me when auto-started": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify me when auto-started"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动开始时通知我"
+          }
+        }
+      }
+    },
     "On by default: checks out PR branches in an isolated worktree (Lody sessions still stay under the project). You can switch to the main directory on any confirmation card.": {
       "extractionState": "manual",
       "localizations": {
@@ -3092,6 +3364,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "默认开：在独立 Worktree 签出 PR 分支审查（Lody 会话仍归属在对应项目下）；单次确认卡片里也可随时临时切为「直用主目录」。"
+          }
+        }
+      }
+    },
+    "Only these repositories": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only these repositories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只限这些仓库"
           }
         }
       }
@@ -3279,6 +3568,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "粘贴 GitHub PR 链接立即审查"
+          }
+        }
+      }
+    },
+    "Pause": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停"
           }
         }
       }
@@ -3572,6 +3878,40 @@
         }
       }
     },
+    "Repositories": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repositories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生效仓库"
+          }
+        }
+      }
+    },
+    "Repository Allowlist": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository Allowlist"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仓库白名单"
+          }
+        }
+      }
+    },
     "Repository → Local Directory Mapping": {
       "extractionState": "manual",
       "localizations": {
@@ -3691,6 +4031,23 @@
         }
       }
     },
+    "Resume": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复"
+          }
+        }
+      }
+    },
     "Resume Target": {
       "extractionState": "manual",
       "localizations": {
@@ -3738,6 +4095,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "处理"
+          }
+        }
+      }
+    },
+    "Review Requested": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Requested"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请你 Review"
           }
         }
       }
@@ -4116,6 +4490,40 @@
         }
       }
     },
+    "Stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止"
+          }
+        }
+      }
+    },
+    "Stop & Reconfigure": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop & Reconfigure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止并换个设置重来"
+          }
+        }
+      }
+    },
     "Stop run": {
       "extractionState": "manual",
       "localizations": {
@@ -4456,6 +4864,23 @@
         }
       }
     },
+    "Team Mention": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Team Mention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "团队提及"
+          }
+        }
+      }
+    },
     "Team assignment / Team Mention": {
       "extractionState": "manual",
       "localizations": {
@@ -4660,6 +5085,23 @@
         }
       }
     },
+    "Trigger Kinds": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trigger Kinds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "触发方式"
+          }
+        }
+      }
+    },
     "Unbound (will auto shallow clone)": {
       "extractionState": "manual",
       "localizations": {
@@ -4762,6 +5204,23 @@
         }
       }
     },
+    "Using default settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Using default settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用的设置"
+          }
+        }
+      }
+    },
     "View review token & model usage": {
       "extractionState": "manual",
       "localizations": {
@@ -4792,6 +5251,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "建议"
+          }
+        }
+      }
+    },
+    "When enabled, matching GitHub PR requests are dispatched to Lody automatically with your default Agent and model. You can pause anytime from the menu bar.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When enabled, matching GitHub PR requests are dispatched to Lody automatically with your default Agent and model. You can pause anytime from the menu bar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启后，符合条件的 GitHub PR 请求将按默认 Lody Agent 与模型自动派发审查；随时可在菜单栏底栏一键暂停。"
           }
         }
       }
@@ -4966,6 +5442,23 @@
         }
       }
     },
+    "e.g. acme/*, acme/web-*": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. acme/*, acme/web-*"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如 acme/*, acme/web-*"
+          }
+        }
+      }
+    },
     "e.g. acme/web": {
       "extractionState": "manual",
       "localizations": {
@@ -5098,6 +5591,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "~/work, ~/projects（逗号分隔）"
+          }
+        }
+      }
+    },
+    "⚡ Auto": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚡ Auto"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "⚡ 自动"
           }
         }
       }

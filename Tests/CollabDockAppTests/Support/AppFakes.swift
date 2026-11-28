@@ -50,12 +50,20 @@ final class RecordingSystemIntegration: SystemIntegrating {
     private(set) var launchAtLogin: [Bool] = []
     /// 每次应用界面语言时写入的 `AppleLanguages` 覆盖（nil 表示移除覆盖、跟随系统）
     private(set) var languageOverrides: [[String]?] = []
+    /// 「已自动开始审查」通知（只记录 enabled 时真正发出的）
+    private(set) var autoStarted: [String] = []
+    /// 「自动开始失败」通知：(条目 ID, 错误信息)
+    private(set) var autoStartFailures: [(itemID: String, message: String)] = []
 
     func configureNotificationsIfAvailable() { configureCount += 1 }
     func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool) { if enabled { incoming.append(item.id) } }
     func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool) { if enabled { completions.append(item.id) } }
     func setLaunchAtLogin(_ enabled: Bool) -> String? { launchAtLogin.append(enabled); return nil }
     func applyInterfaceLanguage(_ appleLanguages: [String]?) { languageOverrides.append(appleLanguages) }
+    func postAutoStartNotification(for item: CollaborationItem, enabled: Bool) { if enabled { autoStarted.append(item.id) } }
+    func postAutoStartFailureNotification(for item: CollaborationItem, message: String, enabled: Bool) {
+        if enabled { autoStartFailures.append((item.id, message)) }
+    }
     func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {}
     func openLocalReport(path: String) {}
 }
@@ -139,10 +147,23 @@ struct FakeConnectorFactory: ConnectorFactory {
     var source: ScriptedSource = ScriptedSource()
     var status = ScriptedStatusQuery()
     var fetcher = ScriptedFetcher()
+    var reactor = RecordingReactor()
 
     func makeSource(context: ConnectorBuildContext) -> (any CollaborationSource)? { source }
     func makePRStatusQuery(context: ConnectorBuildContext) -> (any PRStatusQuerying)? { status }
     func makePRFetcher(context: ConnectorBuildContext) -> (any PullRequestFetching)? { fetcher }
+    func makePRReactor(context: ConnectorBuildContext) -> (any PullRequestReacting)? { reactor }
+}
+
+/// 记录「开始审查时加 👀」的调用
+final class RecordingReactor: PullRequestReacting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [String] = []
+    var calls: [String] { lock.withLock { recorded } }
+
+    func addReaction(_ content: GitHubReactionContent, to item: CollaborationItem) async throws {
+        lock.withLock { recorded.append(item.id) }
+    }
 }
 
 // MARK: - Execution backend
@@ -261,6 +282,32 @@ enum AppFixtures {
         return PolledCollaborationCandidate(
             dedupeKey: "github:acme/backend#\(number):reviewRequested:\(sha)",
             event: IncomingCollaborationEvent(platform: .github, scope: "acme/backend", externalRef: "#\(number)", triggerKind: .reviewRequested, actor: "alice"),
+            item: item
+        )
+    }
+
+    /// 任意仓库 / 触发方式的候选（用于自动开始的范围判断）
+    static func candidate(repository: String, number: Int, trigger: TriggerKind) -> PolledCollaborationCandidate {
+        let item = CollaborationItem(
+            id: "github:\(repository)#\(number):\(trigger.rawValue):abc1234",
+            platform: .github,
+            itemKind: .pullRequest,
+            scope: repository,
+            externalRef: "#\(number)",
+            title: "PR \(number)",
+            url: URL(string: "https://github.com/\(repository)/pull/\(number)")!,
+            author: "alice",
+            triggeredBy: "alice",
+            triggerKind: trigger,
+            payload: .codeChange(CodeChangePayload(
+                repository: repository, number: number, baseRef: "main", headRef: "feat/\(number)",
+                headSHA: "abc1234", additions: 1, deletions: 0, changedFiles: 1
+            )),
+            status: .pendingConfirmation
+        )
+        return PolledCollaborationCandidate(
+            dedupeKey: item.id,
+            event: IncomingCollaborationEvent(platform: .github, scope: repository, externalRef: "#\(number)", triggerKind: trigger, actor: "alice"),
             item: item
         )
     }

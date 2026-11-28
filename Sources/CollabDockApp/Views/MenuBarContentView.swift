@@ -31,7 +31,7 @@ public struct MenuBarContentView: View {
 
     private var activeDetailItem: CollaborationItem? {
         guard let id = activeDetailItemID else { return nil }
-        return coordinator.items.first(where: { $0.id == id && $0.status == .pendingConfirmation })
+        return coordinator.items.first(where: { $0.id == id && $0.status.isInboxActive })
     }
 
     public var body: some View {
@@ -333,9 +333,17 @@ public struct MenuBarContentView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     sectionHeader(L("Running"), count: runningItems.count)
                     ForEach(runningItems) { item in
-                        RunningTaskBannerView(item: item) {
-                            coordinator.cancelRunningItem(id: item.id)
-                        }
+                        RunningTaskBannerView(
+                            item: item,
+                            onSelect: item.wasAutoStarted ? {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    activeDetailItemID = item.id
+                                }
+                            } : nil,
+                            onCancel: {
+                                coordinator.cancelRunningItem(id: item.id)
+                            }
+                        )
                     }
                 }
             }
@@ -352,6 +360,15 @@ public struct MenuBarContentView: View {
                                         .foregroundStyle(CDTheme.diffDeletion)
                                         .lineLimit(1)
                                         .truncationMode(.middle)
+                                    if item.wasAutoStarted {
+                                        Text(L("Auto-start Failed"))
+                                            .font(.system(size: 9.5, weight: .semibold))
+                                            .foregroundStyle(CDTheme.diffDeletion)
+                                            .padding(.horizontal, 5.5)
+                                            .padding(.vertical, 1.5)
+                                            .background(CDTheme.diffDeletion.opacity(0.13), in: Capsule())
+                                            .fixedSize()
+                                    }
                                     Spacer()
                                     CDPillButton(title: L("Retry"), systemImage: "arrow.clockwise") {
                                         coordinator.retryFailedItem(id: item.id)
@@ -411,6 +428,11 @@ public struct MenuBarContentView: View {
                     ForEach(draftItems) { item in
                         DraftResultCardView(
                             item: item,
+                            onSelect: item.wasAutoStarted ? {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    activeDetailItemID = item.id
+                                }
+                            } : nil,
                             onOpenSource: { openURL(item.deliveryURL ?? item.url) },
                             onHandoff: item.sessionHandle?.engine == .lody ? { coordinator.openHandoff(for: item) } : nil,
                             onMarkCompleted: {
@@ -489,8 +511,46 @@ public struct MenuBarContentView: View {
 
     // MARK: - 极简底栏
 
+    @ViewBuilder
+    private var autoStartStatusBar: some View {
+        if coordinator.settings.autoStart.isEnabled {
+            let paused = coordinator.settings.autoStart.isPaused
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(paused ? CDTheme.statusAmber : CDTheme.statusGreen)
+                        .frame(width: 6, height: 6)
+                    Text(paused ? L("Auto-Review: Paused") : L("Auto-Review: Active"))
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(paused ? L("Resume") : L("Pause")) {
+                        withAnimation(.snappy(duration: 0.14)) {
+                            coordinator.toggleAutoStartPause()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(paused ? CDTheme.statusGreen : CDTheme.statusAmber)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(
+                        (paused ? CDTheme.statusGreen : CDTheme.statusAmber).opacity(0.12),
+                        in: Capsule()
+                    )
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(CDTheme.subtleSurface(for: scheme))
+                CDHairlineDivider(leadingInset: 0)
+            }
+        }
+    }
+
     private var footerBar: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 0) {
+            autoStartStatusBar
+            HStack(spacing: 8) {
             Button {
                 coordinator.togglePause()
             } label: {
@@ -574,9 +634,10 @@ public struct MenuBarContentView: View {
             .buttonStyle(.plain)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7.5)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7.5)
     }
 
     private var footerGitHubAvatar: some View {
@@ -822,18 +883,28 @@ private struct CollaborationRowView: View {
 
 private struct RunningTaskBannerView: View {
     let item: CollaborationItem
+    let onSelect: (() -> Void)?
     let onCancel: () -> Void
 
     var body: some View {
         CDInsetCard(padding: 11) {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     ProgressView()
                         .controlSize(.small)
                     Text(item.displayContextTag)
                         .font(.system(size: 11.5, weight: .semibold, design: .monospaced))
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if item.wasAutoStarted {
+                        Text(L("⚡ Auto"))
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(CDTheme.statusAmber)
+                            .padding(.horizontal, 5.5)
+                            .padding(.vertical, 1.5)
+                            .background(CDTheme.statusAmber.opacity(0.14), in: Capsule())
+                            .fixedSize()
+                    }
                     Spacer()
                     CDHoverIconButton(systemImage: "stop.fill", helpText: L("Stop run"), action: onCancel)
                 }
@@ -842,12 +913,17 @@ private struct RunningTaskBannerView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onSelect?()
+            }
         }
     }
 }
 
 private struct DraftResultCardView: View {
     let item: CollaborationItem
+    let onSelect: (() -> Void)?
     let onOpenSource: () -> Void
     let onHandoff: (() -> Void)?
     let onMarkCompleted: () -> Void
@@ -882,7 +958,7 @@ private struct DraftResultCardView: View {
         let badge = badgeSpec
         CDInsetCard(padding: 11) {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     if badge.isRunning {
                         ProgressView()
                             .controlSize(.mini)
@@ -896,6 +972,15 @@ private struct DraftResultCardView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if item.wasAutoStarted {
+                        Text(L("⚡ Auto"))
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(CDTheme.statusAmber)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(CDTheme.statusAmber.opacity(0.14), in: Capsule())
+                            .fixedSize()
+                    }
                     Spacer()
                     Text(badge.text)
                         .font(.system(size: 10, weight: .medium))
@@ -911,6 +996,10 @@ private struct DraftResultCardView: View {
                 Text(item.title)
                     .font(.system(size: 12.5, weight: .semibold))
                     .lineLimit(2)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onSelect?()
+                    }
 
                 if let output = item.executionOutput {
                     Text(output.summaryText)
