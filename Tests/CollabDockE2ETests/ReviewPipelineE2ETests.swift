@@ -10,6 +10,12 @@ import Testing
     .enabled(if: GitSandbox.isGitAvailable)
 )
 struct ReviewPipelineE2ETests {
+    /// 当前界面语言下的内置模板，渲染 `{{pr_url}}` 后就是 Lody 应收到的完整消息
+    static func rendered(_ kind: PromptTemplateKind, for item: CollaborationItem) -> String {
+        TaskPreset.defaultTemplate(for: kind, language: CoreL10n.currentLanguage)
+            .replacingOccurrences(of: "{{pr_url}}", with: item.url.absoluteString)
+    }
+
     private static let lodyOK = #"{"ok":true,"sessionId":"lody-sess-1","status":"running"}"#
 
     private func neutralDirectory(in scenario: PRScenario) throws -> URL {
@@ -91,7 +97,8 @@ struct ReviewPipelineE2ETests {
         #expect(fake.argv.contains("--worktree"))
         #expect(fake.value(after: "--branch") == PRScenario.headRef)
         let prompt = try #require(fake.argv.last)
-        #expect(prompt.contains("https://github.com/\(PRScenario.repository)/pull/\(PRScenario.number)") || prompt.contains("#\(PRScenario.number)"))
+        // 发给 Lody 的只有首次审查模板 + PR 链接（见 UserPromptTemplateSpecTests）
+        #expect(prompt == Self.rendered(.firstReview, for: item))
         #expect(!prompt.contains(PRScenario.token))
         #expect(fake.workingDirectory != realPath(scenario.sandbox.userRepo.path), "lody must not start inside the target repository")
         let leakedKeys = fake.environmentKeys.intersection(["GITHUB_TOKEN", "GH_TOKEN", "GH_ENTERPRISE_TOKEN"])
@@ -176,8 +183,8 @@ struct ReviewPipelineE2ETests {
         #expect(Array(fake.argv.prefix(3)) == ["session", "chat", "--json"])
         #expect(fake.argv.contains("lody-sess-1"))
         let prompt = try #require(fake.argv.last)
-        #expect(prompt.contains("pull/\(PRScenario.number)/head"), "the Lody agent fetches the new commits itself")
-        #expect(!prompt.contains("<untrusted_incremental_diff>"), "the diff is not inlined into the chat message")
+        // 续聊消息只有复审模板 + PR 链接：agent 在原会话里自己拉取、对比新提交，CollabDock 不再附带提交范围、命令或 diff
+        #expect(prompt == Self.rendered(.followUp, for: item))
         #expect(run.sessionHandle?.sessionID == "lody-sess-1")
         expectNoGitHubWrites(scenario.github)
     }

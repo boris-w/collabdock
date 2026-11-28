@@ -7,7 +7,6 @@ public struct AgentRunRequest: Sendable {
     public let preset: TaskPreset
     public let workspace: PreparedWorkspaceContext
     public let environment: EnvironmentSnapshot?
-    public let injectPresetPrompt: Bool
     public let cancellationToken: ProcessCancellationToken
 
     public init(
@@ -16,7 +15,6 @@ public struct AgentRunRequest: Sendable {
         preset: TaskPreset,
         workspace: PreparedWorkspaceContext,
         environment: EnvironmentSnapshot? = nil,
-        injectPresetPrompt: Bool = true,
         cancellationToken: ProcessCancellationToken = ProcessCancellationToken()
     ) {
         self.item = item
@@ -24,7 +22,6 @@ public struct AgentRunRequest: Sendable {
         self.preset = preset
         self.workspace = workspace
         self.environment = environment
-        self.injectPresetPrompt = injectPresetPrompt
         self.cancellationToken = cancellationToken
     }
 }

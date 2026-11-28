@@ -75,6 +75,11 @@ public struct ConnectorConfig: Codable, Hashable, Sendable, Identifiable {
     ]
 }
 
+public enum PromptTemplateKind: String, CaseIterable, Hashable, Sendable {
+    case firstReview
+    case followUp
+}
+
 public enum TaskPresetCategory: String, Codable, Hashable, Sendable {
     case codeReview
     case troubleshooting
@@ -86,26 +91,72 @@ public struct TaskPreset: Codable, Hashable, Sendable, Identifiable {
     public var name: String
     public var category: TaskPresetCategory
     public var promptInstructions: String
+    public var followUpPromptInstructions: String
 
     public init(
         id: String,
         name: String,
         category: TaskPresetCategory,
-        promptInstructions: String
+        promptInstructions: String = "",
+        followUpPromptInstructions: String = ""
     ) {
         self.id = id
         self.name = name
         self.category = category
         self.promptInstructions = promptInstructions
+        self.followUpPromptInstructions = followUpPromptInstructions
     }
 
-    /// 极简默认预制（仅保留 1 条最轻量的通用模板，不做过度预制；个人偏好可自由编辑或新建，关联 ITER-011）
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, promptInstructions, followUpPromptInstructions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.category = try c.decode(TaskPresetCategory.self, forKey: .category)
+        self.promptInstructions = (try? c.decodeIfPresent(String.self, forKey: .promptInstructions)) ?? ""
+        self.followUpPromptInstructions = (try? c.decodeIfPresent(String.self, forKey: .followUpPromptInstructions)) ?? ""
+    }
+
+    /// 旧版（ITER-011 ~ PR #15）默认提示词文案；加载旧配置时若正好等于此句，自动迁移为空字符串以跟随当前界面语言内置默认模板
+    public static let legacyDefaultPromptInstructions = "请帮我 review 这个 PR。"
+
+    /// 当前界面语言的内置默认模板（模板字段留空或仅含空白时使用）
+    public static func defaultTemplate(for kind: PromptTemplateKind, language: ResolvedLanguage) -> String {
+        switch (kind, language) {
+        case (.firstReview, .zhHans):
+            return "请帮我 review 这个 PR：{{pr_url}}"
+        case (.followUp, .zhHans):
+            return "PR 已经更新，请继续审查：{{pr_url}}"
+        case (.firstReview, .en):
+            return "Please review this PR: {{pr_url}}"
+        case (.followUp, .en):
+            return "The PR has been updated. Please continue reviewing: {{pr_url}}"
+        }
+    }
+
+    /// 返回生效模板：自定义非空白时返回自定义内容，否则回退当前界面语言的内置默认模板
+    public func effectiveTemplate(for kind: PromptTemplateKind, language: ResolvedLanguage) -> String {
+        let raw: String = switch kind {
+        case .firstReview:
+            promptInstructions
+        case .followUp:
+            followUpPromptInstructions
+        }
+        if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return Self.defaultTemplate(for: kind, language: language)
+        }
+        return raw
+    }
+
+    /// 极简默认预制：两个模板字段均留空，从而始终跟随当前界面语言的内置默认模板
     public static let defaults: [TaskPreset] = [
         TaskPreset(
             id: "code-review-general",
             name: "Review 这个 PR",
-            category: .codeReview,
-            promptInstructions: "请帮我 review 这个 PR。"
+            category: .codeReview
         )
     ]
 
@@ -225,8 +276,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var globalTriggerRules: TriggerRules
     public var defaultEngine: AgentEngine
     public var defaultEffort: ReasoningEffort
-    /// 唤起 AI 时是否注入内置任务模板与安全约束提示词（默认开启；关闭后仅发原始触发上下文与补充指令）
-    public var injectPresetPrompt: Bool
     public var lodyConfig: LodyConfig
     public var customExecutablePaths: [String: String]
     public var workspaceSearchRoots: [String]
@@ -250,7 +299,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
         globalTriggerRules: TriggerRules = TriggerRules(),
         defaultEngine: AgentEngine = .lody,
         defaultEffort: ReasoningEffort = .high,
-        injectPresetPrompt: Bool = true,
         lodyConfig: LodyConfig = LodyConfig(),
         customExecutablePaths: [String: String] = [:],
         workspaceSearchRoots: [String] = ["~/work", "~/projects"],
@@ -268,7 +316,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
         self.globalTriggerRules = globalTriggerRules
         self.defaultEngine = .lody
         self.defaultEffort = defaultEffort
-        self.injectPresetPrompt = injectPresetPrompt
         self.lodyConfig = lodyConfig
         self.customExecutablePaths = customExecutablePaths
         self.workspaceSearchRoots = workspaceSearchRoots
@@ -283,7 +330,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     enum CodingKeys: String, CodingKey {
         case pollIntervalSeconds, launchAtLogin, notificationsEnabled, connectors
         case globalTriggerRules, defaultEngine, defaultEffort
-        case injectPresetPrompt, lodyConfig
+        case lodyConfig
         case customExecutablePaths, workspaceSearchRoots, repositoryDirectoryOverrides
         case usageCurrency, developerModeEnabled, autoCompleteApprovedOrClosedPRs
         case appLanguage, presets
@@ -293,7 +340,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         case defaultModels
     }
 
-    /// 向后兼容解码：旧直连引擎键与 reviewLanguage 静默忽略，legacy defaultEngine 归一为 .lody
+    /// 向后兼容解码：旧直连引擎键、reviewLanguage 与 injectPresetPrompt 静默忽略，legacy defaultEngine 归一为 .lody
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
@@ -325,7 +372,6 @@ public struct AppSettings: Codable, Hashable, Sendable {
         }
 
         self.defaultEffort = (try? c.decodeIfPresent(ReasoningEffort.self, forKey: .defaultEffort)) ?? fallback.defaultEffort
-        self.injectPresetPrompt = (try? c.decodeIfPresent(Bool.self, forKey: .injectPresetPrompt)) ?? fallback.injectPresetPrompt
         self.lodyConfig = decodedLody
         self.customExecutablePaths = (try? c.decodeIfPresent([String: String].self, forKey: .customExecutablePaths)) ?? fallback.customExecutablePaths
         self.workspaceSearchRoots = (try? c.decodeIfPresent([String].self, forKey: .workspaceSearchRoots)) ?? fallback.workspaceSearchRoots
@@ -338,6 +384,15 @@ public struct AppSettings: Codable, Hashable, Sendable {
         // 若用户从未改过旧版 6 条出厂预制，平滑精简为新版极简默认；若用户自定义过任何模板则 100% 保留
         if decodedPresets == TaskPreset.legacyFactoryDefaults {
             decodedPresets = TaskPreset.defaults
+        } else {
+            // 若预制里存的正好是旧版默认文案，迁移为空以自动跟随当前界面语言内置默认模板，保留 id 与 name
+            decodedPresets = decodedPresets.map { preset in
+                var migrated = preset
+                if migrated.promptInstructions == TaskPreset.legacyDefaultPromptInstructions {
+                    migrated.promptInstructions = ""
+                }
+                return migrated
+            }
         }
         self.presets = decodedPresets.isEmpty ? TaskPreset.defaults : decodedPresets
     }

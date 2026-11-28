@@ -181,18 +181,12 @@ public struct LodyBackend: ExecutionBackend {
         _ request: AgentRunRequest,
         onProgress: @escaping @Sendable (String) -> Void = { _ in }
     ) async throws -> AgentRunResult {
-        let prompt = commandBuilder.buildSafePrompt(
+        let prompt = commandBuilder.buildPrompt(
             item: request.item,
             preset: request.preset,
             extraInstructions: request.plan.extraInstructions,
-            launchMode: .nativeBackgroundSession,
-            injectPresetPrompt: request.injectPresetPrompt,
-            unifiedDiff: nil,
             previousReview: request.plan.previousReview,
-            continuityMode: request.plan.continuityMode,
-            incrementalDiff: request.workspace.incrementalDiff,
-            incrementalCommitLog: request.workspace.incrementalCommitLog,
-            wasForcePushed: request.workspace.wasForcePushed
+            continuityMode: request.plan.continuityMode
         )
 
         let spec = try buildCommand(

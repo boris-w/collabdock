@@ -22,6 +22,7 @@ public struct SettingsView: View {
     @State private var versionTapCount: Int = 0
     @State private var lastVersionTapAt: Date = .distantPast
     @State private var devModeToast: String? = nil
+    @State private var expandedPresetIDs: Set<String>
 
     private var appVersionLabel: String {
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
@@ -31,6 +32,8 @@ public struct SettingsView: View {
     public init(coordinator: AppCoordinator, initialTab: SettingsTab = .connectors) {
         self.coordinator = coordinator
         self._selectedTab = State(initialValue: initialTab)
+        let firstID = coordinator.settings.presets.first?.id
+        self._expandedPresetIDs = State(initialValue: firstID.map { [$0] } ?? [])
     }
 
     public var body: some View {
@@ -888,39 +891,82 @@ public struct SettingsView: View {
 
     // MARK: - 5. 提示词与团队
 
-    private var teamAndGeneralTab: some View {
-        Form {
-            Section(L("Prompt Injection Strategy")) {
-                Toggle(L("Inject the selected prompt preset and read-only safety guardrails"), isOn: $coordinator.settings.injectPresetPrompt)
-                Text(
-                    coordinator.settings.injectPresetPrompt
-                    ? L("Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text.")
-                    : L("Disabled: no preset is injected; only the minimal PR / trigger context and your extra note are sent (with <untrusted_external_data> isolation preserved).")
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func presetExpansionBinding(for id: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedPresetIDs.contains(id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedPresetIDs.insert(id)
+                } else {
+                    expandedPresetIDs.remove(id)
+                }
             }
+        )
+    }
 
+    private func templateEditor(title: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: text)
+                    .font(.system(size: 11.5))
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                if text.wrappedValue.isEmpty {
+                    Text(placeholder)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(minHeight: 54, maxHeight: 84)
+            .background(
+                Color(nsColor: .textBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.7)
+            )
+        }
+    }
+
+    private var teamAndGeneralTab: some View {
+        let currentLang = CoreL10n.currentLanguage
+        let defaultFirstTemplate = TaskPreset.defaultTemplate(for: .firstReview, language: currentLang)
+        let defaultFollowUpTemplate = TaskPreset.defaultTemplate(for: .followUp, language: currentLang)
+
+        return Form {
             Section {
                 ForEach($coordinator.settings.presets) { $preset in
                     let presetID = preset.id
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 6) {
+                    DisclosureGroup(isExpanded: presetExpansionBinding(for: presetID)) {
+                        VStack(alignment: .leading, spacing: 8) {
                             TextField(L("Preset Name"), text: $preset.name)
                                 .textFieldStyle(.roundedBorder)
-                            TextEditor(text: $preset.promptInstructions)
-                                .font(.system(size: 11.5))
-                                .frame(minHeight: 68)
-                                .padding(4)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.7)
-                                )
+
+                            templateEditor(
+                                title: L("First Review"),
+                                text: $preset.promptInstructions,
+                                placeholder: defaultFirstTemplate
+                            )
+
+                            templateEditor(
+                                title: L("Follow-up after PR Update"),
+                                text: $preset.followUpPromptInstructions,
+                                placeholder: defaultFollowUpTemplate
+                            )
+
                             if coordinator.settings.presets.count > 1 {
                                 HStack {
                                     Spacer()
                                     Button(L("Delete Preset"), role: .destructive) {
                                         coordinator.settings.presets.removeAll { $0.id == presetID }
+                                        expandedPresetIDs.remove(presetID)
                                     }
                                     .controlSize(.small)
                                 }
@@ -930,29 +976,41 @@ public struct SettingsView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(preset.name).font(.subheadline.weight(.medium))
-                            Text(preset.promptInstructions)
+                            Text(preset.effectiveTemplate(for: .firstReview, language: currentLang))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     }
                 }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L("Leave blank to use the built-in default for the current UI language. Only the rendered template (plus any extra note) is sent to Lody."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(L("Supported placeholders: %@", "{{pr_url}}, {{repo}}, {{number}}, {{head_sha}}, {{previous_sha}}"))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
             } header: {
                 HStack {
-                    Text(L("Prompt Presets (only the selected preset is injected)"))
+                    Text(L("Prompt Templates"))
                     Spacer()
                     Button(L("+ New Preset")) {
+                        let newID = "custom-\(Int(Date().timeIntervalSince1970))"
                         let newPreset = TaskPreset(
-                            id: "custom-\(Int(Date().timeIntervalSince1970))",
+                            id: newID,
                             name: L("Custom Preset"),
-                            category: .codeReview,
-                            promptInstructions: L("Please review this PR, focusing on...")
+                            category: .codeReview
                         )
                         coordinator.settings.presets.append(newPreset)
+                        expandedPresetIDs.insert(newID)
                     }
                     .controlSize(.small)
                     Button(L("Reset Defaults")) {
                         coordinator.settings.presets = TaskPreset.defaults
+                        expandedPresetIDs = Set(TaskPreset.defaults.first.map { [$0.id] } ?? [])
                     }
                     .controlSize(.small)
                 }

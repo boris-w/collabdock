@@ -112,8 +112,7 @@ public enum E2EAcceptanceRunner {
                 plan: plan,
                 preset: TaskPreset.defaults[0],
                 workspace: prepared,
-                environment: env,
-                injectPresetPrompt: true
+                environment: env
             )
         ) { progress in
             print("[E2E][progress] \(progress)")

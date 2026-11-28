@@ -1549,23 +1549,6 @@
         }
       }
     },
-    "Disabled: no preset is injected; only the minimal PR / trigger context and your extra note are sent (with <untrusted_external_data> isolation preserved).": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Disabled: no preset is injected; only the minimal PR / trigger context and your extra note are sent (with <untrusted_external_data> isolation preserved)."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已关闭：不注入任何模板，仅发送最精简的 PR / 触发上下文与你的补充指令（仍保留 <untrusted_external_data> 隔离）。"
-          }
-        }
-      }
-    },
     "Dismiss": {
       "extractionState": "manual",
       "localizations": {
@@ -1702,40 +1685,6 @@
         }
       }
     },
-    "Effective prompt (minimal mode, no preset injected)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Effective prompt (minimal mode, no preset injected)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实际唤起提示词（精简模式，未注入模板）"
-          }
-        }
-      }
-    },
-    "Effective prompt (with safety guardrails and preset)": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Effective prompt (with safety guardrails and preset)"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "实际唤起提示词（已注入安全约束与模板）"
-          }
-        }
-      }
-    },
     "Effort": {
       "extractionState": "manual",
       "localizations": {
@@ -1766,23 +1715,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "启用开发者模式（关闭将自动清理演示数据）"
-          }
-        }
-      }
-    },
-    "Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enabled: injects only the single selected preset plus read-only guardrails. Lody sessions output readable Markdown. Click \"Prompt\" on the confirmation card to inspect the full text."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已开启：每次唤起仅注入当前选中的 1 条模板（不会全量注入）+ 只读安全边界；Lody 会话输出人类可读 Markdown。确认卡片点「预览提示词」可实时查看完整原文。"
           }
         }
       }
@@ -2004,6 +1936,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地数据库打开失败（本次运行数据不会持久化）：%@"
+          }
+        }
+      }
+    },
+    "First Review": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First Review"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首次审查"
+          }
+        }
+      }
+    },
+    "Follow-up after PR Update": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow-up after PR Update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PR 更新后复审"
           }
         }
       }
@@ -2314,40 +2280,6 @@
         }
       }
     },
-    "Inject the selected prompt preset and read-only safety guardrails": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inject the selected prompt preset and read-only safety guardrails"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "唤起 AI 时自动注入选中的任务模板与只读防注入边界"
-          }
-        }
-      }
-    },
-    "Injection disabled": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Injection disabled"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "未启用注入"
-          }
-        }
-      }
-    },
     "Input": {
       "extractionState": "manual",
       "localizations": {
@@ -2497,6 +2429,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "开机自启需从打包后的 CollabDock.app 运行时生效"
+          }
+        }
+      }
+    },
+    "Leave blank to use the built-in default for the current UI language. Only the rendered template (plus any extra note) is sent to Lody.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leave blank to use the built-in default for the current UI language. Only the rendered template (plus any extra note) is sent to Lody."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "留空则自动使用当前界面语言的内置默认模板。发给 Lody 的消息仅包含渲染后的模板与可选补充指令。"
           }
         }
       }
@@ -2943,6 +2892,23 @@
         }
       }
     },
+    "Message to send to Lody": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Message to send to Lody"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将发送给 Lody 的提示词原文"
+          }
+        }
+      }
+    },
     "Model": {
       "extractionState": "manual",
       "localizations": {
@@ -3368,23 +3334,6 @@
         }
       }
     },
-    "Please review this PR, focusing on...": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please review this PR, focusing on..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请帮我 review 这个 PR，重点关注..."
-          }
-        }
-      }
-    },
     "Pluggable Collaboration Connectors": {
       "extractionState": "manual",
       "localizations": {
@@ -3487,23 +3436,6 @@
         }
       }
     },
-    "Prompt Injection Strategy": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prompt Injection Strategy"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "唤起提示词注入策略"
-          }
-        }
-      }
-    },
     "Prompt Preset": {
       "extractionState": "manual",
       "localizations": {
@@ -3521,19 +3453,19 @@
         }
       }
     },
-    "Prompt Presets (only the selected preset is injected)": {
+    "Prompt Templates": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Prompt Presets (only the selected preset is injected)"
+            "value": "Prompt Templates"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "任务模板（仅注入当前选中的 1 条，按个人习惯自由增删）"
+            "value": "提示词模板"
           }
         }
       }
@@ -4214,6 +4146,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地 SQLite 存储"
+          }
+        }
+      }
+    },
+    "Supported placeholders: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported placeholders: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持的占位符：%@"
           }
         }
       }

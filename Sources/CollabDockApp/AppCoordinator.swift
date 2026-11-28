@@ -1242,7 +1242,6 @@ public final class AppCoordinator {
         let searchRoots = settings.workspaceSearchRoots
         let lodyConfig = settings.lodyConfig
         let lodyCatalogSnapshot = lodyCatalog
-        let injectPreset = settings.injectPresetPrompt
         let notifyEnabled = settings.notificationsEnabled
         let lodyAgentDisplayName = lodyAgentConfigDisplayName(for: activeLodyCfg)
 
@@ -1301,7 +1300,6 @@ public final class AppCoordinator {
                     searchRoots: searchRoots,
                     preferredLocalPath: resolvedDirInfo.path,
                     environment: envSnapshot,
-                    injectPresetPrompt: injectPreset,
                     lodyAgentDisplayName: lodyAgentDisplayName
                 )
 

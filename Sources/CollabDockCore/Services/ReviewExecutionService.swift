@@ -9,7 +9,6 @@ public struct ReviewExecutionRequest: Sendable {
     public let searchRoots: [String]
     public let preferredLocalPath: String?
     public let environment: EnvironmentSnapshot?
-    public let injectPresetPrompt: Bool
     public let lodyAgentDisplayName: String?
 
     public init(
@@ -20,7 +19,6 @@ public struct ReviewExecutionRequest: Sendable {
         searchRoots: [String] = [],
         preferredLocalPath: String? = nil,
         environment: EnvironmentSnapshot? = nil,
-        injectPresetPrompt: Bool = true,
         lodyAgentDisplayName: String? = nil
     ) {
         self.item = item
@@ -30,7 +28,6 @@ public struct ReviewExecutionRequest: Sendable {
         self.searchRoots = searchRoots
         self.preferredLocalPath = preferredLocalPath
         self.environment = environment
-        self.injectPresetPrompt = injectPresetPrompt
         self.lodyAgentDisplayName = lodyAgentDisplayName
     }
 }
@@ -177,7 +174,6 @@ public struct ReviewExecutionService: Sendable {
             preset: request.preset,
             workspace: preparedContext,
             environment: request.environment,
-            injectPresetPrompt: request.injectPresetPrompt,
             cancellationToken: ticket.primary
         )
 

@@ -125,7 +125,6 @@ public struct AgentSessionRunner: Sendable {
         incrementalDiff: String? = nil,
         incrementalCommitLog: String? = nil,
         wasForcePushed: Bool = false,
-        injectPresetPrompt: Bool = true,
         cancellationToken: ProcessCancellationToken,
         onProgress: @escaping @Sendable (String) -> Void
     ) async throws -> AgentRunResult {
@@ -142,7 +141,6 @@ public struct AgentSessionRunner: Sendable {
             preset: preset,
             workspace: workspace,
             environment: environmentSnapshot,
-            injectPresetPrompt: injectPresetPrompt,
             cancellationToken: cancellationToken
         )
         let backend = LodyBackend(

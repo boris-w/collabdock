@@ -135,6 +135,50 @@ public enum PreviewSnapshotter {
             to: dir.appendingPathComponent("settings-workspaces-light.png")
         )
 
+        let promptsCoord = AppCoordinator(previewMode: true)
+        if !isZH {
+            promptsCoord.settings.presets = [
+                TaskPreset(
+                    id: "code-review-general",
+                    name: "Review this PR",
+                    category: .codeReview
+                )
+            ]
+        }
+        renderWindow(
+            view: SettingsView(coordinator: promptsCoord, initialTab: .teamAndGeneral),
+            scheme: .light,
+            width: 684,
+            height: 580,
+            language: language,
+            to: dir.appendingPathComponent("settings-prompts-light.png")
+        )
+
+        let detailPreviewCoord = AppCoordinator(previewMode: true)
+        detailPreviewCoord.settings.defaultEngine = .lody
+        detailPreviewCoord.settings.lodyConfig.defaultAgentConfig = "lody-claude"
+        detailPreviewCoord.setPreferredLodyModel("opus", forAgentConfig: "lody-claude")
+        if !isZH {
+            detailPreviewCoord.settings.presets = [
+                TaskPreset(
+                    id: "code-review-general",
+                    name: "Review this PR",
+                    category: .codeReview
+                )
+            ]
+        }
+        render(
+            view: MenuBarContentView(
+                coordinator: detailPreviewCoord,
+                initialDetailItemID: "demo-gh-482",
+                initialShowPromptPreview: true
+            ),
+            scheme: .dark,
+            height: CDTheme.detailHeight + 104,
+            language: language,
+            to: dir.appendingPathComponent("detail-prompt-preview-dark.png")
+        )
+
         let statsPopoverDark = AppCoordinator(previewMode: true)
         render(
             view: MenuBarContentView(coordinator: statsPopoverDark, initialShowStats: true),
@@ -219,8 +263,7 @@ public enum PreviewSnapshotter {
                     TaskPreset(
                         id: "code-review-general",
                         name: "Review this PR",
-                        category: .codeReview,
-                        promptInstructions: "Please review this PR."
+                        category: .codeReview
                     )
                 ]
             }

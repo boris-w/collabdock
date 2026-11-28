@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Removed
+- **移除系统提示词拼装与 `injectPresetPrompt` 开关** (`PR #16`)：不再向 Lody 附加系统安全约束段、`<untrusted_*>` 数据块、PR 标题/描述/评论/分支名/diff/提交记录、拉取对比命令或输出格式要求；移除 `AppSettings.injectPresetPrompt`（旧配置静默忽略）、`AgentCommandBuilder.buildSafePrompt` / `sanitizeUntrustedContent` 及确认卡片/设置页中的注入开关。
 - **收拢为仅 Lody 执行路径，移除直连 CLI 引擎及相关托管/回写链路** (`PR #14`)：
   - 移除直连 Claude Code / Codex / Antigravity (`agy`) CLI 后端（`DirectCLIBackend`）、直连命令构建（含 `claude --bg` 与 `agy --resume`）、托管结构化运行（managed structured run）及 JSON Schema 输出。
   - 移除双模型会诊（`CouncilSynthesizer` / `CouncilPartner` / `ExecutionPlan.councilPartner`）。
@@ -13,6 +14,10 @@
   - 移除菜单栏确认卡片与设置页中的 4 引擎卡片、模式（Mode）、交付方式（Delivery）、运行模式（Launch Mode）、会诊（Council）及审查语言控件，设置页「AI 引擎」精简为「Lody」。
 
 ### Changed
+- **发给 Lody 的提示词改为纯用户模板（首次审查 / PR 更新后复审）+ PR 链接** (`PR #16`)：
+  - 新增 `PromptTemplateKind`（`firstReview` / `followUp`）与 `TaskPreset.followUpPromptInstructions`、`defaultTemplate(for:language:)`、`effectiveTemplate(for:language:)`；模板字段留空或仅含空白时自动使用当前界面语言的内置默认模板（中/英 × 首次/复审），旧版默认文案 `请帮我 review 这个 PR。` 加载时平滑迁移为空并保留 `id` 与 `name`。
+  - `AgentCommandBuilder.buildPrompt` 仅渲染经校验的有限占位符（`{{pr_url}}`、`{{repo}}`、`{{number}}`、`{{head_sha}}`、`{{previous_sha}}`，其余 `{{...}}` 原样保留），有补充指令时空一行接在末尾。
+  - 「设置 → 提示词与团队」改为「首次审查 / PR 更新后复审」双输入框（灰色占位符展示当前语言内置默认并列出支持的占位符）；确认卡片「预览提示词」直接展示即将发给 Lody 的原文。
 - **全链路默认并统一走 Lody 后台会话（兼容旧数据平滑反序列化）** (`PR #14`)：
   - `AgentEngine.selectableEngines` 收拢为 `[.lody]`，`ExecutionBackendKind` 仅保留 `.lody`，`ReviewExecutionService` 仅注入单个 Lody `backend` 且结果统一为 `.backgroundDispatched`；历史旧数据中的 `claude` / `codex` / `agy` 引擎记录、`managedStructuredRun`、`.codeReview` 输出、`localReportPath` / `deliveryURL`、旧版设置键与用量账本标签均保持平滑解码，非 Lody 上一轮复审记录自动降级为新开 Lody 增量会话。
   - 菜单栏确认卡片将 **Lody Agent**（来自 `lody agent-config list`，支持工作区默认或指定 Agent）提升为主选项，同时保留工作区目录、复审策略与附加指示控制；`TriggerRuleEngine` 忽略 `--engine`/`--cli` 对已移除直连引擎的指定并不再从 `--model` 反推引擎；`EnvironmentDetector` 仅探测 `git`、`gh` 与 `lody`。

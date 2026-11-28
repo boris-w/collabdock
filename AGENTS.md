@@ -40,7 +40,6 @@
 - CLI 非零退出时优先从 stdout 的 JSON `error` 提取错误（`lody --json` 把错误写在 stdout）。
 - `review_requested` 通知按 PR head SHA 去重（作者推新提交后能再次触发复审）。
 - PR 自动归档：`APPROVED` / `MERGED` / `CLOSED` 归档，`CHANGES_REQUESTED` 留在收件箱。
-- 外部内容进入提示词前会中和 `<untrusted_*>` 边界标签，不要绕过 `AgentCommandBuilder.sanitizeUntrustedContent`。
 
 ## 5. 代码地图
 

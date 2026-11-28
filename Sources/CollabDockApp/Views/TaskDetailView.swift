@@ -15,11 +15,17 @@ struct TaskDetailView: View {
     @State private var showExtraInstructions: Bool = false
     @State private var showPromptPreview: Bool = false
 
-    init(item: CollaborationItem, coordinator: AppCoordinator, onBack: @escaping () -> Void) {
+    init(
+        item: CollaborationItem,
+        coordinator: AppCoordinator,
+        initialShowPromptPreview: Bool = false,
+        onBack: @escaping () -> Void
+    ) {
         self.item = item
         self.coordinator = coordinator
         self.onBack = onBack
         self._plan = State(initialValue: coordinator.defaultPlan(for: item))
+        self._showPromptPreview = State(initialValue: initialShowPromptPreview)
     }
 
     private var effectiveLodyAgentConfig: String {
@@ -131,7 +137,7 @@ struct TaskDetailView: View {
             CDHairlineDivider(leadingInset: 0)
             bottomActionBar
         }
-        .frame(width: CDTheme.popoverWidth, height: CDTheme.detailHeight)
+        .frame(width: CDTheme.popoverWidth, height: showPromptPreview ? CDTheme.detailHeight + 104 : CDTheme.detailHeight)
     }
 
     // MARK: - 顶部返回导航
@@ -525,7 +531,7 @@ struct TaskDetailView: View {
 
                     inlineMenuRow(
                         label: L("Prompt Preset"),
-                        value: coordinator.settings.injectPresetPrompt ? selectedPreset.name : L("Injection disabled")
+                        value: selectedPreset.name
                     ) {
                         ForEach(availablePresets) { preset in
                             Button {
@@ -692,17 +698,15 @@ struct TaskDetailView: View {
             }
 
             if showPromptPreview {
-                let previewText = AgentCommandBuilder().buildSafePrompt(
+                let previewText = AgentCommandBuilder().buildPrompt(
                     item: item,
                     preset: selectedPreset,
                     extraInstructions: plan.extraInstructions,
-                    launchMode: .nativeBackgroundSession,
-                    injectPresetPrompt: coordinator.settings.injectPresetPrompt,
                     previousReview: plan.previousReview,
                     continuityMode: plan.continuityMode
                 )
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(coordinator.settings.injectPresetPrompt ? L("Effective prompt (with safety guardrails and preset)") : L("Effective prompt (minimal mode, no preset injected)"))
+                    Text(L("Message to send to Lody"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                     ScrollView {
@@ -712,7 +716,7 @@ struct TaskDetailView: View {
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(height: 110)
+                    .frame(height: 76)
                     .padding(8)
                     .background(
                         CDTheme.subtleSurface(for: scheme),
