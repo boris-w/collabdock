@@ -38,9 +38,6 @@ public struct LodyBackend: ExecutionBackend {
         if let path = request.environment?.resolvedPATH {
             gitEnv["PATH"] = path
         }
-        let prevSHAForIncremental: String? = (request.plan.continuityMode == .freshSessionFull)
-            ? nil
-            : request.plan.previousReview?.reviewedHeadSHA
 
         let repoName = request.item.payload.linkedRepository
         let prCode: CodeChangePayload? = {
@@ -65,22 +62,7 @@ public struct LodyBackend: ExecutionBackend {
         }()
 
         if let localPath = resolvedLocalPath {
-            var incDiff: String?
-            var incLog: String?
-            var forcePushed = false
-            if let prCode, let prevSHA = prevSHAForIncremental, !prevSHA.isEmpty {
-                onProgress(CoreL10n.format("Computing incremental fix diff since %@...", String(prevSHA.prefix(7))))
-                let inc = await worktreeManager.computeIncrementalChanges(
-                    inRepositoryAt: localPath,
-                    previousSHA: prevSHA,
-                    code: prCode,
-                    gitExecutablePath: gitPath,
-                    environment: gitEnv
-                )
-                incDiff = inc.diff
-                incLog = inc.commitLog
-                forcePushed = inc.wasForcePushed
-            } else if let prCode, request.plan.useIsolatedWorktree {
+            if let prCode {
                 let displayName = URL(fileURLWithPath: localPath).lastPathComponent
                 onProgress(CoreL10n.format("Refreshing PR branch refs in local project %@...", displayName))
                 await worktreeManager.refreshRemoteRefs(
@@ -93,11 +75,7 @@ public struct LodyBackend: ExecutionBackend {
             return PreparedWorkspaceContext(
                 workspaceURL: URL(fileURLWithPath: localPath, isDirectory: true),
                 baseRepositoryURL: nil,
-                isTemporaryWorktree: false,
-                unifiedDiff: nil,
-                incrementalDiff: incDiff,
-                incrementalCommitLog: incLog,
-                wasForcePushed: forcePushed
+                isTemporaryWorktree: false
             )
         }
 
@@ -121,7 +99,6 @@ public struct LodyBackend: ExecutionBackend {
             extraLocalRepoPaths: extraLocalRepos,
             preferredLocalPath: request.preferredLocalPath,
             useIsolatedWorktree: request.plan.useIsolatedWorktree,
-            previousReviewedSHA: prevSHAForIncremental,
             gitExecutablePath: gitPath,
             environment: gitEnv
         )

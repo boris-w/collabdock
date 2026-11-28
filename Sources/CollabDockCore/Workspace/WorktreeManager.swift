@@ -4,30 +4,15 @@ public struct PreparedWorkspaceContext: Equatable, Sendable {
     public let workspaceURL: URL
     public let baseRepositoryURL: URL?
     public let isTemporaryWorktree: Bool
-    public let unifiedDiff: String?
-    /// 复审场景：相对上次审查 SHA 的增量 Unified Diff（若分支被 force-push 则自动回退为全量 Diff）
-    public let incrementalDiff: String?
-    /// 复审场景：新增 Commit 列表（`git log --oneline`）
-    public let incrementalCommitLog: String?
-    /// 复审场景：上次审查的 SHA 是否已不在当前分支历史中（发生了 rebase / force-push）
-    public let wasForcePushed: Bool
 
     public init(
         workspaceURL: URL,
         baseRepositoryURL: URL? = nil,
-        isTemporaryWorktree: Bool = false,
-        unifiedDiff: String? = nil,
-        incrementalDiff: String? = nil,
-        incrementalCommitLog: String? = nil,
-        wasForcePushed: Bool = false
+        isTemporaryWorktree: Bool = false
     ) {
         self.workspaceURL = workspaceURL
         self.baseRepositoryURL = baseRepositoryURL
         self.isTemporaryWorktree = isTemporaryWorktree
-        self.unifiedDiff = unifiedDiff
-        self.incrementalDiff = incrementalDiff
-        self.incrementalCommitLog = incrementalCommitLog
-        self.wasForcePushed = wasForcePushed
     }
 }
 
@@ -153,7 +138,7 @@ public struct RepoScanner: Sendable {
     }
 }
 
-/// 隔离 Git Worktree 与增量 Diff 准备协议（`WorktreeManager` 为生产实现，供后端与服务单测注入 Fake）
+/// 隔离 Git Worktree 与远端分支引用刷新协议（`WorktreeManager` 为生产实现，供后端与服务单测注入 Fake）
 public protocol WorktreeManaging: Sendable {
     func prepareContext(
         for item: CollaborationItem,
@@ -161,7 +146,6 @@ public protocol WorktreeManaging: Sendable {
         extraLocalRepoPaths: [String],
         preferredLocalPath: String?,
         useIsolatedWorktree: Bool,
-        previousReviewedSHA: String?,
         gitExecutablePath: String,
         environment: [String: String]
     ) async throws -> PreparedWorkspaceContext
@@ -172,14 +156,6 @@ public protocol WorktreeManaging: Sendable {
         gitExecutablePath: String,
         environment: [String: String]
     ) async
-
-    func computeIncrementalChanges(
-        inRepositoryAt rootPath: String,
-        previousSHA: String,
-        code: CodeChangePayload,
-        gitExecutablePath: String,
-        environment: [String: String]
-    ) async -> (diff: String?, commitLog: String?, wasForcePushed: Bool)
 }
 
 /// 上下文与隔离 Git Worktree 管理器（绝不污染用户当前分支与未提交修改，关联 REQ-006, TASK-011）
@@ -207,7 +183,6 @@ public struct WorktreeManager: WorktreeManaging {
         extraLocalRepoPaths: [String] = [],
         preferredLocalPath: String? = nil,
         useIsolatedWorktree: Bool = true,
-        previousReviewedSHA: String? = nil,
         gitExecutablePath: String,
         environment: [String: String]
     ) async throws -> PreparedWorkspaceContext {
@@ -244,7 +219,6 @@ public struct WorktreeManager: WorktreeManaging {
                 localRepos: localRepos,
                 explicitRepoURL: explicitURL,
                 useIsolatedWorktree: useIsolatedWorktree,
-                previousReviewedSHA: previousReviewedSHA,
                 gitPath: gitExecutablePath,
                 env: environment
             )
@@ -302,97 +276,6 @@ public struct WorktreeManager: WorktreeManaging {
         }
     }
 
-    /// 复审场景：在本地仓库中拉取最新 PR 引用并计算 `previousSHA..最新HEAD` 的增量 Diff 与提交日志（若发生 force-push 自动回退全量）
-    public func computeIncrementalChanges(
-        inRepositoryAt rootPath: String,
-        previousSHA: String,
-        code: CodeChangePayload,
-        gitExecutablePath: String,
-        environment: [String: String]
-    ) async -> (diff: String?, commitLog: String?, wasForcePushed: Bool) {
-        guard FileManager.default.isExecutableFile(atPath: gitExecutablePath),
-              !previousSHA.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return (nil, nil, false)
-        }
-        let localRef = "refs/collabdock/pr-\(code.number)"
-        let fetchPR = await runner.run(
-            executablePath: gitExecutablePath,
-            arguments: ["-C", rootPath, "fetch", "--no-tags", "origin", "pull/\(code.number)/head:\(localRef)", "--force"],
-            environment: environment,
-            timeoutSeconds: 45
-        )
-        _ = await runner.run(
-            executablePath: gitExecutablePath,
-            arguments: [
-                "-C", rootPath, "fetch", "--no-tags", "origin",
-                "+refs/heads/\(code.headRef):refs/remotes/origin/\(code.headRef)",
-                "+refs/heads/\(code.baseRef):refs/remotes/origin/\(code.baseRef)"
-            ],
-            environment: environment,
-            timeoutSeconds: 45
-        )
-        let headTarget = fetchPR.succeeded ? localRef : "origin/\(code.headRef)"
-        return await computeIncrementalRange(
-            inRepositoryAt: rootPath,
-            previousSHA: previousSHA,
-            headRef: headTarget,
-            baseRef: code.baseRef,
-            gitPath: gitExecutablePath,
-            env: environment
-        )
-    }
-
-    private func computeIncrementalRange(
-        inRepositoryAt repoPath: String,
-        previousSHA: String,
-        headRef: String,
-        baseRef: String,
-        gitPath: String,
-        env: [String: String]
-    ) async -> (diff: String?, commitLog: String?, wasForcePushed: Bool) {
-        let ancestorCheck = await runner.run(
-            executablePath: gitPath,
-            arguments: ["-C", repoPath, "merge-base", "--is-ancestor", previousSHA, headRef],
-            environment: env,
-            timeoutSeconds: 10
-        )
-
-        if ancestorCheck.succeeded {
-            let diffRes = await runner.run(
-                executablePath: gitPath,
-                arguments: ["-C", repoPath, "diff", "\(previousSHA)..\(headRef)"],
-                environment: env,
-                timeoutSeconds: 20
-            )
-            let logRes = await runner.run(
-                executablePath: gitPath,
-                arguments: ["-C", repoPath, "log", "--oneline", "--max-count=30", "\(previousSHA)..\(headRef)"],
-                environment: env,
-                timeoutSeconds: 10
-            )
-            let diffText = diffRes.succeeded ? diffRes.stdout : nil
-            let logText = logRes.succeeded ? logRes.stdout.trimmingCharacters(in: .whitespacesAndNewlines) : nil
-            return (diffText, logText?.isEmpty == true ? nil : logText, false)
-        } else {
-            // 检测到 rebase / force-push，自动回退到相对 origin/<baseRef> 的最新全量 Diff
-            let diffRes = await runner.run(
-                executablePath: gitPath,
-                arguments: ["-C", repoPath, "diff", "origin/\(baseRef)...\(headRef)"],
-                environment: env,
-                timeoutSeconds: 20
-            )
-            let logRes = await runner.run(
-                executablePath: gitPath,
-                arguments: ["-C", repoPath, "log", "--oneline", "--max-count=30", "origin/\(baseRef)..\(headRef)"],
-                environment: env,
-                timeoutSeconds: 10
-            )
-            let diffText = diffRes.succeeded ? diffRes.stdout : nil
-            let logText = logRes.succeeded ? logRes.stdout.trimmingCharacters(in: .whitespacesAndNewlines) : nil
-            return (diffText, logText?.isEmpty == true ? nil : logText, true)
-        }
-    }
-
     public func removeWorktree(
         baseRepositoryURL: URL,
         worktreeURL: URL,
@@ -416,7 +299,6 @@ public struct WorktreeManager: WorktreeManaging {
         localRepos: [String: URL],
         explicitRepoURL: URL?,
         useIsolatedWorktree: Bool,
-        previousReviewedSHA: String?,
         gitPath: String,
         env: [String: String]
     ) async throws -> PreparedWorkspaceContext {
@@ -472,39 +354,13 @@ public struct WorktreeManager: WorktreeManaging {
         )
 
         let targetCommit = fetchPR.succeeded ? localRef : "FETCH_HEAD"
-        var incDiff: String?
-        var incLog: String?
-        var forcePushed = false
-        if let prevSHA = previousReviewedSHA, !prevSHA.isEmpty {
-            let inc = await computeIncrementalRange(
-                inRepositoryAt: baseRepoURL.path,
-                previousSHA: prevSHA,
-                headRef: targetCommit,
-                baseRef: code.baseRef,
-                gitPath: gitPath,
-                env: env
-            )
-            incDiff = inc.diff
-            incLog = inc.commitLog
-            forcePushed = inc.wasForcePushed
-        }
 
-        // 若用户显式选择直接在主目录审查（不建 Worktree），仅计算 PR Diff，绝不切换用户当前分支
+        // 若用户显式选择直接在主目录审查（不建 Worktree），直接返回主目录，绝不切换用户当前分支
         if !useIsolatedWorktree {
-            let diffRes = await runner.run(
-                executablePath: gitPath,
-                arguments: ["-C", baseRepoURL.path, "diff", "origin/\(code.baseRef)...\(targetCommit)"],
-                environment: env,
-                timeoutSeconds: 20
-            )
             return PreparedWorkspaceContext(
                 workspaceURL: baseRepoURL,
                 baseRepositoryURL: baseRepoURL,
-                isTemporaryWorktree: false,
-                unifiedDiff: diffRes.succeeded ? diffRes.stdout : nil,
-                incrementalDiff: incDiff,
-                incrementalCommitLog: incLog,
-                wasForcePushed: forcePushed
+                isTemporaryWorktree: false
             )
         }
 
@@ -529,23 +385,10 @@ public struct WorktreeManager: WorktreeManaging {
             throw WorkspaceError.worktreeFailed(addRes.stderr)
         }
 
-        // 3. 在隔离 worktree 内计算标准 Unified Diff，供后续 DiffLineValidator 行号校验
-        let diffRes = await runner.run(
-            executablePath: gitPath,
-            arguments: ["-C", worktreeURL.path, "diff", "origin/\(code.baseRef)...HEAD"],
-            environment: env,
-            timeoutSeconds: 20
-        )
-        let diffText = diffRes.succeeded ? diffRes.stdout : nil
-
         return PreparedWorkspaceContext(
             workspaceURL: worktreeURL,
             baseRepositoryURL: baseRepoURL,
-            isTemporaryWorktree: true,
-            unifiedDiff: diffText,
-            incrementalDiff: incDiff,
-            incrementalCommitLog: incLog,
-            wasForcePushed: forcePushed
+            isTemporaryWorktree: true
         )
     }
 

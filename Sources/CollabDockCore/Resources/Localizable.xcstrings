@@ -155,23 +155,6 @@
         }
       }
     },
-    "Computing incremental fix diff since %@...": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Computing incremental fix diff since %@..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在计算相对 %@ 的增量修复 Diff..."
-          }
-        }
-      }
-    },
     "Conditional polling for Notifications / PR Reviews with Lody session dispatch": {
       "extractionState": "manual",
       "localizations": {

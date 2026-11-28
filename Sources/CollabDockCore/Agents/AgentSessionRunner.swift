@@ -121,20 +121,10 @@ public struct AgentSessionRunner: Sendable {
         lodyConfig: LodyConfig,
         lodyCatalog: LodyCatalogSnapshot? = nil,
         lodyWorkspaceTarget: LodyWorkspaceTarget? = nil,
-        unifiedDiff: String? = nil,
-        incrementalDiff: String? = nil,
-        incrementalCommitLog: String? = nil,
-        wasForcePushed: Bool = false,
         cancellationToken: ProcessCancellationToken,
         onProgress: @escaping @Sendable (String) -> Void
     ) async throws -> AgentRunResult {
-        let workspace = PreparedWorkspaceContext(
-            workspaceURL: workspaceURL,
-            unifiedDiff: unifiedDiff,
-            incrementalDiff: incrementalDiff,
-            incrementalCommitLog: incrementalCommitLog,
-            wasForcePushed: wasForcePushed
-        )
+        let workspace = PreparedWorkspaceContext(workspaceURL: workspaceURL)
         let request = AgentRunRequest(
             item: item,
             plan: plan,
