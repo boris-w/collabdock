@@ -116,16 +116,12 @@ struct PRScenario {
         WorktreeManager(cacheRootURL: sandbox.cacheRoot)
     }
 
-    func prepare(
-        _ item: CollaborationItem,
-        previousReviewedSHA: String? = nil
-    ) async throws -> PreparedWorkspaceContext {
+    func prepare(_ item: CollaborationItem) async throws -> PreparedWorkspaceContext {
         try await worktreeManager.prepareContext(
             for: item,
             searchRoots: [],
             preferredLocalPath: sandbox.userRepo.path,
             useIsolatedWorktree: true,
-            previousReviewedSHA: previousReviewedSHA,
             gitExecutablePath: sandbox.gitPath,
             environment: sandbox.env
         )

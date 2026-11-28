@@ -129,7 +129,7 @@ struct ReviewPipelineE2ETests {
         #expect(try await reopened.loadAllItems().map(\.id) == [first.item.id])
     }
 
-    @Test("Re-review after a fix push: the incremental range is computed in the repo and the previous Lody session is continued")
+    @Test("Re-review after a fix push: the local project learns the author's new commit and the previous Lody session is continued")
     func incrementalReReviewContinuesLodySession() async throws {
         let scenario = try await PRScenario.make()
         defer { scenario.sandbox.cleanup() }
@@ -163,17 +163,23 @@ struct ReviewPipelineE2ETests {
             temporaryWorkingDirectory: try neutralDirectory(in: scenario)
         )
 
+        let userRepo = scenario.sandbox.userRepo.path
+        // 前提：用户本地仓库还没见过作者的新提交
+        #expect(await Self.hasCommit(newHead, in: userRepo, scenario) == false)
+
         let context = try await backend.prepareWorkspace(
             for: WorkspacePreparationRequest(
-                item: item, plan: plan, preferredLocalPath: scenario.sandbox.userRepo.path, environment: environment
+                item: item, plan: plan, preferredLocalPath: userRepo, environment: environment
             ),
             onProgress: { _ in }
         )
-        #expect(context.wasForcePushed == false)
-        let incremental = try #require(context.incrementalDiff)
-        #expect(incremental.contains("+    mutating func purge() { storage.removeAll() }"))
-        #expect(!incremental.contains("+    static let ttl = 60"), "round-1 changes must not be re-reviewed")
-        #expect(context.incrementalCommitLog?.contains("fix: purge clears storage") == true)
+        #expect(context.workspaceURL.path == userRepo)
+        // 派发前刷新了 PR 引用：Lody 的 agent 在本地项目里能直接看到并对比作者的新提交（CollabDock 自己不再算 diff）
+        #expect(await Self.hasCommit(newHead, in: userRepo, scenario))
+        #expect(try await scenario.sandbox.git(["-C", userRepo, "rev-parse", "refs/remotes/origin/\(PRScenario.headRef)"]) == newHead)
+        // 用户自己的分支与未提交改动不受影响
+        #expect(try await scenario.sandbox.currentBranch() == "main")
+        #expect(try await scenario.sandbox.git(["-C", userRepo, "status", "--porcelain"]) == "?? WIP.txt")
 
         let run = try await backend.execute(
             AgentRunRequest(item: item, plan: plan, preset: TaskPreset.defaults[0], workspace: context, environment: environment),
@@ -226,8 +232,8 @@ struct ReviewPipelineE2ETests {
         #expect(!fake.argv.contains("claude-sess-1"))
     }
 
-    @Test("Re-review after a force-push falls back to the full PR diff")
-    func forcePushFallsBackToFullDiff() async throws {
+    @Test("Re-review after a force-push: the rewritten PR head replaces the old one in the local project")
+    func forcePushRefreshesToRewrittenHead() async throws {
         let scenario = try await PRScenario.make()
         defer { scenario.sandbox.cleanup() }
         let firstHead = scenario.headSHA
@@ -237,10 +243,45 @@ struct ReviewPipelineE2ETests {
             with: "    static let ttl = 120\n}\n"
         )
         let newHead = try await scenario.authorPushes(content: rewritten, message: "feat: ttl (rebased)", rewriteHistory: true)
+        let previous = PreviousReviewContext(
+            previousItemID: scenario.item(headSHA: firstHead).id,
+            reviewedHeadSHA: firstHead,
+            reviewedAt: Date(),
+            engine: .lody,
+            sessionID: "lody-sess-1",
+            reviewRound: 1
+        )
+        let item = scenario.item(headSHA: newHead, previousReview: previous)
+        let plan = ExecutionPlan(
+            engine: .lody, model: "default", launchMode: .nativeBackgroundSession,
+            continuityMode: .continueSessionIncremental, previousReview: previous
+        )
+        let backend = LodyBackend(catalog: LodyCatalogSnapshot(), worktreeManager: scenario.worktreeManager)
+        let userRepo = scenario.sandbox.userRepo.path
 
-        let context = try await scenario.prepare(scenario.item(headSHA: newHead), previousReviewedSHA: firstHead)
-        #expect(context.wasForcePushed)
-        #expect(context.incrementalDiff?.contains("+    static let ttl = 120") == true)
+        _ = try await backend.prepareWorkspace(
+            for: WorkspacePreparationRequest(item: item, plan: plan, preferredLocalPath: userRepo, environment: Self.gitOnlyEnvironment(scenario)),
+            onProgress: { _ in }
+        )
+
+        #expect(try await scenario.sandbox.git(["-C", userRepo, "rev-parse", "refs/remotes/origin/\(PRScenario.headRef)"]) == newHead)
+        #expect(try await scenario.sandbox.currentBranch() == "main")
+    }
+
+    /// `git cat-file -e <sha>`：本地仓库是否已有该提交对象
+    static func hasCommit(_ sha: String, in repo: String, _ scenario: PRScenario) async -> Bool {
+        (try? await scenario.sandbox.git(["-C", repo, "cat-file", "-e", "\(sha)^{commit}"])) != nil
+    }
+
+    static func gitOnlyEnvironment(_ scenario: PRScenario) -> EnvironmentSnapshot {
+        EnvironmentSnapshot(
+            resolvedPATH: "/usr/bin:/bin",
+            git: CLIProbeStatus(name: "git", isInstalled: true, executablePath: scenario.sandbox.gitPath),
+            gh: CLIProbeStatus(name: "gh", isInstalled: false),
+            engines: [:],
+            githubAuth: GitHubAuthSnapshot(isAuthenticated: false),
+            discoveredModels: [:]
+        )
     }
 }
 

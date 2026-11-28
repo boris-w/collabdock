@@ -94,7 +94,7 @@ struct WorktreeAndRepoScannerTests {
             author: "diana",
             triggeredBy: "diana",
             triggerKind: .mention,
-            triggerBody: "@boris 排查",
+            triggerBody: "@dev 排查",
             payload: .conversation(ConversationPayload(channelName: "#值班群"))
         )
         let ctx = try await manager.prepareContext(
@@ -146,68 +146,198 @@ struct WorktreeAndRepoScannerTests {
         #expect(ctx.workspaceURL.standardizedFileURL == extraRepo.standardizedFileURL)
     }
 
-    @Test("Computes incremental commit diff between old reviewed SHA and new fix commit, and handles force-push fallback [TASK-015][ITER-013]")
-    func computesIncrementalDiffAndDetectsForcePush() async throws {
-        let runner = DefaultProcessRunner()
+    // MARK: - Refreshing PR refs (what the Lody agent relies on; replaces the removed incremental-diff computation)
+
+    /// 真实 git 沙箱：bare 远端 + 用户本地克隆 + 作者的另一个克隆。作者推送后，用户仓库在刷新前看不到新提交。
+    private struct RefreshSandbox {
+        let root: URL
+        let origin: URL
+        let userRepo: URL
+        let author: URL
         let gitPath = "/usr/bin/git"
-        guard FileManager.default.isExecutableFile(atPath: gitPath) else { return }
+        let env: [String: String]
+        let runner = DefaultProcessRunner()
 
-        let sandbox = FileManager.default.temporaryDirectory
-            .appendingPathComponent("collabdock-inc-\(UUID().uuidString)", isDirectory: true)
-        let originBare = sandbox.appendingPathComponent("origin.git", isDirectory: true)
-        let userRepo = sandbox.appendingPathComponent("repo", isDirectory: true)
-        try FileManager.default.createDirectory(at: originBare, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: userRepo, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: sandbox) }
+        init() async throws {
+            root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("collabdock-refresh-\(UUID().uuidString)", isDirectory: true)
+            origin = root.appendingPathComponent("origin.git", isDirectory: true)
+            userRepo = root.appendingPathComponent("work/repo", isDirectory: true)
+            author = root.appendingPathComponent("author/repo", isDirectory: true)
+            try FileManager.default.createDirectory(at: origin, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: userRepo.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: author.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var e = ProcessInfo.processInfo.environment
+            e["GIT_CONFIG_GLOBAL"] = "/dev/null"
+            e["GIT_CONFIG_NOSYSTEM"] = "1"
+            e["GIT_AUTHOR_NAME"] = "T"
+            e["GIT_AUTHOR_EMAIL"] = "t@example.com"
+            e["GIT_COMMITTER_NAME"] = "T"
+            e["GIT_COMMITTER_EMAIL"] = "t@example.com"
+            env = e
 
-        let env = ProcessInfo.processInfo.environment
-        _ = await runner.run(executablePath: gitPath, arguments: ["init", "--bare", originBare.path], environment: env, timeoutSeconds: 10)
-        _ = await runner.run(executablePath: gitPath, arguments: ["init", "-b", "main", userRepo.path], environment: env, timeoutSeconds: 10)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "config", "user.email", "t@t.dev"], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "config", "user.name", "T"], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "remote", "add", "origin", originBare.path], environment: env, timeoutSeconds: 5)
+            try await git(["init", "-q", "--bare", "-b", "main", origin.path])
+            try await git(["clone", "-q", origin.path, author.path])
+            try await git(["-C", author.path, "checkout", "-q", "-b", "main"])
+            try "let a = 1\n".write(to: author.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
+            try await git(["-C", author.path, "add", "."])
+            try await git(["-C", author.path, "commit", "-q", "-m", "init"])
+            try await git(["-C", author.path, "push", "-q", "origin", "main"])
+            try await git(["-C", author.path, "checkout", "-q", "-b", "feat/fix"])
+            try "let a = 2\n".write(to: author.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
+            try await git(["-C", author.path, "commit", "-q", "-am", "round1 feat"])
+            try await git(["-C", author.path, "push", "-q", "origin", "HEAD:refs/heads/feat/fix", "HEAD:refs/pull/1/head"])
+            // 用户在第 1 轮时克隆（此时已能看到第 1 轮的 PR 头）
+            try await git(["clone", "-q", origin.path, userRepo.path])
+        }
 
-        try "let a = 1\n".write(to: userRepo.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "add", "."], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "commit", "-m", "init"], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "push", "-u", "origin", "main"], environment: env, timeoutSeconds: 10)
+        @discardableResult
+        func git(_ args: [String]) async throws -> String {
+            let out = await runner.run(executablePath: gitPath, arguments: args, environment: env, timeoutSeconds: 30)
+            guard out.succeeded else { throw RefreshError.git(args.joined(separator: " "), out.stderr) }
+            return out.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
 
-        // Round 1 PR commit
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "checkout", "-b", "feat/fix"], environment: env, timeoutSeconds: 5)
-        try "let a = 2\n".write(to: userRepo.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "commit", "-am", "round1 feat"], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "push", "origin", "feat/fix"], environment: env, timeoutSeconds: 10)
-        let round1SHA = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "rev-parse", "HEAD"], environment: env, timeoutSeconds: 5).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        /// 作者推送一个新提交到 PR 分支（`rewrite` 时模拟 rebase + force-push），返回新 PR 头
+        func authorPushes(_ content: String, message: String, rewrite: Bool = false, refs: [String] = ["refs/heads/feat/fix", "refs/pull/1/head"]) async throws -> String {
+            if rewrite {
+                try await git(["-C", author.path, "checkout", "-q", "-B", "feat/fix", "main"])
+            }
+            try content.write(to: author.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
+            try await git(["-C", author.path, "commit", "-q", "-am", message])
+            try await git(["-C", author.path, "push", "-q", "--force", "origin"] + refs.map { "HEAD:\($0)" })
+            return try await git(["-C", author.path, "rev-parse", "HEAD"])
+        }
 
-        // Round 2 developer fix commit
-        try "let a = 2\nlet fixedBug = true\n".write(to: userRepo.appendingPathComponent("A.swift"), atomically: true, encoding: .utf8)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "commit", "-am", "fix review comment"], environment: env, timeoutSeconds: 5)
-        _ = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "push", "origin", "feat/fix"], environment: env, timeoutSeconds: 10)
-        let round2SHA = await runner.run(executablePath: gitPath, arguments: ["-C", userRepo.path, "rev-parse", "HEAD"], environment: env, timeoutSeconds: 5).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        func userHasCommit(_ sha: String) async -> Bool {
+            (try? await git(["-C", userRepo.path, "cat-file", "-e", "\(sha)^{commit}"])) != nil
+        }
 
-        let manager = WorktreeManager(runner: runner, cacheRootURL: sandbox.appendingPathComponent("cache", isDirectory: true))
-        let code = CodeChangePayload(repository: "acme/repo", number: 1, baseRef: "main", headRef: "feat/fix", headSHA: round2SHA, additions: 2, deletions: 1, changedFiles: 1)
+        func code(headRef: String = "feat/fix", number: Int = 1, headSHA: String) -> CodeChangePayload {
+            CodeChangePayload(repository: "acme/repo", number: number, baseRef: "main", headRef: headRef, headSHA: headSHA, additions: 1, deletions: 1, changedFiles: 1)
+        }
 
-        let inc = await manager.computeIncrementalChanges(
-            inRepositoryAt: userRepo.path,
-            previousSHA: round1SHA,
-            code: code,
-            gitExecutablePath: gitPath,
-            environment: env
+        func cleanup() { try? FileManager.default.removeItem(at: root) }
+    }
+
+    private enum RefreshError: Error { case git(String, String) }
+
+    @Test("Refreshing PR refs brings the author's new commit into the local project without touching the user's checkout")
+    func refreshBringsNewCommit() async throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else { return }
+        let sb = try await RefreshSandbox()
+        defer { sb.cleanup() }
+        let newHead = try await sb.authorPushes("let a = 2\nlet fixedBug = true\n", message: "fix review comment")
+        #expect(await sb.userHasCommit(newHead) == false)
+        let branchBefore = try await sb.git(["-C", sb.userRepo.path, "rev-parse", "--abbrev-ref", "HEAD"])
+
+        let manager = WorktreeManager(runner: sb.runner, cacheRootURL: sb.root.appendingPathComponent("cache", isDirectory: true))
+        await manager.refreshRemoteRefs(inRepositoryAt: sb.userRepo.path, code: sb.code(headSHA: newHead), gitExecutablePath: sb.gitPath, environment: sb.env)
+
+        #expect(await sb.userHasCommit(newHead))
+        #expect(try await sb.git(["-C", sb.userRepo.path, "rev-parse", "refs/remotes/origin/feat/fix"]) == newHead)
+        #expect(try await sb.git(["-C", sb.userRepo.path, "rev-parse", "--abbrev-ref", "HEAD"]) == branchBefore)
+        #expect(try await sb.git(["-C", sb.userRepo.path, "status", "--porcelain"]).isEmpty)
+    }
+
+    @Test("Refreshing PR refs follows a force-push: the rewritten head replaces the old one")
+    func refreshFollowsForcePush() async throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else { return }
+        let sb = try await RefreshSandbox()
+        defer { sb.cleanup() }
+        let rewritten = try await sb.authorPushes("let a = 3\n", message: "feat (rebased)", rewrite: true)
+
+        let manager = WorktreeManager(runner: sb.runner, cacheRootURL: sb.root.appendingPathComponent("cache", isDirectory: true))
+        await manager.refreshRemoteRefs(inRepositoryAt: sb.userRepo.path, code: sb.code(headSHA: rewritten), gitExecutablePath: sb.gitPath, environment: sb.env)
+
+        #expect(try await sb.git(["-C", sb.userRepo.path, "rev-parse", "refs/remotes/origin/feat/fix"]) == rewritten)
+    }
+
+    @Test("A cross-fork PR (no branch on origin) is refreshed from refs/pull/<n>/head")
+    func refreshFallsBackToPullRef() async throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else { return }
+        let sb = try await RefreshSandbox()
+        defer { sb.cleanup() }
+        let forkHead = try await sb.authorPushes("let a = 2\nlet fromFork = true\n", message: "fork fix", refs: ["refs/pull/2/head"])
+        #expect(await sb.userHasCommit(forkHead) == false)
+
+        let manager = WorktreeManager(runner: sb.runner, cacheRootURL: sb.root.appendingPathComponent("cache", isDirectory: true))
+        await manager.refreshRemoteRefs(
+            inRepositoryAt: sb.userRepo.path,
+            code: sb.code(headRef: "contributor-branch", number: 2, headSHA: forkHead),
+            gitExecutablePath: sb.gitPath,
+            environment: sb.env
         )
-        #expect(inc.wasForcePushed == false)
-        #expect(inc.diff?.contains("let fixedBug = true") == true)
-        #expect(inc.commitLog?.contains("fix review comment") == true)
 
-        // 模拟不可达 SHA（force-push / rebase 后）：自动回退为全量 Diff 且标记 wasForcePushed = true
-        let forcePushed = await manager.computeIncrementalChanges(
-            inRepositoryAt: userRepo.path,
-            previousSHA: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-            code: code,
-            gitExecutablePath: gitPath,
-            environment: env
+        #expect(await sb.userHasCommit(forkHead))
+        #expect(try await sb.git(["-C", sb.userRepo.path, "rev-parse", "refs/remotes/origin/contributor-branch"]) == forkHead)
+    }
+
+    // MARK: - No diff is computed any more (nothing reads it since the prompt became template-only)
+
+    /// 记录所有 git 调用（并真实执行），用于断言准备工作区时不再跑 `git diff`
+    private final class RecordingRunner: ProcessRunner, @unchecked Sendable {
+        private let inner = DefaultProcessRunner()
+        private let lock = NSLock()
+        private var calls: [[String]] = []
+        var recorded: [[String]] { lock.withLock { calls } }
+
+        func run(executablePath: String, arguments: [String], environment: [String: String], timeoutSeconds: TimeInterval) async -> ProcessOutput {
+            lock.withLock { calls.append(arguments) }
+            return await inner.run(executablePath: executablePath, arguments: arguments, environment: environment, timeoutSeconds: timeoutSeconds)
+        }
+
+        /// git 子命令（跳过 `-C <path>` 等前置参数）
+        var subcommands: [String] {
+            recorded.compactMap { args in
+                var i = 0
+                while i < args.count, args[i].hasPrefix("-") {
+                    i += (args[i] == "-C" || args[i] == "-c") ? 2 : 1
+                }
+                return i < args.count ? args[i] : nil
+            }
+        }
+    }
+
+    @Test("Preparing a PR workspace (isolated worktree or the project directory itself) never runs `git diff`", arguments: [true, false])
+    func preparingWorkspaceComputesNoDiff(isolated: Bool) async throws {
+        guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else { return }
+        let sb = try await RefreshSandbox()
+        defer { sb.cleanup() }
+        let head = try await sb.git(["-C", sb.author.path, "rev-parse", "HEAD"])
+        let recorder = RecordingRunner()
+        let manager = WorktreeManager(runner: recorder, cacheRootURL: sb.root.appendingPathComponent("cache", isDirectory: true))
+        let item = CollaborationItem(
+            id: "github:acme/repo#1:reviewRequested:\(head)",
+            platform: .github,
+            itemKind: .pullRequest,
+            scope: "acme/repo",
+            externalRef: "#1",
+            title: "round1 feat",
+            url: URL(string: "https://github.com/acme/repo/pull/1")!,
+            author: "alice",
+            triggeredBy: "alice",
+            triggerKind: .reviewRequested,
+            payload: .codeChange(sb.code(headSHA: head))
         )
-        #expect(forcePushed.wasForcePushed == true)
-        #expect(forcePushed.diff?.contains("let fixedBug = true") == true)
+
+        let ctx = try await manager.prepareContext(
+            for: item,
+            searchRoots: [],
+            preferredLocalPath: sb.userRepo.path,
+            useIsolatedWorktree: isolated,
+            gitExecutablePath: sb.gitPath,
+            environment: sb.env
+        )
+
+        #expect(ctx.isTemporaryWorktree == isolated)
+        if isolated {
+            let checkedOut = try await sb.git(["-C", ctx.workspaceURL.path, "rev-parse", "HEAD"])
+            #expect(checkedOut == head, "the isolated worktree is on the PR head")
+        } else {
+            #expect(ctx.workspaceURL.standardizedFileURL == sb.userRepo.standardizedFileURL)
+        }
+        #expect(!recorder.subcommands.contains("diff"), "git calls: \(recorder.recorded)")
+        #expect(recorder.subcommands.contains("fetch"), "the PR head is still fetched")
     }
 }

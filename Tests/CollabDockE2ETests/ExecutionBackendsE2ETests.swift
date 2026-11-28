@@ -65,8 +65,8 @@ struct ExecutionBackendsE2ETests {
             == .localProject(idOrPath: "lp-1", useWorktree: false, branch: nil))
     }
 
-    @Test("Lody: an explicitly chosen directory wins; a continued review computes the incremental diff there instead of refreshing refs")
-    func lodyPreferredPathWithIncrementalDiff() async throws {
+    @Test("Lody: an explicitly chosen directory wins; a continued review refreshes the PR refs there (no diff is computed)")
+    func lodyPreferredPathReReviewRefreshesRefs() async throws {
         let worktrees = FakeWorktreeManager()
         let backend = LodyBackend(catalog: LodyCatalogSnapshot(), worktreeManager: worktrees)
         let previous = PreviousReviewContext(previousItemID: "r1", reviewedHeadSHA: "1111111", reviewedAt: Date(), engine: .lody, sessionID: "lody-1")
@@ -74,20 +74,46 @@ struct ExecutionBackendsE2ETests {
             engine: .lody, model: "gemini-4-neon", launchMode: .nativeBackgroundSession,
             continuityMode: .continueSessionIncremental, previousReview: previous
         )
+        let progress = ProgressLog()
 
         let context = try await backend.prepareWorkspace(
             for: WorkspacePreparationRequest(item: lodyItem(), plan: plan, preferredLocalPath: "/Users/dev/code/backend-2", environment: lodyEnvironment()),
-            onProgress: { _ in }
+            onProgress: { progress.append($0) }
         )
 
         #expect(context.workspaceURL.path == "/Users/dev/code/backend-2")
-        #expect(context.incrementalDiff == "INC-DIFF")
-        #expect(context.incrementalCommitLog == "abc1234 fix: purge")
-        #expect(worktrees.incrementalCalls.map(\.previousSHA) == ["1111111"])
-        #expect(worktrees.refreshCalls.isEmpty)
+        #expect(context.isTemporaryWorktree == false)
+        #expect(worktrees.refreshDetails == [.init(path: "/Users/dev/code/backend-2", number: 7, headRef: "feat/cache")])
         #expect(worktrees.prepareCalls.isEmpty)
+        #expect(!progress.all.contains { $0.localizedCaseInsensitiveContains("diff") }, "no diff is computed any more: \(progress.all)")
         #expect(backend.resolveWorkspaceTarget(for: lodyItem(), plan: plan, workspace: context)
             == .localProject(idOrPath: "/Users/dev/code/backend-2", useWorktree: true, branch: "feat/cache"))
+    }
+
+    @Test("Lody: the PR refs are refreshed in the local project in both rounds, also when the project directory is used directly",
+          arguments: [false, true])
+    func lodyRefreshesRefsWithoutIsolatedWorktree(isReReview: Bool) async throws {
+        let worktrees = FakeWorktreeManager()
+        let catalog = LodyCatalogSnapshot(localProjects: [
+            LodyLocalProjectOption(id: "lp-1", name: "backend", rootPath: "/Users/dev/code/backend", repositoryFullName: "acme/backend")
+        ])
+        let backend = LodyBackend(catalog: catalog, worktreeManager: worktrees)
+        let previous = PreviousReviewContext(previousItemID: "r1", reviewedHeadSHA: "1111111", reviewedAt: Date(), engine: .lody, sessionID: "lody-1")
+        let plan = ExecutionPlan(
+            engine: .lody, model: "gemini-4-neon", launchMode: .nativeBackgroundSession,
+            useIsolatedWorktree: false,
+            continuityMode: isReReview ? .continueSessionIncremental : .freshSessionFull,
+            previousReview: isReReview ? previous : nil
+        )
+
+        let context = try await backend.prepareWorkspace(
+            for: WorkspacePreparationRequest(item: lodyItem(), plan: plan, environment: lodyEnvironment()),
+            onProgress: { _ in }
+        )
+
+        #expect(context.workspaceURL.path == "/Users/dev/code/backend")
+        #expect(worktrees.refreshCalls == ["/Users/dev/code/backend"], "re-review: \(isReReview)")
+        #expect(worktrees.prepareCalls.isEmpty)
     }
 
     @Test("Lody: a repo linked in the Lody cloud workspace is dispatched with --repo and never cloned locally")
