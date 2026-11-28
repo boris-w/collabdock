@@ -19,9 +19,27 @@ if [[ ! -f "${ROOT_DIR}/Resources/AppIcon.icns" \
 fi
 
 if [[ "${UNIVERSAL}" == "1" ]]; then
-  echo "[CollabDock] Building Universal Binary (arm64 + x86_64, ${BUILD_CONFIG})..."
-  swift build -c "${BUILD_CONFIG}" --arch arm64 --arch x86_64
-  BIN_DIR="$(swift build -c "${BUILD_CONFIG}" --arch arm64 --arch x86_64 --show-bin-path)"
+  # Build each architecture with SwiftPM's native build system and merge with lipo.
+  # `swift build --arch arm64 --arch x86_64` switches to the Xcode build system, which compiles
+  # String Catalogs with symbol generation and rejects keys such as "%@"; it would also ship a
+  # differently built app than the one CI tests.
+  echo "[CollabDock] Building arm64 and x86_64 separately (${BUILD_CONFIG})..."
+  swift build -c "${BUILD_CONFIG}" --arch arm64
+  ARM_BIN_DIR="$(swift build -c "${BUILD_CONFIG}" --arch arm64 --show-bin-path)"
+  swift build -c "${BUILD_CONFIG}" --arch x86_64
+  X86_BIN_DIR="$(swift build -c "${BUILD_CONFIG}" --arch x86_64 --show-bin-path)"
+
+  BIN_DIR="${OUT_DIR}/universal-bin"
+  rm -rf "${BIN_DIR}"
+  mkdir -p "${BIN_DIR}"
+  echo "[CollabDock] Merging into a Universal Binary with lipo..."
+  lipo -create "${ARM_BIN_DIR}/${APP_NAME}" "${X86_BIN_DIR}/${APP_NAME}" -output "${BIN_DIR}/${APP_NAME}"
+  # Resource bundles are architecture-independent
+  for bundle in "${ARM_BIN_DIR}"/*.bundle; do
+    if [[ -d "${bundle}" ]]; then
+      cp -R "${bundle}" "${BIN_DIR}/"
+    fi
+  done
 else
   echo "[CollabDock] Building Swift package (${BUILD_CONFIG})..."
   swift build -c "${BUILD_CONFIG}"
