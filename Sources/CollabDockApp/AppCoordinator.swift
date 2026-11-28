@@ -389,7 +389,7 @@ public final class AppCoordinator {
     }
 
     public var completedItems: [CollaborationItem] {
-        items.filter { !$0.status.isInboxActive }
+        items.filter { !$0.status.isInboxActive && $0.completionReason != .superseded }
     }
 
     public var pendingConfirmationCount: Int {
