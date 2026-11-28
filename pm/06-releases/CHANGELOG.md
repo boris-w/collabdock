@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Removed
+- **移除工作区准备阶段不再被消费的 `git diff` / `git log` 增量与全量 Diff 计算** (`PR #18`)：
+  - `PreparedWorkspaceContext` 移除 `unifiedDiff`、`incrementalDiff`、`incrementalCommitLog`、`wasForcePushed`；`WorktreeManaging` 移除 `computeIncrementalChanges` 及 `prepareContext` 的 `previousReviewedSHA` 参数；`WorktreeManager` 删除 `computeIncrementalRange` 及主目录/隔离 Worktree 路径中的 `git diff` / `git log` 步骤，保留 PR head/base 拉取与 detached worktree 创建。
+  - `LodyBackend.prepareWorkspace` 每次派发到本地项目时（无论首次审查还是复审、无论是否启用隔离 Worktree）均调用 `refreshRemoteRefs` 刷新远端分支引用，并移除不再使用的 `Computing incremental fix diff since ...` 进度文案与词库条目。
 - **移除系统提示词拼装与 `injectPresetPrompt` 开关** (`PR #16`)：不再向 Lody 附加系统安全约束段、`<untrusted_*>` 数据块、PR 标题/描述/评论/分支名/diff/提交记录、拉取对比命令或输出格式要求；移除 `AppSettings.injectPresetPrompt`（旧配置静默忽略）、`AgentCommandBuilder.buildSafePrompt` / `sanitizeUntrustedContent` 及确认卡片/设置页中的注入开关。
 - **收拢为仅 Lody 执行路径，移除直连 CLI 引擎及相关托管/回写链路** (`PR #14`)：
   - 移除直连 Claude Code / Codex / Antigravity (`agy`) CLI 后端（`DirectCLIBackend`）、直连命令构建（含 `claude --bg` 与 `agy --resume`）、托管结构化运行（managed structured run）及 JSON Schema 输出。
