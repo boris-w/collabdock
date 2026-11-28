@@ -1,5 +1,7 @@
 # 03 · 系统技术架构设计（Architecture）
 
+> **2026-11-28 起执行方式只保留 Lody（见 [ADR-008](decisions/ADR-008-lody-only-execution.md)）。** 文中关于直连 Claude Code / Codex / Antigravity CLI、托管运行、JSON Schema、双模型会诊、GitHub Pending 草稿回写和本地报告的内容已过时，仅作历史参考。
+
 > **关联决策**：[ADR-001](./decisions/ADR-001-native-swiftui-menubar.md) | [ADR-002](./decisions/ADR-002-github-conditional-polling.md) | [ADR-003](./decisions/ADR-003-unified-cli-adapter-and-sandbox.md) | [ADR-004](./decisions/ADR-004-pending-review-and-distribution.md) | [ADR-005](./decisions/ADR-005-generalize-to-collabdock.md) | [ADR-006](./decisions/ADR-006-native-session-and-background-drivers.md) | [ADR-007](./decisions/ADR-007-lody-integration.md)
 
 ---

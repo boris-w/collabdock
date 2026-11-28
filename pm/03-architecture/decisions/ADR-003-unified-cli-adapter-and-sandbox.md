@@ -1,6 +1,6 @@
 # ADR-003 · 三大 AI CLI 统一适配器、只读沙箱与 JSON Schema 契约
 
-- **状态**：已采纳（Accepted）
+- **状态**：已被 [ADR-008](ADR-008-lody-only-execution.md) 取代（Superseded，2026-11-28）
 - **日期**：2026-11-26
 - **关联需求**：[REQ-006](../../02-product/PRD.md#req-006--隔离-git-worktree-上下文准备p0), [REQ-007](../../02-product/PRD.md#req-007--三大-ai-cli-统一调度引擎p0), [REQ-008](../../02-product/PRD.md#req-008--安全防注入与权限隔离p0)
 

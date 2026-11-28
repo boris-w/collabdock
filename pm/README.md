@@ -1,5 +1,7 @@
 # CollabDock 项目管理与全流程可追溯中心（PM Hub）
 
+> **2026-11-28 起执行方式只保留 Lody（见 [ADR-008](03-architecture/decisions/ADR-008-lody-only-execution.md)）。** 文中关于直连 Claude Code / Codex / Antigravity CLI、托管运行、JSON Schema、双模型会诊、GitHub Pending 草稿回写和本地报告的内容已过时，仅作历史参考。
+
 本目录是 **CollabDock（协作 Dock）**——面向 **Claude Code / OpenAI Codex CLI / Google Antigravity CLI / Lody** 的 macOS 原生 SwiftUI 多平台本地 AI 协作调度坞站——的**唯一软件工程与项目管理真实源（Single Source of Truth）**。
 
 所有需求提出、架构拍板、任务拆解、迭代执行、视觉验收与团队发布均通过**统一编号体系**实现端到端双向追溯。
@@ -30,7 +32,7 @@ pm/
 │   └── UX_SPEC.md                         # 原生 SwiftUI 交互规范、多平台自适应与状态机
 ├── 03-architecture/
 │   ├── ARCHITECTURE.md                    # 四柱可插拔架构、模块契约与安全模型
-│   └── decisions/                         # 架构决策记录（ADR-001 ~ ADR-007）
+│   └── decisions/                         # 架构决策记录（ADR-001 ~ ADR-008）
 ├── 04-planning/
 │   ├── ROADMAP.md                         # M0 ~ M4 里程碑与准出标准
 │   ├── BACKLOG.md                         # 可执行任务清单（TASK-001 ~ TASK-020）
