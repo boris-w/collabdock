@@ -53,7 +53,7 @@ PR 标题、评论和提交信息都是外部可控的输入。CollabDock 的防
 
 1. **人工门控**：不会自动执行任何东西。只有你在确认卡片上点击确认，才会派发 Lody 会话。
 2. **默认只读模式**：若所选 Lody Agent 提供只读 / plan 模式（如 `plan`、`read-only`），派发时会自动传入该只读模式。
-3. **不可信输入隔离**：外部内容在提示词里包在 `<untrusted_external_data>` 标签中（并先中和伪造的闭合标签），复审消息中的 git 命令仅使用整数 PR 编号和校验后的十六进制 SHA，绝不将不可信分支名拼入命令。这能降低提示词与命令注入风险，但不能替代人工审查。
+3. **极简提示词边界**：发给 Lody 的消息只包含你配置的模板（首次审查 / PR 更新后复审）及可选补充指令，外部 PR 标题、正文、评论或分支名均不拼入提示词；仅渲染经严格校验的有限占位符（`{{pr_url}}`、`{{repo}}`、`{{number}}`、`{{head_sha}}`、`{{previous_sha}}`），降低提示词与命令注入风险（但不能替代人工审查）。
 4. **GitHub token 与宿主会话隔离**：token 由 `gh auth token` 获取，只在应用进程内用于只读查询 GitHub API。启动 `lody` 子进程前会剥离 `GITHUB_TOKEN`、`GH_TOKEN`、`GH_ENTERPRISE_TOKEN` 以及 `ELECTRON_RUN_AS_NODE`、`LODY_*` 宿主环境变量，并在中性临时目录启动，防止目标仓库内同名 `package.json` 劫持 `npx`。
 5. **不直接写 GitHub**：CollabDock 自身不发起任何 GitHub 评论或 Review 写请求。
 

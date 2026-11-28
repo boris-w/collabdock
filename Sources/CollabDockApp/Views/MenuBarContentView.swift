@@ -10,6 +10,7 @@ public struct MenuBarContentView: View {
     @State private var activeDetailItemID: String?
     @State private var showQuickStats: Bool = false
     @State private var showImportPRBar: Bool = false
+    private let initialShowPromptPreview: Bool
     @State private var importPRInput: String = ""
     @State private var isImportingPR: Bool = false
     @State private var importPRError: String?
@@ -18,12 +19,14 @@ public struct MenuBarContentView: View {
         coordinator: AppCoordinator,
         initialDetailItemID: String? = nil,
         initialShowStats: Bool = false,
-        initialShowImportBar: Bool = false
+        initialShowImportBar: Bool = false,
+        initialShowPromptPreview: Bool = false
     ) {
         self.coordinator = coordinator
         self._activeDetailItemID = State(initialValue: initialDetailItemID)
         self._showQuickStats = State(initialValue: initialShowStats)
         self._showImportPRBar = State(initialValue: initialShowImportBar)
+        self.initialShowPromptPreview = initialShowPromptPreview
     }
 
     private var activeDetailItem: CollaborationItem? {
@@ -36,7 +39,8 @@ public struct MenuBarContentView: View {
             if let detailItem = activeDetailItem {
                 TaskDetailView(
                     item: detailItem,
-                    coordinator: coordinator
+                    coordinator: coordinator,
+                    initialShowPromptPreview: initialShowPromptPreview
                 ) {
                     withAnimation(.snappy(duration: 0.2)) {
                         activeDetailItemID = nil

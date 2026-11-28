@@ -53,7 +53,7 @@ PR titles, comments, and commit messages are attacker-controllable input. Collab
 
 1. **Human gate**: nothing runs automatically. A Lody session starts only after you click confirm.
 2. **Read-only mode by default**: when the selected Lody agent advertises a read-only / plan mode (`plan`, `read-only`), CollabDock passes it automatically.
-3. **Untrusted input wrapping**: external content is wrapped in `<untrusted_external_data>` tags (with forged closing tags neutralized), and git commands in follow-up prompts only use integer PR numbers and validated hex SHAs — never untrusted branch names. This reduces prompt and command injection risk; it does not replace human judgment.
+3. **Minimal prompt surface**: messages sent to Lody contain only your rendered template (first review / follow-up after PR update) and optional extra note — untrusted PR titles, descriptions, comments, and branch names never enter the prompt. Only strictly validated placeholders (`{{pr_url}}`, `{{repo}}`, `{{number}}`, `{{head_sha}}`, `{{previous_sha}}`) are substituted, reducing prompt and command injection risk (while never replacing human judgment).
 4. **Token & host-session isolation**: the GitHub token comes from `gh auth token` and is only used inside the app process for read-only GitHub API calls. `GITHUB_TOKEN`, `GH_TOKEN`, `GH_ENTERPRISE_TOKEN`, `ELECTRON_RUN_AS_NODE`, and `LODY_*` variables are stripped before spawning `lody`, and `lody` starts in a neutral temporary directory so a repository's `package.json` cannot hijack `npx`.
 5. **No GitHub writes**: CollabDock itself does not issue any write requests to GitHub.
 
