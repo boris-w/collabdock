@@ -9,9 +9,8 @@ import Testing
 /// 2. `Sources/` 里任何含中文的字符串字面量都必须是某个 catalog 的 key（即会被翻译），否则就是漏翻；
 /// 3. 系统语言都不受支持时回退英文：Package 的 `defaultLocalization` 与 App 的 `CFBundleDevelopmentRegion` 为 `en`。
 ///
-/// 暂不扫描（另有归属）：`Sources/CollabDockApp/Debug/`（仅 DEBUG 的截图 / 验收工具）、
-/// `AgentCommandBuilder.swift`（内置提示词，下一个 PR 改为只发用户模板），以及用户可编辑的数据默认值
-/// （触发关键词、任务模板），它们在运行时读出来作为白名单。
+/// 暂不扫描（另有归属）：`Sources/CollabDockApp/Debug/`（仅 DEBUG 的截图 / 验收工具），以及用户可编辑的数据默认值
+/// （触发关键词、任务模板与内置默认模板），它们在运行时读出来作为白名单。
 @Suite("SPEC — every user-facing string is localized into English and Simplified Chinese (issue #4)")
 struct LocalizationCoverageSpecTests {
     static let repoRoot = URL(fileURLWithPath: #filePath)
@@ -19,7 +18,6 @@ struct LocalizationCoverageSpecTests {
 
     static let excludedPathFragments = [
         "/Sources/CollabDockApp/Debug/",
-        "/Sources/CollabDockCore/Agents/AgentCommandBuilder.swift",
     ]
 
     // MARK: 1. catalogs
@@ -144,6 +142,14 @@ struct LocalizationCoverageSpecTests {
         for preset in TaskPreset.defaults + TaskPreset.legacyFactoryDefaults {
             values.insert(preset.name)
             values.insert(preset.promptInstructions)
+            values.insert(preset.followUpPromptInstructions)
+        }
+        // 内置默认模板（按界面语言）与用于迁移识别的旧默认文案，属于用户可编辑模板的默认值
+        values.insert(TaskPreset.legacyDefaultPromptInstructions)
+        for kind in PromptTemplateKind.allCases {
+            for language in [ResolvedLanguage.zhHans, .en] {
+                values.insert(TaskPreset.defaultTemplate(for: kind, language: language))
+            }
         }
         return values
     }

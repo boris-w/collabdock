@@ -101,7 +101,6 @@ struct PersistenceTests {
         #expect(decoded.pollIntervalSeconds == 120)
         #expect(decoded.defaultEngine == .lody)
         #expect(decoded.workspaceSearchRoots == ["~/custom-code"])
-        #expect(decoded.injectPresetPrompt == true)
         #expect(decoded.lodyConfig.preferNPXFallback == true)
         #expect(decoded.lodyConfig.defaultAgentConfig == "antigravity")
         #expect(decoded.presets == TaskPreset.defaults)

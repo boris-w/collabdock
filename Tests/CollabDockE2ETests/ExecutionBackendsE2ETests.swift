@@ -161,6 +161,9 @@ struct ExecutionBackendsE2ETests {
         #expect(fake.argv.contains("--worktree"))
         #expect(fake.value(after: "--branch") == "feat/cache")
         #expect(fake.value(after: "--title") == "CR #7 feat: add ttl")
+        #expect(fake.argv.last == TaskPreset.defaultTemplate(for: .firstReview, language: CoreL10n.currentLanguage)
+            .replacingOccurrences(of: "{{pr_url}}", with: request.item.url.absoluteString),
+            "the message is exactly the rendered template")
         #expect(fake.environmentKeys.intersection(RealWorldGuardsE2ETests.inheritedHostVariables.keys).isEmpty)
     }
 
