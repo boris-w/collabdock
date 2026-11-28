@@ -70,9 +70,10 @@ public struct DefaultConnectorFactory: ConnectorFactory {
     }
 }
 
-/// 执行后端构造工厂协议（Lody-only，供 App 层单测注入 FakeBackend）
+/// 执行后端构造工厂协议（Lody-only，供 App 层单测注入 FakeBackend / RecordingCanceller）
 public protocol ExecutionBackendFactory: Sendable {
     func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend
+    func makeSessionCanceller(config: LodyConfig) -> any SessionCancelling
 }
 
 /// 生产默认执行后端工厂
@@ -85,6 +86,10 @@ public struct DefaultExecutionBackendFactory: ExecutionBackendFactory {
 
     public func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend {
         LodyBackend(config: config, catalog: catalog, worktreeManager: worktreeManager)
+    }
+
+    public func makeSessionCanceller(config: LodyConfig) -> any SessionCancelling {
+        LodyBackend(config: config, worktreeManager: worktreeManager)
     }
 }
 

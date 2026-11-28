@@ -64,7 +64,11 @@ final class RecordingSystemIntegration: SystemIntegrating {
     func postAutoStartFailureNotification(for item: CollaborationItem, message: String, enabled: Bool) {
         if enabled { autoStartFailures.append((item.id, message)) }
     }
-    func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) {}
+    /// 通知按钮（打开 Lody / 停止）的回调，由 AppCoordinator 在初始化时接上
+    var onNotificationAction: ((String, NotificationAction) -> Void)?
+    /// 打开过的会话（「打开 Lody」）
+    private(set) var handoffs: [String] = []
+    func openSessionHandoff(handle: AgentSessionHandle, lodyWorkspace: String?) { handoffs.append(handle.sessionID) }
     func openLocalReport(path: String) {}
 }
 
@@ -251,6 +255,28 @@ final class QueueBackendFactory: ExecutionBackendFactory, @unchecked Sendable {
 
     func makeLodyBackend(config: LodyConfig, catalog: LodyCatalogSnapshot?) -> any ExecutionBackend {
         lock.withLock { queue.isEmpty ? fallback : queue.removeFirst() }
+    }
+
+    let canceller = RecordingCanceller()
+    func makeSessionCanceller(config: LodyConfig) -> any SessionCancelling { canceller }
+}
+
+/// 记录「停止」时取消过的 Lody 会话；可注入失败
+final class RecordingCanceller: SessionCancelling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _cancelled: [String] = []
+    private var _error: Error?
+    var cancelled: [String] { lock.withLock { _cancelled } }
+    var error: Error? {
+        get { lock.withLock { _error } }
+        set { lock.withLock { _error = newValue } }
+    }
+    func cancelSession(_ handle: AgentSessionHandle, environment: EnvironmentSnapshot?) async throws {
+        let failure: Error? = lock.withLock {
+            _cancelled.append(handle.sessionID)
+            return _error
+        }
+        if let failure { throw failure }
     }
 }
 

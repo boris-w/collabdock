@@ -665,6 +665,23 @@
         }
       }
     },
+    "Missing Lody session ID; cannot cancel session.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Missing Lody session ID; cannot cancel session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缺少 Lody 会话 ID，无法取消该会话。"
+          }
+        }
+      }
+    },
     "New Session · Full PR": {
       "extractionState": "manual",
       "localizations": {

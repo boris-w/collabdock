@@ -1,7 +1,7 @@
 import Foundation
 
-/// Lody 编排层执行后端：封装 Lody 工作区路由、中性临时 cwd、npx -y lody@latest 回退、Deep Link 与标题格式
-public struct LodyBackend: ExecutionBackend {
+/// Lody 编排层执行后端：封装 Lody 工作区路由、中性临时 cwd、npx -y lody@latest 回退、Deep Link、会话取消与标题格式
+public struct LodyBackend: ExecutionBackend, SessionCancelling {
     public let kind: ExecutionBackendKind = .lody
 
     public let config: LodyConfig
@@ -200,6 +200,69 @@ public struct LodyBackend: ExecutionBackend {
             durationSeconds: elapsedSeconds
         )
         return try parseResult(raw, for: request)
+    }
+
+    /// 取消远端正在运行的一轮 Lody 会话（`lody session cancel <sessionId> --json [--workspace <ws>]`）
+    /// 安全约束：会话 ID 为空/空白时直接抛错且绝不启动 lody（避免 lody 回退读取 `LODY_SESSION_ID` 环境变量）
+    public func cancelSession(
+        _ handle: AgentSessionHandle,
+        environment: EnvironmentSnapshot?
+    ) async throws {
+        let sessionID = handle.sessionID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sessionID.isEmpty else {
+            throw AgentRunnerError.processFailed(
+                exitCode: 1,
+                stderr: CoreL10n.string("Missing Lody session ID; cannot cancel session.")
+            )
+        }
+
+        let resolvedBinary = resolveBinary(environment: environment)
+        let useNPX = resolvedBinary.usesNPXFallback || (resolvedBinary.executablePath?.hasSuffix("/npx") == true)
+        let rawExecutable: String
+        if useNPX {
+            rawExecutable = (resolvedBinary.executablePath?.hasSuffix("/npx") == true)
+                ? resolvedBinary.executablePath!
+                : "npx"
+        } else {
+            rawExecutable = resolvedBinary.executablePath ?? "lody"
+        }
+
+        let finalExecutablePath: String
+        if rawExecutable.hasPrefix("/") {
+            finalExecutablePath = rawExecutable
+        } else if let found = AgentSessionRunner.findInPATH(rawExecutable, path: environment?.resolvedPATH) {
+            finalExecutablePath = found
+        } else {
+            throw AgentRunnerError.executableNotFound(rawExecutable)
+        }
+
+        var args: [String] = []
+        if useNPX {
+            args.append(contentsOf: ["-y", "lody@latest"])
+        }
+        args.append(contentsOf: ["session", "cancel", sessionID, "--json"])
+        let ws = config.workspace.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !ws.isEmpty {
+            args.append(contentsOf: ["--workspace", ws])
+        }
+
+        let sanitizedEnv = AgentSessionRunner.sanitizedEnvironment(from: environment)
+        let execResult = try await AgentSessionRunner.executeStreaming(
+            executablePath: finalExecutablePath,
+            arguments: args,
+            workingDirectory: temporaryWorkingDirectory,
+            environment: sanitizedEnv,
+            cancellationToken: ProcessCancellationToken(),
+            onProgress: { _ in }
+        )
+        guard execResult.exitCode == 0 else {
+            let detail = AgentSessionRunner.extractFailureMessage(
+                stderr: execResult.stderr,
+                stdout: execResult.stdout,
+                engine: .lody
+            )
+            throw AgentRunnerError.processFailed(exitCode: execResult.exitCode, stderr: detail)
+        }
     }
 
     public func parseResult(

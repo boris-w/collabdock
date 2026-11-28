@@ -4,10 +4,17 @@ import ServiceManagement
 import UserNotifications
 import CollabDockCore
 
+/// 「已自动开始」通知支持的交互按钮（关联 PR #22）
+public enum NotificationAction: String, CaseIterable, Hashable, Sendable {
+    case openLody
+    case stop
+}
+
 /// macOS 系统集成能力协议（通知、开机自启、界面语言覆盖与打开 Lody 会话），用于 `AppCoordinator` 依赖注入与单测隔离
 @MainActor
 public protocol SystemIntegrating: AnyObject {
     var onNotificationSelectedItem: ((String) -> Void)? { get set }
+    var onNotificationAction: ((String, NotificationAction) -> Void)? { get set }
     func configureNotificationsIfAvailable()
     func postIncomingTaskNotification(for item: CollaborationItem, enabled: Bool)
     func postCompletionNotification(for item: CollaborationItem, summary: String, enabled: Bool)
@@ -28,7 +35,12 @@ public extension SystemIntegrating {
 public final class SystemIntegrationService: NSObject, UNUserNotificationCenterDelegate, SystemIntegrating {
     public static let shared = SystemIntegrationService()
 
+    private static let autoStartCategoryID = "COLLABDOCK_AUTO_START"
+    private static let openLodyActionID = "COLLABDOCK_OPEN_LODY"
+    private static let stopReviewActionID = "COLLABDOCK_STOP_REVIEW"
+
     public var onNotificationSelectedItem: ((String) -> Void)?
+    public var onNotificationAction: ((String, NotificationAction) -> Void)?
 
     private var isRunningInsideAppBundle: Bool {
         Bundle.main.bundleURL.pathExtension == "app" && Bundle.main.bundleIdentifier != nil
@@ -42,6 +54,23 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
         guard isRunningInsideAppBundle else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        let openAction = UNNotificationAction(
+            identifier: Self.openLodyActionID,
+            title: L("Open Lody"),
+            options: [.foreground]
+        )
+        let stopAction = UNNotificationAction(
+            identifier: Self.stopReviewActionID,
+            title: L("Stop"),
+            options: [.destructive]
+        )
+        let autoStartCategory = UNNotificationCategory(
+            identifier: Self.autoStartCategoryID,
+            actions: [openAction, stopAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([autoStartCategory])
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
@@ -86,6 +115,7 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
         content.subtitle = "\(item.platform.displayName) · \(item.displayContextTag)"
         content.body = item.title
         content.sound = .default
+        content.categoryIdentifier = Self.autoStartCategoryID
         content.userInfo = ["itemID": item.id]
 
         let request = UNNotificationRequest(
@@ -127,9 +157,16 @@ public final class SystemIntegrationService: NSObject, UNUserNotificationCenterD
         didReceive response: UNNotificationResponse
     ) async {
         let itemID = response.notification.request.content.userInfo["itemID"] as? String
+        let actionID = response.actionIdentifier
         await MainActor.run {
-            NSApp.activate(ignoringOtherApps: true)
-            if let itemID {
+            guard let itemID else { return }
+            switch actionID {
+            case Self.openLodyActionID:
+                self.onNotificationAction?(itemID, .openLody)
+            case Self.stopReviewActionID:
+                self.onNotificationAction?(itemID, .stop)
+            default:
+                NSApp.activate(ignoringOtherApps: true)
                 self.onNotificationSelectedItem?(itemID)
             }
         }
