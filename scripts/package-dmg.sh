@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="CollabDock"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.2.0}"
 OUT_DIR="${ROOT_DIR}/build"
 APP_BUNDLE="${OUT_DIR}/${APP_NAME}.app"
 DMG_PATH="${OUT_DIR}/${APP_NAME}-${VERSION}.dmg"
