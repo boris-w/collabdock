@@ -1,6 +1,6 @@
 # ADR-004 · 默认回写 GitHub Pending Review 草稿与团队分发体系
 
-- **状态**：已采纳（Accepted）
+- **状态**：Pending Review 草稿回写部分已被 [ADR-008](ADR-008-lody-only-execution.md) 取代（2026-11-28）；团队分发部分仍有效
 - **日期**：2026-11-26
 - **关联需求**：[REQ-009](../../02-product/PRD.md#req-009--github-pending-review-草稿回写与行号校验p0), [REQ-011](../../02-product/PRD.md#req-011--团队分发团队模板与自动更新p1)
 

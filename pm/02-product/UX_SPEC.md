@@ -1,5 +1,7 @@
 # 02 · 原生 SwiftUI 菜单栏交互与界面规范（UX Spec）
 
+> **2026-11-28 起执行方式只保留 Lody（见 [ADR-008](../03-architecture/decisions/ADR-008-lody-only-execution.md)）。** 文中关于直连 Claude Code / Codex / Antigravity CLI、托管运行、JSON Schema、双模型会诊、GitHub Pending 草稿回写和本地报告的内容已过时，仅作历史参考。
+
 > **关联需求**：[REQ-003](./PRD.md#req-003--可手动配置的触发规则引擎p0) | [REQ-004](./PRD.md#req-004--macos-原生菜单栏常驻与通知提醒p0) | [REQ-005](./PRD.md#req-005--人工确认门控与动态模型选择p0)  
 > **设计原则**：对标 **CodexBar × Magpie × Linear × macOS Tahoe Liquid Glass** —— 克制中性灰阶、零系统灰表单堆砌、两级渐进披露（收件箱列表 -> Control Center 推入确认画布）、3 秒完成「扫一眼 PR -> 点进选引擎/模型 -> 确认执行」。
 

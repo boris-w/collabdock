@@ -1,5 +1,7 @@
 # 02 · 产品需求规格说明书（PRD）
 
+> **2026-11-28 起执行方式只保留 Lody（见 [ADR-008](../03-architecture/decisions/ADR-008-lody-only-execution.md)）。** 文中关于直连 Claude Code / Codex / Antigravity CLI、托管运行、JSON Schema、双模型会诊、GitHub Pending 草稿回写和本地报告的内容已过时，仅作历史参考。
+
 > **文档状态**：v0.2（`ITER-002` / `ADR-005` 升级为多平台通用协作调度坞站 CollabDock）  
 > **最后更新**：2026-11-26  
 > **关联文档**：[UX_SPEC.md](./UX_SPEC.md) | [ARCHITECTURE.md](../03-architecture/ARCHITECTURE.md) | [ADR-005](../03-architecture/decisions/ADR-005-generalize-to-collabdock.md) | [TRACEABILITY.md](../04-planning/TRACEABILITY.md)
