@@ -18,6 +18,7 @@
   - 菜单栏确认卡片将 **Lody Agent**（来自 `lody agent-config list`，支持工作区默认或指定 Agent）提升为主选项，同时保留工作区目录、复审策略与附加指示控制；`TriggerRuleEngine` 忽略 `--engine`/`--cli` 对已移除直连引擎的指定并不再从 `--model` 反推引擎；`EnvironmentDetector` 仅探测 `git`、`gh` 与 `lody`。
 
 ### Fixed
+- **修复「已归档」列表同 PR 出现多张卡片的问题** (`PR #15`)：`AppCoordinator.completedItems` 过滤掉 `completionReason == .superseded` 的历史被取代轮次，不在「已归档」列表展示也不计入「已完成」数量，同时保留底层记录供复审上下文与用量统计使用；`clearCompletedItems()` 仍一并清理这些隐藏记录。
 - **修复手动导入 PR 新一轮时未自动归档上一轮已处理卡片的问题** (`REQ-002`)：`InboxSyncService` 抽出共用归档规则 `archiveSupersededRounds` 并新增 `importPullRequestResult` 返回被归档条目，`AppCoordinator.importPullRequest` 同步更新列表，使手动「+」导入与自动同步一致保持同 PR 仅一张活跃卡片。
 - **修复 Lody 续聊复审及超 1 小时审查耗时丢失与累计上下文重复计入问题** (`REQ-014`)：
   - `LodySessionUsageSnapshot` 暴露 `lastMessageAt` 并新增 `roundDurationSeconds(since:)`（按最后一条消息时间减去本轮派发时间计算，移除 1 小时静默上限）；`AppCoordinator` 的卡片摘要与用量账本同步改用对应用量记录的 `createdAt` 作为本轮派发起点。
